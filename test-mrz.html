@@ -1,0 +1,3470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0b5fff">
+  <title>Patient details — MRZ test</title>
+  <style>
+:root {
+  --bg: #f4f5f7;
+  --bg-card: #ffffff;
+  --bg-subtle: #eef0f3;
+  --fg: #15181d;
+  --muted: #4b5563;
+  --border: #cfd4dc;
+  --accent: #0b5fff;
+  --accent-fg: #ffffff;
+  --warning: #9a6b00;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --tap: 44px;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --bg: #101215;
+    --bg-card: #1a1d22;
+    --bg-subtle: #15181d;
+    --fg: #f2f4f7;
+    --muted: #b0b7c3;
+    --border: #3a404a;
+    --accent: #6ea0ff;
+    --accent-fg: #0b1220;
+    --warning: #f0c36b;
+  }
+}
+html[data-theme="dark"] {
+  --bg: #101215;
+  --bg-card: #1a1d22;
+  --bg-subtle: #15181d;
+  --fg: #f2f4f7;
+  --muted: #b0b7c3;
+  --border: #3a404a;
+  --accent: #6ea0ff;
+  --accent-fg: #0b1220;
+  --warning: #f0c36b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.wrap { max-width: 920px; margin: 0 auto; padding: 16px 16px 80px; }
+h1 { font-size: 1.7rem; line-height: 1.25; margin: 0 0 8px; }
+h2 { font-size: 1.2rem; margin: 28px 0 10px; }
+.lede, .muted, .hint { color: var(--muted); }
+.lede { margin: 0 0 16px; }
+.callout {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.callout .lead { font-weight: 700; margin-bottom: 4px; }
+label.field, .field-label, .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  width: 100%;
+}
+input[type="text"], select, textarea {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--fg);
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.45;
+}
+textarea { min-height: 96px; resize: vertical; }
+#messagePreview { min-height: 220px; font-family: var(--mono); font-size: 14px; background: var(--bg-subtle); }
+.invalid { border-color: var(--warning) !important; }
+.hint { font-size: 12px; line-height: 1.4; margin-top: 4px; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 700px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.grow { flex: 1 1 140px; }
+button, .btn {
+  min-height: var(--tap);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--fg);
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
+.actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.hidden { display: none !important; }
+
+  #eidFillNote, #eidFillNotePaste, .eid-fill-note {
+    white-space: pre-wrap;
+  }
+  #eidFillNote.is-on, #eidFillNotePaste.is-on, .eid-fill-note.is-on {
+    display: block !important;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+.photo-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.photo-btn { position: relative; }
+.photo-btn input[type="file"] {
+  position: absolute;
+  width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+#attachmentList { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.attachment-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.attachment-item img {
+  width: 72px; height: 72px; object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.attachment-name { flex: 1 1 140px; color: var(--fg); font-size: 14px; line-height: 1.4; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+  
+.field > span { color: var(--muted); }
+.gender-toggle {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.gender-btn {
+  flex: 1 1 0;
+  width: 50%;
+  min-height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+.gender-btn.is-on, .gender-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+
+.vitals-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 10px 8px;
+}
+@media (max-width: 560px) {
+  .vitals-grid { grid-template-columns: 1fr 1fr; }
+}
+.vital-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vital-input input { flex: 1; min-width: 0; }
+.vital-unit { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.bp-pair { display: flex; align-items: center; gap: 6px; width: 100%; }
+.bp-pair input { flex: 1; min-width: 0; text-align: center; }
+.bp-slash { font-weight: 600; color: var(--fg); }
+
+.chip-row, .quick-times { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.quick-times { margin-top: 12px; }
+button.chip, .chip-row button, .quick-times button, button.gcs-btn {
+  font-weight: 700;
+}
+button.chip.is-on, .quick-times button.is-on, button.gcs-btn.is-on, #nkdaBtn.is-on, #noMedsBtn.is-on {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+.extra-vitals {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.extra-vitals-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.gcs-pad { margin-top: 8px; }
+.gcs-pad-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.gcs-pad-row .lab { width: 20px; font-weight: 700; color: var(--muted); }
+button.gcs-btn { min-width: 44px; }
+.gcs-pad-total { margin-top: 8px; font-weight: 700; }
+button.clear-form-btn {
+  min-height: 52px;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+.theme-toggle {
+  margin: 8px 0 12px;
+  font-weight: 600;
+}
+.test-banner {
+  background: #9a6b00;
+  color: #fff6e0;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-align: center;
+  padding: 12px 14px;
+  margin: 0 0 16px;
+  border-radius: var(--radius);
+  font-size: 16px;
+}
+html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .test-banner { background: #f0c36b; color: #3a2d12; }
+}
+</style>
+</head>
+<body>
+  <div class="wrap" data-fast-fill="1">
+    <div class="test-banner" role="status">TEST PAGE – MRZ preview</div>
+    <header>
+      <h1>Patient details</h1>
+      <p class="lede">A short form to capture patient details at an event, or when someone needs a quick handover. Fill in what you know, edit anything before you copy, and send it the way you need to.</p>
+    </header>
+    <div class="callout">
+      <div class="lead">Nothing is sent</div>
+      This is a TEST copy for MRZ reading on the back of an Emirates ID. It runs only on this device. A draft is kept separately from the live Patient details form. Check every field by hand.
+    </div>
+    <button type="button" id="darkModeToggle" class="theme-toggle" aria-pressed="false">Dark mode: off</button>
+    <p>Leave blank what you do not know — blank fields are left out of the message. If you change a form field after editing the message, the message is rebuilt from the form.</p>
+
+    <h2>Event</h2>
+    <label class="field"><span>Event name</span><input id="eventName" type="text" placeholder="e.g. ADNOC family day"></label>
+    <div class="grid grid-2" style="margin-top:12px">
+      <div class="field-label"><span>Date</span>
+        <div class="row">
+          <div class="grow">
+            <input id="eventDate" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="e.g. 11/11/2026">
+            <div id="dateHint" class="hint hidden">Use a real date, dd/mm/yyyy</div>
+          </div>
+          <button type="button" id="dateToday">Today</button>
+        </div>
+      </div>
+      <div>
+        <div class="field-label"><span>Time in</span>
+          <div class="row">
+            <div class="grow">
+              <input id="eventTime" type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="e.g. 14:20">
+              <div id="timeHint" class="hint hidden">Use 00:00–23:59</div>
+            </div>
+            <button type="button" id="timeNow">Now</button>
+          </div>
+        </div>
+        <div class="field-label" style="margin-top:12px"><span>Time out</span>
+          <div class="row">
+            <div class="grow">
+              <input id="eventTimeOut" type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="e.g. 15:10">
+              <div id="timeOutHint" class="hint hidden">Use 00:00–23:59</div>
+            </div>
+            <button type="button" id="timeOutNow">Now</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="quick-times" id="quickTimes">
+      <button type="button" data-time-key="callReceived" data-label="Call received">Call received</button>
+      <button type="button" data-time-key="onScene" data-label="On scene">On scene</button>
+      <button type="button" data-time-key="leavingScene" data-label="Leaving scene">Leaving scene</button>
+    </div>
+    <label class="field" style="margin-top:12px"><span>Location / area</span><input id="location" type="text" placeholder="e.g. Hall A, west entrance"></label>
+
+    <h2>Patient details</h2>
+    <label class="field"><span>Participant type</span><select id="participantType"></select></label>
+    <label class="field hidden" id="participantTypeOtherWrap" style="margin-top:12px"><span>Participant type (other)</span><input id="participantTypeOther" type="text" placeholder="Type the participant type"></label>
+    <label class="field" style="margin-top:12px"><span>Name</span><input id="patientName" type="text" placeholder="e.g. Ahmed"></label>
+    <label class="field" style="margin-top:12px"><span>Surname</span><input id="patientSurname" type="text" placeholder="e.g. Ali"></label>
+    <div style="margin-top:12px">
+      <label class="field"><span>EID / ID / Passport</span><input id="eid" type="text" placeholder="784-XXXX-XXXXXXX-X"></label>
+      <div class="photo-btns">
+        <label class="btn photo-btn">
+          <input id="eidFile" type="file" multiple>
+          Attach files
+        </label>
+        <label class="btn photo-btn">
+          <input id="eidCamera" type="file" accept="image/*" capture="environment">
+          Take photo
+        </label>
+      </div>
+      <div class="hint" style="margin-top:6px">On a computer, Take photo may just open the file picker.</div>
+      <div id="attachmentList"></div>
+      <div class="hint" style="margin-top:8px">Attached files are sent with Share, not with Copy. They stay on this device until you share or remove them.</div>
+      <div class="photo-btns" style="margin-top:10px">
+        <button type="button" id="readCard">Read card</button>
+        <button type="button" id="readMrz">Read back of card (MRZ)</button>
+      </div>
+      <div class="hint" style="margin-top:6px">For MRZ, attach or take a photo of the <strong>back</strong> of the Emirates ID (the three lines of letters at the bottom). Photos stay on this device.</div>
+      <div id="eidFillNote" class="hint hidden" style="margin-top:8px"></div>
+      <label class="field" style="margin-top:10px">
+        <span>Paste card text</span>
+        <span class="hint">If Read card can't run, copy the card with Google Lens (front and back), paste it here, then tap Fill from card text.</span>
+        <textarea id="eidPaste" rows="6" placeholder="Paste the copied Emirates ID text (front and back)"></textarea>
+      </label>
+      <div style="margin-top:10px"><button type="button" id="fillFromCardText">Fill from card text</button></div>
+      <div class="hint" style="margin-top:8px">Read card can read more than one photo (front and back of the Emirates ID) on this device — the pictures are not sent anywhere. If the reader can't run on this page, paste the card text above. Check every field by hand.</div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px">
+            <div class="field" id="genderField">
+        <span>Gender</span>
+        <div class="gender-toggle" role="group" aria-label="Gender">
+          <button type="button" class="gender-btn" id="genderMale" data-gender="Male" aria-pressed="false">Male</button>
+          <button type="button" class="gender-btn" id="genderFemale" data-gender="Female" aria-pressed="false">Female</button>
+        </div>
+        <input type="hidden" id="gender" value="">
+      </div>
+      <div>
+        <label class="field"><span>Nationality</span><select id="nationality"></select></label>
+        <label class="field hidden" id="nationalityOtherWrap" style="margin-top:12px"><span>Nationality (other)</span><input id="nationalityOther" type="text" placeholder="Type the nationality"></label>
+      </div>
+      <div class="field-label"><span>Date of birth</span>
+        <input id="dateOfBirth" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="e.g. 11/11/1990">
+        <div id="dobHint" class="hint hidden">Use a real date, dd/mm/yyyy, not in the future</div>
+      </div>
+      <div>
+        <label class="field"><span>Age</span><select id="ageMode"></select></label>
+        <label class="field hidden" id="ageMonthsWrap" style="margin-top:12px"><span>Age in months</span><select id="ageMonths"></select></label>
+      </div>
+      <label class="field"><span>Cellphone</span><input id="cellphone" type="text" placeholder="e.g. +971 50 123 4567"></label>
+    </div>
+
+    <h2>What happened</h2>
+    <label class="field"><span>Chief complaint</span><input id="complaint" type="text" placeholder="e.g. dizziness, collapse"></label>
+    <div class="chip-row" id="complaintChips"></div>
+    <label class="field" style="margin-top:12px"><span>Short description</span><textarea id="description" rows="4" placeholder="What happened, in a few lines"></textarea></label>
+
+    <h2>History</h2>
+    <label class="field"><span>Allergies</span><input id="allergies" type="text" placeholder="e.g. No known drug allergies, or penicillin"></label>
+    <div class="chip-row"><button type="button" id="nkdaBtn">No known drug allergies</button></div>
+    <label class="field" style="margin-top:12px"><span>Medications</span><input id="medications" type="text" placeholder="Current medicines"></label>
+    <div class="chip-row"><button type="button" id="noMedsBtn">No meds</button></div>
+    <label class="field" style="margin-top:12px"><span>Medical history</span><input id="medicalHistory" type="text" placeholder="Past medical history"></label>
+
+    <h2>Condition</h2>
+    <label class="field"><span>Condition</span><select id="condition"></select></label>
+    <div class="field-label" style="margin-top:12px"><span>Vitals</span></div>
+        <div class="vitals-grid">
+      <div class="field">
+        <span>BP</span>
+        <div class="bp-pair">
+          <input id="bpSys" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="120" aria-label="Systolic BP">
+          <span class="bp-slash" aria-hidden="true">/</span>
+          <input id="bpDia" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="80" aria-label="Diastolic BP">
+        </div>
+      </div>
+      <label class="field"><span>HR</span>
+        <span class="vital-input"><input id="hr" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="88"><span class="vital-unit">bpm</span></span>
+      </label>
+      <label class="field"><span>RR</span>
+        <span class="vital-input"><input id="rr" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="18"><span class="vital-unit">/min</span></span>
+      </label>
+      <label class="field"><span>SpO2</span>
+        <span class="vital-input"><input id="spo2" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="98"><span class="vital-unit">%</span></span>
+      </label>
+      <label class="field"><span>Temp</span>
+        <span class="vital-input"><input id="temp" type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="37.2"><span class="vital-unit">°C</span></span>
+      </label>
+      <label class="field"><span>HGT</span>
+        <span class="vital-input"><input id="hgt" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="6.2"><span class="vital-unit">mmol/L</span></span>
+      </label>
+    </div>
+    <div id="extraVitals"></div>
+    <div style="margin-top:10px"><button type="button" id="repeatVitals">+ Repeat vitals</button></div>
+    <div class="field-label" style="margin-top:12px"><span>GCS</span></div>
+    <div class="gcs-pad" id="gcsPad">
+      <div class="gcs-pad-row" data-axis="E"><span class="lab">E</span><button type="button" class="gcs-btn" data-gcs="E" data-val="1">1</button><button type="button" class="gcs-btn" data-gcs="E" data-val="2">2</button><button type="button" class="gcs-btn" data-gcs="E" data-val="3">3</button><button type="button" class="gcs-btn" data-gcs="E" data-val="4">4</button></div>
+      <div class="gcs-pad-row" data-axis="V"><span class="lab">V</span><button type="button" class="gcs-btn" data-gcs="V" data-val="1">1</button><button type="button" class="gcs-btn" data-gcs="V" data-val="2">2</button><button type="button" class="gcs-btn" data-gcs="V" data-val="3">3</button><button type="button" class="gcs-btn" data-gcs="V" data-val="4">4</button><button type="button" class="gcs-btn" data-gcs="V" data-val="5">5</button></div>
+      <div class="gcs-pad-row" data-axis="M"><span class="lab">M</span><button type="button" class="gcs-btn" data-gcs="M" data-val="1">1</button><button type="button" class="gcs-btn" data-gcs="M" data-val="2">2</button><button type="button" class="gcs-btn" data-gcs="M" data-val="3">3</button><button type="button" class="gcs-btn" data-gcs="M" data-val="4">4</button><button type="button" class="gcs-btn" data-gcs="M" data-val="5">5</button><button type="button" class="gcs-btn" data-gcs="M" data-val="6">6</button></div>
+      <div class="gcs-pad-total" id="gcsPadTotal">GCS not set</div>
+    </div>
+    <label class="field" style="margin-top:12px"><span>Treatment given</span><textarea id="treatment" rows="3" placeholder="Treatment given"></textarea></label>
+
+    <h2>Outcome</h2>
+    <label class="field"><span>Outcome</span><select id="outcome"></select></label>
+    <label class="field hidden" id="hospitalWrap" style="margin-top:12px"><span>Hospital</span><input id="hospital" type="text" placeholder="Hospital name"></label>
+    <label class="field hidden" id="outcomeOtherWrap" style="margin-top:12px"><span>Outcome (other)</span><input id="outcomeOther" type="text" placeholder="Type the outcome"></label>
+
+    <h2>Next of kin</h2>
+    <label class="field"><span>Name</span><input id="nextOfKinName" type="text" placeholder="Next of kin name"></label>
+    <div class="grid grid-2" style="margin-top:12px">
+      <label class="field"><span>Relationship</span><input id="relationship" type="text" placeholder="e.g. wife, brother"></label>
+      <label class="field"><span>Number</span><input id="nextOfKinNumber" type="text" placeholder="e.g. +971 50 123 4567"></label>
+    </div>
+
+    <h2>Completed by</h2>
+    <div class="grid grid-2">
+      <label class="field"><span>Your name</span><input id="completedBy" type="text" placeholder="Your name"></label>
+      <label class="field"><span>Call sign</span><input id="callSign" type="text" placeholder="e.g. Medic 1"></label>
+    </div>
+
+    <h2>Message to copy</h2>
+    <p>The message updates as you fill the form. You can also edit the text below before you copy it.</p>
+    <textarea id="messagePreview" rows="16"></textarea>
+    <textarea id="copyFallback" class="hidden" readonly aria-hidden="true"></textarea>
+    <div class="actions">
+      <button type="button" class="primary" id="copyMessage">Copy message</button>
+      <button type="button" id="shareMessage">Share</button>
+    </div>
+    <button type="button" id="clearForm" class="clear-form-btn">Clear form</button>
+    <div id="shareNote" class="hint hidden" style="margin-top:8px"></div>
+  </div>
+  <script>
+(function () {
+  "use strict";
+  const NATIONALITY_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "Emirati (UAE)", label: "Emirati (UAE)" },
+    { value: "Indian", label: "Indian" },
+    { value: "Pakistani", label: "Pakistani" },
+    { value: "Bangladeshi", label: "Bangladeshi" },
+    { value: "Filipino", label: "Filipino" },
+    { value: "Nepali", label: "Nepali" },
+    { value: "Sri Lankan", label: "Sri Lankan" },
+    { value: "Egyptian", label: "Egyptian" },
+    { value: "__sep__", label: "──────", disabled: true },
+    { value: "Argentinian", label: "Argentinian" },
+    { value: "Brazilian", label: "Brazilian" },
+    { value: "Canadian", label: "Canadian" },
+    { value: "Chinese", label: "Chinese" },
+    { value: "Colombian", label: "Colombian" },
+    { value: "Dutch", label: "Dutch" },
+    { value: "French", label: "French" },
+    { value: "German", label: "German" },
+    { value: "Iranian", label: "Iranian" },
+    { value: "Irish", label: "Irish" },
+    { value: "Italian", label: "Italian" },
+    { value: "Japanese", label: "Japanese" },
+    { value: "Korean", label: "Korean" },
+    { value: "Lebanese", label: "Lebanese" },
+    { value: "Mexican", label: "Mexican" },
+    { value: "Polish", label: "Polish" },
+    { value: "Russian", label: "Russian" },
+    { value: "Saudi Arabian", label: "Saudi Arabian" },
+    { value: "Scottish", label: "Scottish" },
+    { value: "South African", label: "South African" },
+    { value: "Spanish", label: "Spanish" },
+    { value: "Thai", label: "Thai" },
+    { value: "Turkish", label: "Turkish" },
+    { value: "UK", label: "UK" },
+    { value: "Ukrainian", label: "Ukrainian" },
+    { value: "USA", label: "USA" },
+    { value: "Vietnamese", label: "Vietnamese" },
+    { value: "Zimbabwean", label: "Zimbabwean" },
+    { value: "Other", label: "Other" },
+];
+  const GENDER_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "Male", label: "Male" },
+    { value: "Female", label: "Female" },
+  ];
+  const PARTICIPANT_TYPE_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "Visitor/Guest", label: "Visitor/Guest" },
+    { value: "Exhibitor/Staff", label: "Exhibitor/Staff" },
+    { value: "Other", label: "Other" },
+  ];
+  const CONDITION_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "Stable", label: "Stable" },
+    { value: "Serious", label: "Serious" },
+    { value: "Critical", label: "Critical" },
+  ];
+  const OUTCOME_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "Treated and released on scene", label: "Treated and released on scene" },
+    { value: "Transported", label: "Transported" },
+    { value: "Refused treatment/transport", label: "Refused treatment/transport" },
+    { value: "Other", label: "Other" },
+  ];
+
+  function filled(value) { return value.trim(); }
+  function formatVitalsLine(opts) {
+    var parts = [];
+    var sys = String((opts && opts.bpSys) || "").trim();
+    var dia = String((opts && opts.bpDia) || "").trim();
+    if (sys && dia) parts.push("BP " + sys + "/" + dia);
+    else if (sys) parts.push("BP " + sys);
+    else if (dia) parts.push("BP /" + dia);
+    var hr = String((opts && (opts.hr || opts.heartRate)) || "").trim();
+    var rr = String((opts && (opts.rr || opts.respRate)) || "").trim();
+    var spo2 = String((opts && opts.spo2) || "").trim();
+    var temp = String((opts && opts.temp) || "").trim();
+    var hgt = String((opts && opts.hgt) || "").trim();
+    if (hr) parts.push("HR " + hr);
+    if (rr) parts.push("RR " + rr);
+    if (spo2) parts.push("SpO2 " + spo2 + "%");
+    if (temp) parts.push("Temp " + temp);
+    if (hgt) parts.push("HGT " + hgt);
+    return parts.join(", ");
+  }
+  function addLine(lines, label, value) {
+    const text = filled(value);
+    if (text) lines.push(label + ": " + text);
+  }
+  function formatDateDigits(raw) {
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return digits.slice(0, 2) + "/" + digits.slice(2);
+    return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+  }
+  function parseDateDDMMYYYY(value) {
+    const match = filled(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) return false;
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const d = new Date(year, month - 1, day);
+    return d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day;
+  }
+  function formatTodayDate() {
+    const d = new Date();
+    return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
+  }
+  function isDateFieldInvalid(value, blurred) {
+    const text = filled(value);
+    if (!text) return false;
+    if (parseDateDDMMYYYY(text)) return false;
+    return blurred || text.replace(/\D/g, "").length >= 8;
+  }
+  function dobDateFromDDMMYYYY(value) {
+    if (!parseDateDDMMYYYY(value)) return null;
+    const match = filled(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) return null;
+    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+  }
+  function isDobValid(value, now) {
+    now = now || new Date();
+    const dob = dobDateFromDDMMYYYY(value);
+    if (!dob) return false;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return dob.getTime() <= today.getTime();
+  }
+  function isDobFieldInvalid(value, blurred, now) {
+    const text = filled(value);
+    if (!text) return false;
+    if (isDobValid(text, now)) return false;
+    return blurred || text.replace(/\D/g, "").length >= 8;
+  }
+  function ageFromDobSelection(value, now) {
+    now = now || new Date();
+    const empty = { mode: "", months: "" };
+    const dob = dobDateFromDDMMYYYY(value);
+    if (!dob) return empty;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (dob.getTime() > today.getTime()) return empty;
+    let years = now.getFullYear() - dob.getFullYear();
+    if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) years -= 1;
+    if (years > 120) return empty;
+    if (years >= 1) return { mode: String(Math.min(years, 110)), months: "" };
+    let months = (now.getFullYear() - dob.getFullYear()) * 12 + (now.getMonth() - dob.getMonth());
+    if (now.getDate() < dob.getDate()) months -= 1;
+    if (months < 0) return empty;
+    return { mode: "infant", months: String(Math.max(0, Math.min(11, months))) };
+  }
+  function formatAgeMessage(mode, months) {
+    if (mode === "infant") {
+      if (months === "") return "";
+      const n = Number(months);
+      if (!isFinite(n) || n < 0) return "";
+      return n === 1 ? "1 month" : n + " months";
+    }
+    if (mode === "") return "";
+    const n = Number(mode);
+    if (!isFinite(n)) return "";
+    return n === 1 ? "1 year" : n + " years";
+  }
+
+    function levenshtein(a, b) {
+    a = String(a || "").toLowerCase();
+    b = String(b || "").toLowerCase();
+    if (a === b) return 0;
+    var al = a.length, bl = b.length, i, j;
+    if (!al) return bl;
+    if (!bl) return al;
+    var prev = new Array(bl + 1);
+    for (j = 0; j <= bl; j++) prev[j] = j;
+    for (i = 1; i <= al; i++) {
+      var cur = [i];
+      for (j = 1; j <= bl; j++) {
+        var cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+        cur[j] = Math.min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+      }
+      prev = cur;
+    }
+    return prev[bl];
+  }
+  function maxTypo(s) {
+    var n = (s || "").length;
+    if (n <= 6) return 1;
+    if (n <= 12) return 2;
+    return 3;
+  }
+  function isMostlyArabic(s) {
+    var letters = String(s || "").replace(/[^A-Za-z\u0600-\u06FF]/g, "");
+    if (!letters) return false;
+    var arabic = (String(s).match(/[\u0600-\u06FF]/g) || []).length;
+    return arabic / letters.length > 0.5;
+  }
+  function normalizeOcrLine(s) {
+    s = String(s || "");
+    s = s.replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, " ");
+    s = s.replace(/[：]/g, ":").replace(/[\u2013\u2014]/g, "-");
+    s = s.replace(/[^\x20-\x7E]/g, " ");
+    s = s.replace(/[ \t]+/g, " ").trim();
+    return s;
+  }
+  function titleCaseWords(s) {
+    return String(s || "").split(/(\s+|-)/).map(function (w) {
+      if (!w || w === " " || w === "-") return w;
+      if (!/[A-Za-z]/.test(w)) return w;
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join("");
+  }
+  function prettyEidName(s) {
+    var x = normalizeOcrLine(s).replace(/^[:\-]\s*/, "");
+    if (!x) return "";
+    if (/[A-Za-z]/.test(x) && x === x.toUpperCase()) return titleCaseWords(x);
+    return x;
+  }
+  var EID_LABEL_ALIASES = {
+    name: ["name", "full name", "holder name", "card holder", "narne", "nane", "nome", "nme"],
+    nationality: ["nationality", "nationallty", "nationalty", "nationailty", "natlonality", "nationalily", "nacionality"],
+    gender: ["sex", "gender", "sexe", "gendr"],
+    dob: ["date of birth", "date of blrth", "date of b1rth", "d.o.b", "d.o.b.", "dob", "birth date", "dateof birth", "date ofblrth"],
+    occupation: ["occupation", "occupatlon", "occupaton", "occupat1on", "profession"],
+    employer: ["employer", "employar", "employcr", "sponsor", "sponsoring entity", "sponsar", "employed by"],
+    issuingPlace: ["issuing place", "issuing piace", "place of issue", "place of lssue", "place ofissue", "issued at", "issuingplace"]
+  };
+  var EID_ALL_ALIASES = [];
+  (function () {
+    Object.keys(EID_LABEL_ALIASES).forEach(function (k) {
+      EID_LABEL_ALIASES[k].forEach(function (a) { EID_ALL_ALIASES.push(a); });
+    });
+    ["signature", "card number", "identity card", "united arab emirates", "id number", "id no", "expiry", "date of expiry", "date of issue", "date of lssue"].forEach(function (a) {
+      EID_ALL_ALIASES.push(a);
+    });
+  })();
+  function eidLabelMatchInfo(line, aliases) {
+    var n = normalizeOcrLine(line);
+    if (!n) return null;
+    var lower = n.toLowerCase();
+    var best = null;
+    function consider(score, rest, alias, startAt) {
+      if (!best || score > best.score) best = { rest: (rest || "").trim(), score: score, alias: alias, startAt: startAt || 0 };
+    }
+    for (var a = 0; a < aliases.length; a++) {
+      var alias = aliases[a];
+      var re = new RegExp("^(?:" + alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+") + ")\\b\\s*[:\\-]?\\s*(.*)$", "i");
+      var m = n.match(re);
+      if (m) consider(1, m[1], alias, 0);
+      var idx = lower.indexOf(alias);
+      if (idx >= 0) {
+        var after = n.slice(idx + alias.length).replace(/^[\s:\-]+/, "");
+        consider(idx === 0 ? 0.95 : 0.85, after, alias, idx);
+      }
+    }
+    var words = lower.split(" ").filter(Boolean);
+    for (var i = 0; i < words.length; i++) {
+      for (var len = 1; len <= 4 && i + len <= words.length; len++) {
+        var phrase = words.slice(i, i + len).join(" ");
+        for (var b = 0; b < aliases.length; b++) {
+          var al = aliases[b];
+          var d = levenshtein(phrase, al);
+          if (d <= maxTypo(al) && d / Math.max(al.length, 1) <= 0.4) {
+            var restWords = n.split(" ").filter(Boolean).slice(i + len).join(" ").replace(/^[:\-]\s*/, "");
+            consider(0.9 - d * 0.08, restWords, al, i);
+          }
+        }
+      }
+    }
+    return best && best.score >= 0.75 ? best : null;
+  }
+  function isEidLabelOnly(s) {
+    var info = eidLabelMatchInfo(s, EID_ALL_ALIASES);
+    return !!(info && info.startAt === 0 && !info.rest);
+  }
+  function startsWithEidFieldLabel(s) {
+    return !!eidLabelMatchInfo(s, EID_ALL_ALIASES);
+  }
+  function tidyNameChars(s) {
+    return normalizeOcrLine(String(s || "").replace(/\|/g, "I"));
+  }
+  function isolateEnglishPhrase(s) {
+    var x = tidyNameChars(s);
+    var words = x.split(" ").filter(Boolean);
+    var best = "", run = [];
+    function flush() {
+      var p = run.join(" ");
+      if (p.length > best.length) best = p;
+      run = [];
+    }
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i].replace(/[^A-Za-z'-]/g, "");
+      if (w.length >= 2 && /^[A-Za-z][A-Za-z'-]*$/.test(w)) run.push(w);
+      else flush();
+    }
+    flush();
+    return best || x;
+  }
+  function looksLikeGarbageValue(s) {
+    var x = normalizeOcrLine(s);
+    if (!x) return true;
+    if (/[<>{}=]/.test(x)) return true;
+    return false;
+  }
+  function isEidNameValue(s) {
+    var x = normalizeOcrLine(s);
+    if (!x || isMostlyArabic(s)) return false;
+    if (/^784\b/.test(x) || /\d{8,}/.test(x)) return false;
+    if (/^\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{2,4}$/.test(x)) return false;
+    if (/^(united arab emirates|identity card|federal authority|id number|card number|signature|resident identity)$/i.test(x)) return false;
+    var info = eidLabelMatchInfo(x, EID_ALL_ALIASES);
+    if (info && info.startAt === 0 && !info.rest) return false;
+    return /[A-Za-z]{2,}/.test(x);
+  }
+  function isEidNationalityValue(s) {
+    var x = normalizeOcrLine(s);
+    if (!x || isMostlyArabic(s)) return false;
+    if (/^784\b/.test(x) || /^\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{2,4}$/.test(x)) return false;
+    return /[A-Za-z]{2,}/.test(x);
+  }
+function parseEidGender(raw) {
+    const n = raw.trim().toLowerCase().replace(/[.:]/g, "");
+    const first = n.split(/[\s/]+/)[0];
+    if (first === "m" || first === "male" || first === "man") return "Male";
+    if (first === "f" || first === "female" || first === "woman") return "Female";
+    return "";
+  }
+  function isEidGenderValue(s) { return parseEidGender(s) !== ""; }
+  
+  function isEidDobValue(s) {
+    return extractDateCandidates(s).length > 0;
+  }
+  function isEidWorkValue(s) {
+    var x = normalizeOcrLine(s);
+    if (!x || isMostlyArabic(s)) return false;
+    if (/^784\b/.test(x) || /^\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{2,4}$/.test(x)) return false;
+    var digits = x.replace(/\D/g, "");
+    if (digits.length >= 12 && /^784/.test(digits)) return false;
+    if (/^(united arab emirates|identity card|signature)$/i.test(x)) return false;
+    return /[A-Za-z]{2,}/.test(x);
+  }
+  function fixDateToken(s) {
+    return String(s || "").replace(/[Oo]/g, "0").replace(/[Il|!]/g, "1").replace(/S/g, "5").replace(/B/g, "8").replace(/Z/g, "2").replace(/G/g, "6").replace(/q/g, "9");
+  }
+  function extractDateCandidates(text) {
+    var src = String(text || "");
+    var out = [];
+    var re = /[0-9OoIl|!SBZGq]{1,2}\s*[/.+\-]\s*[0-9OoIl|!SBZGq]{1,2}\s*[/.+\-]\s*[0-9OoIl|!SBZGq]{2,4}/g;
+    var m;
+    while ((m = re.exec(src))) out.push(fixDateToken(m[0].replace(/\s+/g, "")));
+    return out;
+  }
+  function scoreFieldValue(s, kind) {
+    var x = isolateEnglishPhrase(s);
+    if (!x || (looksLikeGarbageValue(x) && kind !== "gender")) return -8;
+    var words = x.split(" ").filter(Boolean);
+    var lettersOnly = true;
+    var i;
+    for (i = 0; i < words.length; i++) {
+      if (!/^[A-Za-z][A-Za-z'-]*$/.test(words[i])) lettersOnly = false;
+    }
+    var caps = x === x.toUpperCase() && /[A-Z]/.test(x);
+    var title = true;
+    for (i = 0; i < words.length; i++) {
+      if (!/^[A-Z][a-z'-]*$/.test(words[i]) && !/^[A-Z]{2,}$/.test(words[i])) title = false;
+    }
+    var score = 0;
+    if (lettersOnly) score += 2;
+    if (caps) score += 4;
+    if (title && !caps) score += 3;
+    if (!caps && !title && x === x.toLowerCase()) score -= 3;
+    if (x.length <= 3 && kind !== "gender") score -= 4;
+    if (kind === "name") {
+      if (words.length >= 2 && words.length <= 6) score += 4;
+      else if (words.length === 1) score -= 1;
+    }
+    if (kind === "nationality") {
+      if (fuzzyNationalityRaw(x)) score += 8;
+      else score -= 3;
+    }
+    if (kind === "work") {
+      if (words.length >= 1 && words.some(function (w) { return w.length >= 3; })) score += 2;
+      if (caps || title) score += 1;
+    }
+    return score;
+  }
+  function collectLabeledCandidates(lines, key) {
+    var aliases = EID_LABEL_ALIASES[key];
+    var candidates = [];
+    for (var i = 0; i < lines.length; i++) {
+      var info = eidLabelMatchInfo(lines[i], aliases);
+      if (!info) continue;
+      if (info.rest) candidates.push(isolateEnglishPhrase(info.rest) || info.rest);
+      for (var j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+        var rawLine = lines[j];
+        var v = isolateEnglishPhrase(rawLine);
+        if (!v || isMostlyArabic(rawLine)) continue;
+        var nextLabel = eidLabelMatchInfo(rawLine, EID_ALL_ALIASES);
+        if (nextLabel && nextLabel.startAt === 0) break;
+        candidates.push(v);
+      }
+    }
+    return candidates;
+  }
+  function pickBestValue(candidates, kind, isValue) {
+    var best = "", bestScore = -99;
+    for (var i = 0; i < candidates.length; i++) {
+      var v = isolateEnglishPhrase(candidates[i]);
+      if (!v) continue;
+      if (isValue && !isValue(v) && !isValue(candidates[i])) continue;
+      var sc = scoreFieldValue(v, kind);
+      if (sc > bestScore) {
+        bestScore = sc;
+        best = v;
+      }
+    }
+    return bestScore >= 2 ? best : "";
+  }
+  function valueAfterEidLabel(lines, keyOrRe, isValue, kind) {
+    var key = keyOrRe;
+    if (keyOrRe && typeof keyOrRe !== "string" && keyOrRe.test) {
+      var src = String(keyOrRe);
+      if (/nationality/.test(src)) key = "nationality";
+      else if (/occupation/.test(src)) key = "occupation";
+      else if (/employer|sponsor/.test(src)) key = "employer";
+      else if (/issuing|place of issue/.test(src)) key = "issuingPlace";
+      else if (/date of birth|dob/.test(src)) key = "dob";
+      else if (/sex|gender/.test(src)) key = "gender";
+      else key = "name";
+    }
+    kind = kind || (key === "name" ? "name" : key === "nationality" ? "nationality" : "work");
+    return pickBestValue(collectLabeledCandidates(lines, key), kind, isValue);
+  }
+  function parseEidNumber(text) {
+    var mapped = String(text || "").replace(/[Oo]/g, "0").replace(/[Il|]/g, "1");
+    var digits = mapped.replace(/[^\d]/g, "");
+    var m = digits.match(/784\d{12}/);
+    if (!m) return "";
+    var d = m[0];
+    return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7, 14) + "-" + d.slice(14);
+  }
+  function birthYearFromEid(value) {
+    var formatted = parseEidNumber(value);
+    if (!formatted) return "";
+    var year = Number(formatted.slice(4, 8));
+    if (!isFinite(year) || year < 1920 || year > new Date().getFullYear()) return "";
+    return String(year);
+  }
+  function ageFromBirthYear(yearStr, now) {
+    now = now || new Date();
+    var year = Number(yearStr);
+    if (!isFinite(year)) return "";
+    var age = now.getFullYear() - year;
+    if (age < 0 || age > 120) return "";
+    return String(age);
+  }
+  function formatEidDob(raw, now) {
+    now = now || new Date();
+    var candidates = extractDateCandidates(raw);
+    if (!candidates.length) candidates = extractDateCandidates(fixDateToken(normalizeOcrLine(raw)));
+    for (var i = 0; i < candidates.length; i++) {
+      var x = candidates[i];
+      var yearFirst = x.match(/^(\d{4})[/.+\-](\d{1,2})[/.+\-](\d{1,2})$/);
+      var dayFirst = x.match(/^(\d{1,2})[/.+\-](\d{1,2})[/.+\-](\d{2,4})$/);
+      var day = 0, month = 0, year = 0;
+      if (yearFirst) { year = Number(yearFirst[1]); month = Number(yearFirst[2]); day = Number(yearFirst[3]); }
+      else if (dayFirst) {
+        day = Number(dayFirst[1]); month = Number(dayFirst[2]); year = Number(dayFirst[3]);
+        if (year < 100) year += year >= 30 ? 1900 : 2000;
+      } else continue;
+      if (month > 12 && day <= 12) { var tmp = day; day = month; month = tmp; }
+      var formatted = String(day).padStart(2, "0") + "/" + String(month).padStart(2, "0") + "/" + year;
+      if (isDobValid(formatted, now)) return formatted;
+    }
+    return "";
+  }
+  function splitPersonName(full) {
+    var x = prettyEidName(full).replace(/\s+/g, " ").trim();
+    if (!x) return { name: "", surname: "" };
+    var parts = x.split(" ");
+    if (parts.length === 1) return { name: parts[0], surname: "" };
+    return { name: parts.slice(0, -1).join(" "), surname: parts[parts.length - 1] };
+  }
+  var EID_NAT_ALIASES = ["indian", "india", "indlan", "indain", "pakistani", "pakistan", "paklstan", "nepali", "nepalese", "nepal", "south african", "south africa", "emirati", "united arab emirates", "uae", "u a e", "lebanese", "lebanon", "bangladeshi", "bangladesh", "filipino", "filipina", "philippines", "philippine", "egyptian", "egypt", "syrian", "syria", "jordanian", "jordan", "sudanese", "sudan", "ethiopian", "ethiopia", "kenyan", "kenya", "canadian", "canada", "american", "usa", "united states", "british", "united kingdom", "uk", "chinese", "china", "iraqi", "iraq", "iranian", "iran", "saudi", "saudi arabian", "saudi arabia", "yemeni", "yemen", "omani", "oman", "kuwaiti", "kuwait", "sri lankan", "sri lanka", "indonesian", "indonesia", "moroccan", "morocco", "tunisian", "tunisia", "algerian", "algeria", "turkish", "turkey", "russian", "russia", "ukrainian", "ukraine", "french", "france", "german", "germany", "italian", "italy", "irish", "ireland", "australian", "australia", "nigerian", "nigeria", "ghanaian", "ghana", "zimbabwean", "zimbabwe", "mexican", "mexico", "brazilian", "brazil", "argentinian", "argentine", "argentina", "colombian", "colombia", "scottish", "scotland", "spanish", "spain", "dutch", "netherlands", "holland", "polish", "poland", "japanese", "japan", "korean", "korea", "south korean", "south korea", "thai", "thailand", "vietnamese", "vietnam"];
+  function fuzzyNationalityRaw(raw) {
+    var token = normalizeOcrLine(raw).toLowerCase().replace(/\./g, "");
+    if (!token) return "";
+    if (token === "united arab emirates" || token === "identity card") return "";
+    var best = "", bestD = 99;
+    for (var i = 0; i < EID_NAT_ALIASES.length; i++) {
+      var al = EID_NAT_ALIASES[i];
+      if (token === al || new RegExp("\\b" + al.replace(/ /g, "\\s+") + "\\b").test(token)) return al;
+      var d = levenshtein(token, al);
+      if (d < bestD && d <= maxTypo(al) && d / Math.max(al.length, 1) <= 0.34) {
+        bestD = d;
+        best = al;
+      }
+    }
+    return best;
+  }
+  var EID_ISSUE_PLACES = ["abu dhabi", "dubai", "sharjah", "ajman", "umm al quwain", "ras al khaimah", "fujairah", "al ain", "al dhaid", "al dhafra"];
+  function tidyIssuingPlace(raw) {
+    var x = prettyEidName(raw);
+    var low = normalizeOcrLine(raw).toLowerCase();
+    for (var i = 0; i < EID_ISSUE_PLACES.length; i++) {
+      if (low.indexOf(EID_ISSUE_PLACES[i]) !== -1 || levenshtein(low, EID_ISSUE_PLACES[i]) <= maxTypo(EID_ISSUE_PLACES[i])) {
+        return titleCaseWords(EID_ISSUE_PLACES[i]);
+      }
+    }
+    return x;
+  }
+  function guessEidName(lines) {
+    var skip = /^(united arab emirates|identity card|federal authority|id number|card number|signature|resident identity)$/i;
+    var candidates = [];
+    for (var i = 0; i < lines.length; i++) {
+      var v = isolateEnglishPhrase(lines[i]);
+      if (!v || skip.test(v) || !isEidNameValue(v)) continue;
+      var labeled = eidLabelMatchInfo(v, EID_ALL_ALIASES);
+      if (labeled && labeled.startAt === 0) {
+        var nameInfo = eidLabelMatchInfo(v, EID_LABEL_ALIASES.name);
+        v = nameInfo ? isolateEnglishPhrase(nameInfo.rest) : "";
+        if (!v || !isEidNameValue(v)) continue;
+      }
+      var guessedNat = fuzzyNationalityRaw(v);
+      if (guessedNat && levenshtein(v.toLowerCase(), guessedNat) <= 2) continue;
+      var words = v.split(" ").filter(Boolean);
+      if (words.length < 2 || words.length > 6) continue;
+      var ok = true;
+      for (var w = 0; w < words.length; w++) {
+        if (words[w].length < 2 || !/^[A-Za-z'-]+$/.test(words[w])) ok = false;
+      }
+      if (!ok) continue;
+      candidates.push({ v: v, caps: v === v.toUpperCase(), len: v.length });
+    }
+    if (!candidates.length) return "";
+    candidates.sort(function (a, b) {
+      if (a.caps !== b.caps) return a.caps ? -1 : 1;
+      return b.len - a.len;
+    });
+    return candidates[0].v;
+  }
+  function findEidGender(lines) {
+    var i;
+    for (i = 0; i < lines.length; i++) {
+      var info = eidLabelMatchInfo(lines[i], EID_LABEL_ALIASES.gender);
+      if (info) {
+        if (info.rest && parseEidGender(info.rest)) return parseEidGender(info.rest);
+        if (lines[i + 1] && parseEidGender(lines[i + 1])) return parseEidGender(lines[i + 1]);
+      }
+      var n = normalizeOcrLine(lines[i]);
+      var m = n.match(/\b(?:sex|gender)\b\s*[:\-]?\s*([mf]|male|female)\b/i);
+      if (m && parseEidGender(m[1])) return parseEidGender(m[1]);
+      if (/^(m|f|male|female)$/i.test(n) && parseEidGender(n)) {
+        /* only accept a bare M/F token near other card fields, handled below if needed */
+      }
+    }
+    for (i = 0; i < lines.length; i++) {
+      var token = normalizeOcrLine(lines[i]);
+      if (/^(m|f|male|female)$/i.test(token) && parseEidGender(token)) return parseEidGender(token);
+    }
+    return "";
+  }
+  function ageFromParsedDob(dob, now) {
+    if (typeof ageFromDobSelection === "function") {
+      var sel = ageFromDobSelection(dob, now);
+      if (!sel || !sel.mode) return "";
+      if (sel.mode === "infant") return sel.months === "1" ? "1 month" : sel.months + " months";
+      return String(sel.mode);
+    }
+    if (typeof ageFromDob === "function") return ageFromDob(dob, now) || "";
+    return "";
+  }
+function mapEidNationality(raw) {
+    const n = raw.trim().replace(/\./g, "").replace(/\s+/g, " ").toLowerCase();
+    const aliasMap = {
+      "Emirati (UAE)": ["emirati (uae)", "emirati", "united arab emirates", "u a e", "uae", "emirates"],
+      "Emirati": ["emirati", "united arab emirates", "u a e", "uae", "emirates"],
+      "Indian": ["indian", "india"],
+      "Pakistani": ["pakistani", "pakistan"],
+      "Bangladeshi": ["bangladeshi", "bangladesh"],
+      "Filipino": ["filipino", "filipina", "philippines", "philippine"],
+      "Nepali": ["nepali", "nepalese", "nepal"],
+      "Sri Lankan": ["sri lankan", "sri lanka"],
+      "Egyptian": ["egyptian", "egypt"],
+      "USA": ["usa", "u s a", "united states of america", "united states", "american"],
+      "Canadian": ["canadian", "canada"],
+      "Mexican": ["mexican", "mexico"],
+      "Brazilian": ["brazilian", "brazil"],
+      "Argentinian": ["argentinian", "argentine", "argentina"],
+      "Colombian": ["colombian", "colombia"],
+      "UK": ["uk", "united kingdom", "great britain", "british", "england"],
+      "Scottish": ["scottish", "scotland"],
+      "Irish": ["irish", "ireland"],
+      "French": ["french", "france"],
+      "German": ["german", "germany"],
+      "Spanish": ["spanish", "spain"],
+      "Italian": ["italian", "italy"],
+      "Dutch": ["dutch", "netherlands", "holland"],
+      "Polish": ["polish", "poland"],
+      "Russian": ["russian", "russia"],
+      "Ukrainian": ["ukrainian", "ukraine"],
+      "Chinese": ["chinese", "china"],
+      "Japanese": ["japanese", "japan"],
+      "Korean": ["korean", "korea", "south korean", "south korea"],
+      "Thai": ["thai", "thailand"],
+      "Vietnamese": ["vietnamese", "vietnam"],
+      "Turkish": ["turkish", "turkey"],
+      "Zimbabwean": ["zimbabwean", "zimbabwe"],
+      "South African": ["south african", "south africa"],
+      "Iranian": ["iranian", "iran"],
+      "Saudi Arabian": ["saudi arabian", "saudi arabia", "saudi"],
+      "Lebanese": ["lebanese", "lebanon"]
+    };
+    const options = NATIONALITY_OPTIONS.filter(function (o) {
+      return o.value && o.value !== "Other" && o.value !== "Not stated" && !o.disabled;
+    });
+    function esc(al) {
+      return al.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+");
+    }
+    for (var i = 0; i < options.length; i++) {
+      var val = options[i].value;
+      var aliases = (aliasMap[val] || []).concat([val.toLowerCase(), String(options[i].label || "").toLowerCase()]);
+      var seen = {};
+      for (var j = 0; j < aliases.length; j++) {
+        var al = aliases[j];
+        if (!al || seen[al]) continue;
+        seen[al] = true;
+        if (n === al || new RegExp("\\b" + esc(al) + "\\b").test(n)) {
+          return { nationality: val, nationalityOther: "" };
+        }
+      }
+    }
+    if (typeof fuzzyNationalityRaw === "function") {
+      var fuzzyNat = fuzzyNationalityRaw(raw);
+      if (fuzzyNat && fuzzyNat.toLowerCase() !== n) return mapEidNationality(fuzzyNat);
+    }
+    return { nationality: "Other", nationalityOther: prettyEidName(raw.trim()) };
+  }
+  
+  function parseEidText(text, now) {
+    now = now || new Date();
+    var empty = { name: "", surname: "", eid: "", nationality: "", nationalityOther: "", gender: "", dob: "", age: "" };
+    var raw = String(text || "").trim();
+    if (!raw) return empty;
+    var lines = raw.split(/\r?\n/).map(function (l) { return normalizeOcrLine(l); }).filter(Boolean);
+    var nameRaw = valueAfterEidLabel(lines, "name", isEidNameValue, "name");
+    if (!nameRaw) nameRaw = guessEidName(lines);
+    if (nameRaw) nameRaw = isolateEnglishPhrase(nameRaw);
+    var natRaw = valueAfterEidLabel(lines, "nationality", isEidNationalityValue, "nationality");
+    if (!natRaw || !fuzzyNationalityRaw(natRaw)) {
+      for (var i = 0; i < lines.length; i++) {
+        var guessed = fuzzyNationalityRaw(isolateEnglishPhrase(lines[i]));
+        if (guessed && !/^(united arab emirates|uae)$/i.test(normalizeOcrLine(lines[i]))) {
+          natRaw = guessed;
+          break;
+        }
+      }
+    }
+    var gender = findEidGender(lines);
+    var dobRaw = valueAfterEidLabel(lines, "dob", isEidDobValue, "work");
+    if (!dobRaw) {
+      var dates = extractDateCandidates(raw);
+      dobRaw = dates[0] || "";
+    }
+    var nat = { nationality: "", nationalityOther: "" };
+    if (natRaw) {
+      var fuzzy = fuzzyNationalityRaw(natRaw);
+      nat = mapEidNationality(fuzzy || natRaw);
+    }
+    var split = nameRaw ? splitPersonName(nameRaw) : { name: "", surname: "" };
+    var dob = dobRaw ? formatEidDob(dobRaw, now) : "";
+    var eid = parseEidNumber(raw);
+    var age = dob ? ageFromParsedDob(dob, now) : ageFromBirthYear(birthYearFromEid(eid), now);
+    return {
+      name: split.name,
+      surname: split.surname,
+      eid: eid,
+      nationality: nat.nationality,
+      nationalityOther: nat.nationalityOther,
+      gender: gender,
+      dob: dob,
+      age: age
+    };
+  }
+  function formatNowTime() {
+    const d = new Date();
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  var COMPLAINT_CHIPS = ["Chest pain", "Shortness of breath", "Trauma", "Fall", "Abdominal pain", "Seizure", "Altered LOC", "Syncope", "Burns", "Allergic reaction"];
+  var THEME_KEY = "matty-forms-theme";
+  var PD_STORAGE_KEY = "matty-forms-test-mrz-v1";
+  var NKDA_TEXT = "No known drug allergies";
+  var draftReady = false;
+  var saveTimer = null;
+  function appendChip(current, chip) {
+    var cur = String(current || "").trim();
+    if (!cur) return chip;
+    var parts = cur.split(",").map(function (p) { return p.trim().toLowerCase(); });
+    if (parts.indexOf(chip.toLowerCase()) !== -1) return current;
+    return cur + ", " + chip;
+  }
+  function formatGcsShort(e, v, m) {
+    if (!e && !v && !m) return "";
+    var parts = (e ? ("E" + e) : "E?") + (v ? ("V" + v) : "V?") + (m ? ("M" + m) : "M?");
+    if (e && v && m) {
+      if (v === "T") return "GCS " + (Number(e) + Number(m)) + "T (" + parts + ")";
+      return "GCS " + (Number(e) + Number(v) + Number(m)) + " (" + parts + ")";
+    }
+    return "GCS (" + parts + ")";
+  }
+  function newExtraVitalsRow() {
+    return { id: Date.now() + "-" + Math.random().toString(36).slice(2, 8), time: formatNowTime(), bpSys: "", bpDia: "", hr: "", rr: "", spo2: "", temp: "", hgt: "" };
+  }
+  function extraVitalLines(rows) {
+    return (rows || []).map(function (row) {
+      var line = formatVitalsLine(row);
+      if (!line && !row.time) return "";
+      if (!line) return "Vitals at " + row.time + ":";
+      return row.time ? ("Vitals at " + row.time + ": " + line) : ("Vitals: " + line);
+    }).filter(Boolean);
+  }
+
+  function parseHHMM(value) {
+    const match = filled(value).match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) return null;
+    return hours * 60 + minutes;
+  }
+  function formatTimeDigits(raw) {
+    const digits = raw.replace(/\D/g, "").slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return digits.slice(0, 2) + ":" + digits.slice(2);
+  }
+  function finalizeTimeDigits(raw) {
+    const digits = raw.replace(/\D/g, "").slice(0, 4);
+    if (digits.length === 3) return formatTimeDigits(digits.padStart(4, "0"));
+    return formatTimeDigits(raw);
+  }
+  function isTimeFieldInvalid(value, blurred) {
+    const text = filled(value);
+    if (!text) return false;
+    if (parseHHMM(text) != null) return false;
+    return blurred || text.replace(/\D/g, "").length >= 4;
+  }
+  function addSection(lines, heading, body) {
+    if (!body.length) return;
+    if (lines.length) lines.push("");
+    lines.push(heading);
+    lines.push.apply(lines, body);
+  }
+  function buildMessage(opts) {
+    const lines = [];
+    const event = [];
+    addLine(event, "Event name", opts.eventName);
+    if (parseDateDDMMYYYY(opts.eventDate)) addLine(event, "Date", opts.eventDate);
+    if (parseHHMM(opts.eventTime) != null) addLine(event, "Time in", opts.eventTime);
+    if (parseHHMM(opts.eventTimeOut) != null) addLine(event, "Time out", opts.eventTimeOut);
+    if (parseHHMM(opts.callReceived) != null) addLine(event, "Call received", opts.callReceived);
+    if (parseHHMM(opts.onScene) != null) addLine(event, "On scene", opts.onScene);
+    if (parseHHMM(opts.leavingScene) != null) addLine(event, "Leaving scene", opts.leavingScene);
+    addLine(event, "Location", opts.location);
+    addSection(lines, "EVENT", event);
+    const patient = [];
+    addLine(patient, "Participant type", opts.participantType);
+    addLine(patient, "Name", opts.patientName);
+    addLine(patient, "Surname", opts.patientSurname);
+    addLine(patient, "EID / ID / Passport", opts.eid);
+    addLine(patient, "Gender", opts.gender);
+    addLine(patient, "Nationality", opts.nationality);
+    if (isDobValid(opts.dateOfBirth)) addLine(patient, "DOB", opts.dateOfBirth);
+    addLine(patient, "Age", formatAgeMessage(opts.ageMode, opts.ageMonths));
+    addLine(patient, "Cellphone", opts.cellphone);
+    addSection(lines, "PATIENT DETAILS", patient);
+    const happened = [];
+    addLine(happened, "Chief complaint", opts.complaint);
+    addLine(happened, "Short description", opts.description);
+    addSection(lines, "WHAT HAPPENED", happened);
+    const history = [];
+    addLine(history, "Allergies", opts.allergies);
+    addLine(history, "Medications", opts.medications);
+    addLine(history, "Medical history", opts.medicalHistory);
+    addSection(lines, "HISTORY", history);
+    const condition = [];
+    addLine(condition, "Condition", opts.condition);
+    addLine(condition, "Vitals", formatVitalsLine(opts));
+    if (opts.gcs) condition.push(opts.gcs);
+    (opts.extraVitalLines || []).forEach(function (line) { condition.push(line); });
+    addSection(lines, "CONDITION", condition);
+    const treatment = [];
+    addLine(treatment, "Treatment given", opts.treatment);
+    addSection(lines, "TREATMENT", treatment);
+    const outcome = [];
+    addLine(outcome, "Outcome", opts.outcome);
+    addLine(outcome, "Hospital", opts.hospital);
+    addSection(lines, "OUTCOME", outcome);
+    const nok = [];
+    addLine(nok, "Name", opts.nextOfKinName);
+    addLine(nok, "Relationship", opts.relationship);
+    addLine(nok, "Number", opts.nextOfKinNumber);
+    addSection(lines, "NEXT OF KIN", nok);
+    const completed = [];
+    addLine(completed, "Name", opts.completedBy);
+    addLine(completed, "Call sign", opts.callSign);
+    addSection(lines, "COMPLETED BY", completed);
+    if (!lines.length) return "";
+    return ["PATIENT DETAILS", "", ...lines].join("\n").trim();
+  }
+
+  function el(id) { return document.getElementById(id); }
+  function show(node, on) { if (node) node.classList.toggle("hidden", !on); }
+  function syncGenderButtons() {
+    var buttons = document.querySelectorAll(".gender-btn");
+    var val = state.gender;
+    for (var i = 0; i < buttons.length; i++) {
+      var on = buttons[i].getAttribute("data-gender") === val;
+      buttons[i].setAttribute("aria-pressed", on ? "true" : "false");
+      buttons[i].classList.toggle("is-on", on);
+    }
+    var hidden = el("gender");
+    if (hidden) hidden.value = val || "";
+  }
+  function isFastFillSkip(node) {
+    if (!node || !node.tagName) return true;
+    var typ = (node.type || "").toLowerCase();
+    if (typ === "hidden" || typ === "file" || typ === "checkbox" || typ === "radio" || typ === "button" || typ === "submit" || typ === "reset") return true;
+    if (node.classList && node.classList.contains("gender-btn")) return false;
+    var id = node.id || "";
+    if (id === "copyFallback" || id === "messagePreview" || id === "eidPaste" || id === "eidFile" || id === "eidCamera") return true;
+    return false;
+  }
+  function isFastFillVisible(node) {
+    if (!node) return false;
+    var p = node;
+    while (p && p !== document.body) {
+      if (p.classList && p.classList.contains("hidden")) return false;
+      if (p.type === "hidden") return false;
+      if (p.nodeType === 1 && p.getAttribute && p.getAttribute("aria-hidden") === "true") return false;
+      var style = p.style;
+      if (style && (style.display === "none" || style.visibility === "hidden")) return false;
+      p = p.parentElement;
+    }
+    if (node.offsetParent === null && node.getClientRects && node.getClientRects().length === 0) return false;
+    return true;
+  }
+  function fastFillRoot() {
+    return document.querySelector("[data-fast-fill]") || document.querySelector(".wrap") || document.body;
+  }
+  function fastFillFields() {
+    var root = fastFillRoot();
+    var nodes = root.querySelectorAll("input, select, textarea, .gender-btn");
+    var list = [];
+    var seenGender = false;
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.classList && n.classList.contains("gender-btn")) {
+        if (seenGender) continue;
+        if (!isFastFillVisible(n)) continue;
+        seenGender = true;
+        list.push(el("genderField") || n);
+        continue;
+      }
+      if (isFastFillSkip(n) || !isFastFillVisible(n)) continue;
+      list.push(n);
+    }
+    return list;
+  }
+  function focusNextField(from) {
+    var start = from;
+    if (from && from.classList && from.classList.contains("gender-btn")) start = el("genderField") || from;
+    if (from && from.id === "gender") start = el("genderField") || from;
+    var list = fastFillFields();
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] === start || (start && list[i].contains && (list[i] === start || list[i].contains(start) || (start.contains && start.contains(list[i]))))) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0) return;
+    var next = list[idx + 1];
+    if (!next) return;
+    var target = next;
+    if (next.id === "genderField") {
+      var pressed = next.querySelector(".gender-btn[aria-pressed='true']") || next.querySelector(".gender-btn");
+      target = pressed || next;
+    }
+    if (target && typeof target.focus === "function") {
+      try { target.focus(); } catch (e) {}
+    }
+  }
+  function bindFastFill() {
+    var root = fastFillRoot();
+    var inputs = root.querySelectorAll("input[type='text'], input[type='number'], input[type='tel'], input[type='email'], input:not([type]), input[inputmode]");
+    for (var i = 0; i < inputs.length; i++) {
+      var inp = inputs[i];
+      if (isFastFillSkip(inp)) continue;
+      if (!inp.getAttribute("enterkeyhint")) inp.setAttribute("enterkeyhint", "next");
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.keyCode === 13) {
+          e.preventDefault();
+          focusNextField(e.currentTarget);
+        }
+      });
+    }
+    var selects = root.querySelectorAll("select");
+    for (var s = 0; s < selects.length; s++) {
+      selects[s].addEventListener("change", function (e) {
+        var sel = e.currentTarget;
+        if (sel.value === "__sep__") return;
+        window.setTimeout(function () {
+          if (sel.id === "nationality" && sel.value === "Other" && el("nationalityOther") && isFastFillVisible(el("nationalityOther"))) {
+            try { el("nationalityOther").focus(); } catch (err) {}
+            return;
+          }
+          focusNextField(sel);
+        }, 0);
+      });
+    }
+  }
+  var eidAdvanceArmed = true;
+  function maybeAdvanceEid() {
+    var field = el("eid");
+    if (!field) return;
+    var digits = String(state.eid || field.value || "").replace(/\D/g, "");
+    if (digits.length >= 15) {
+      if (eidAdvanceArmed) {
+        eidAdvanceArmed = false;
+        focusNextField(field);
+      }
+    } else {
+      eidAdvanceArmed = true;
+    }
+  }
+  function bindGenderButtons() {
+    var buttons = document.querySelectorAll(".gender-btn");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].addEventListener("click", function (e) {
+        var btn = e.currentTarget;
+        state.gender = btn.getAttribute("data-gender") || "";
+        if (typeof touchForm === "function") touchForm();
+        syncGenderButtons();
+        refresh();
+        focusNextField(btn);
+      });
+    }
+  }
+
+  function fillSelect(select, options) {
+    select.innerHTML = "";
+    options.forEach(function (opt) {
+      const o = document.createElement("option");
+      o.value = opt.value;
+      o.textContent = opt.label;
+      if (opt.disabled) o.disabled = true;
+      select.appendChild(o);
+    });
+  }
+
+  const state = {
+    eventName: "", eventDate: "", dateBlurred: false, eventTime: "", timeBlurred: false, eventTimeOut: "", timeOutBlurred: false, callReceived: "", onScene: "", leavingScene: "", location: "",
+    participantType: "", participantTypeOther: "", patientName: "", patientSurname: "", dateOfBirth: "", dobBlurred: false, ageMode: "", ageMonths: "", gender: "",
+    nationality: "", nationalityOther: "", eid: "", attachments: [], cellphone: "",
+    complaint: "", description: "", allergies: "", medications: "", medicalHistory: "",
+    condition: "", bpSys: "", bpDia: "", hr: "", rr: "", spo2: "", temp: "", hgt: "", extraVitals: [], gcsE: "", gcsV: "", gcsM: "", treatment: "", outcome: "", outcomeOther: "", hospital: "",
+    nextOfKinName: "", relationship: "", nextOfKinNumber: "", completedBy: "", callSign: "",
+    messageEdit: "", messageDirty: false
+  };
+  let copiedTimer = null;
+
+  function generatedMessage() {
+    return buildMessage({
+      eventName: state.eventName,
+      eventDate: state.eventDate,
+      eventTime: state.eventTime,
+      eventTimeOut: state.eventTimeOut,
+      callReceived: state.callReceived,
+      onScene: state.onScene,
+      leavingScene: state.leavingScene,
+      location: state.location,
+      participantType: state.participantType === "Other" ? state.participantTypeOther : state.participantType,
+      patientName: state.patientName,
+      patientSurname: state.patientSurname,
+      dateOfBirth: state.dateOfBirth,
+      ageMode: state.ageMode,
+      ageMonths: state.ageMonths,
+      gender: state.gender,
+      nationality: state.nationality === "Other" ? state.nationalityOther : state.nationality,
+      eid: state.eid,
+      cellphone: state.cellphone,
+      complaint: state.complaint,
+      description: state.description,
+      allergies: state.allergies,
+      medications: state.medications,
+      medicalHistory: state.medicalHistory,
+      condition: state.condition,
+      bpSys: state.bpSys, bpDia: state.bpDia, hr: state.hr, rr: state.rr, spo2: state.spo2, temp: state.temp, hgt: state.hgt,
+      gcs: formatGcsShort(state.gcsE, state.gcsV, state.gcsM),
+      extraVitalLines: extraVitalLines(state.extraVitals),
+      treatment: state.treatment,
+      outcome: state.outcome === "Other" ? state.outcomeOther.trim() : state.outcome,
+      hospital: state.outcome === "Transported" ? state.hospital : "",
+      nextOfKinName: state.nextOfKinName,
+      relationship: state.relationship,
+      nextOfKinNumber: state.nextOfKinNumber,
+      completedBy: state.completedBy,
+      callSign: state.callSign,
+    });
+  }
+  function currentMessage() {
+    return state.messageDirty ? state.messageEdit : generatedMessage();
+  }
+  function touchForm() { state.messageDirty = false; }
+  function refresh() {
+    syncGenderButtons();
+    show(el("ageMonthsWrap"), state.ageMode === "infant");
+    show(el("participantTypeOtherWrap"), state.participantType === "Other");
+    show(el("nationalityOtherWrap"), state.nationality === "Other");
+    show(el("hospitalWrap"), state.outcome === "Transported");
+    show(el("outcomeOtherWrap"), state.outcome === "Other");
+    const dateInvalid = isDateFieldInvalid(state.eventDate, state.dateBlurred);
+    el("eventDate").classList.toggle("invalid", dateInvalid);
+    show(el("dateHint"), dateInvalid);
+    const timeInvalid = isTimeFieldInvalid(state.eventTime, state.timeBlurred);
+    el("eventTime").classList.toggle("invalid", timeInvalid);
+    show(el("timeHint"), timeInvalid);
+    const timeOutInvalid = isTimeFieldInvalid(state.eventTimeOut, state.timeOutBlurred);
+    el("eventTimeOut").classList.toggle("invalid", timeOutInvalid);
+    show(el("timeOutHint"), timeOutInvalid);
+    const dobInvalid = isDobFieldInvalid(state.dateOfBirth, state.dobBlurred);
+    el("dateOfBirth").classList.toggle("invalid", dobInvalid);
+    show(el("dobHint"), dobInvalid);
+    const msg = currentMessage();
+    if (el("messagePreview") !== document.activeElement) el("messagePreview").value = msg;
+    else if (!state.messageDirty) el("messagePreview").value = msg;
+    if (!state.messageDirty) el("messagePreview").value = msg;
+    el("copyFallback").value = msg;
+    syncPreviewButtons();
+    scheduleSave();
+  }
+  function bind(id, key) {
+    el(id).addEventListener("input", function () {
+      state[key] = el(id).value;
+      touchForm();
+      refresh();
+    });
+  }
+  async function copyMessage() {
+    const text = currentMessage();
+    el("copyFallback").value = text;
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch (e) { ok = false; }
+    if (!ok) {
+      const ta = el("copyFallback");
+      ta.classList.remove("hidden");
+      ta.style.position = "fixed";
+      ta.style.left = "0";
+      ta.style.top = "0";
+      ta.style.opacity = "0";
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      ta.classList.add("hidden");
+    }
+    const btn = el("copyMessage");
+    if (ok) {
+      btn.textContent = "Copied";
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(function () { btn.textContent = "Copy message"; }, 2000);
+    } else {
+      btn.textContent = "Select and copy the message";
+    }
+    return ok;
+  }
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+  function showShareNote(text) {
+    const note = el("shareNote");
+    if (!text) {
+      note.textContent = "";
+      note.classList.add("hidden");
+      return;
+    }
+    note.textContent = text;
+    note.classList.remove("hidden");
+  }
+  function canShareFiles(files) {
+    if (!files.length) return false;
+    try {
+      return typeof navigator.canShare === "function" && navigator.canShare({ files: files });
+    } catch (e) {
+      return false;
+    }
+  }
+  function resetFileInputs() {
+    el("eidFile").value = "";
+    el("eidCamera").value = "";
+  }
+  function renderAttachments() {
+    const list = el("attachmentList");
+    list.innerHTML = "";
+    state.attachments.forEach(function (item) {
+      const row = document.createElement("div");
+      row.className = "attachment-item";
+      if (item.file.type.indexOf("image/") === 0) {
+        const img = document.createElement("img");
+        img.src = item.url;
+        img.alt = item.file.name;
+        row.appendChild(img);
+      }
+      const name = document.createElement("div");
+      name.className = "attachment-name";
+      name.textContent = item.file.name + " (" + formatFileSize(item.file.size) + ")";
+      row.appendChild(name);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Remove";
+      btn.addEventListener("click", function () { removeAttachment(item.id); });
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }
+  function clearAttachments() {
+    state.attachments.forEach(function (item) { URL.revokeObjectURL(item.url); });
+    state.attachments = [];
+    resetFileInputs();
+    renderAttachments();
+  }
+  function removeAttachment(id) {
+    const item = state.attachments.find(function (a) { return a.id === id; });
+    if (item) URL.revokeObjectURL(item.url);
+    state.attachments = state.attachments.filter(function (a) { return a.id !== id; });
+    renderAttachments();
+  }
+  function addFiles(list) {
+    const incoming = Array.prototype.slice.call(list).filter(Boolean);
+    if (!incoming.length) return;
+    incoming.forEach(function (file) {
+      state.attachments.push({
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+        file: file,
+        url: URL.createObjectURL(file)
+      });
+    });
+    resetFileInputs();
+    renderAttachments();
+  }
+  async function shareMessage() {
+    showShareNote("");
+    const text = currentMessage();
+    const files = state.attachments.map(function (item) { return item.file; });
+    const images = files.filter(function (file) { return file.type.indexOf("image/") === 0; });
+    const hasShare = typeof navigator.share === "function";
+    try {
+      if (hasShare) {
+        if (files.length && canShareFiles(files)) {
+          await navigator.share({ text: text, files: files });
+          return;
+        }
+        if (images.length && canShareFiles(images)) {
+          await navigator.share({ text: text, files: images });
+          showShareNote("Some files couldn't be included; attach the rest in WhatsApp yourself.");
+          return;
+        }
+        await navigator.share({ text: text });
+        if (files.length) showShareNote("Message shared; this browser couldn't include the files, so attach them in WhatsApp yourself.");
+        return;
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+    }
+    await copyMessage();
+    showShareNote("Sharing not supported here, message copied; attach the files in WhatsApp yourself.");
+  }
+
+  function applyTheme(mode) {
+    var dark = mode === "dark";
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+    try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch (err) {}
+    var btn = el("darkModeToggle");
+    if (btn) {
+      btn.setAttribute("aria-pressed", dark ? "true" : "false");
+      btn.textContent = dark ? "Dark mode: on" : "Dark mode: off";
+    }
+  }
+  function loadTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (err) {}
+    if (saved === "dark" || saved === "light") applyTheme(saved);
+    else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      document.documentElement.setAttribute("data-theme", "dark");
+      var btn = el("darkModeToggle");
+      if (btn) {
+        btn.setAttribute("aria-pressed", "true");
+        btn.textContent = "Dark mode: on";
+      }
+    } else {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  }
+  function scheduleSave() {
+    if (!draftReady) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try {
+        localStorage.setItem(PD_STORAGE_KEY, JSON.stringify({
+          eventName: state.eventName, eventDate: state.eventDate, eventTime: state.eventTime, eventTimeOut: state.eventTimeOut,
+          callReceived: state.callReceived, onScene: state.onScene, leavingScene: state.leavingScene,
+          location: state.location, participantType: state.participantType, participantTypeOther: state.participantTypeOther,
+          patientName: state.patientName, patientSurname: state.patientSurname, dateOfBirth: state.dateOfBirth,
+          ageMode: state.ageMode, ageMonths: state.ageMonths, gender: state.gender, nationality: state.nationality,
+          nationalityOther: state.nationalityOther, eid: state.eid, cellphone: state.cellphone, complaint: state.complaint,
+          description: state.description, allergies: state.allergies, medications: state.medications, medicalHistory: state.medicalHistory,
+          condition: state.condition, bpSys: state.bpSys, bpDia: state.bpDia, hr: state.hr, rr: state.rr, spo2: state.spo2,
+          temp: state.temp, hgt: state.hgt, extraVitals: state.extraVitals, gcsE: state.gcsE, gcsV: state.gcsV, gcsM: state.gcsM,
+          treatment: state.treatment, outcome: state.outcome, outcomeOther: state.outcomeOther, hospital: state.hospital,
+          nextOfKinName: state.nextOfKinName, relationship: state.relationship, nextOfKinNumber: state.nextOfKinNumber,
+          completedBy: state.completedBy, callSign: state.callSign
+        }));
+      } catch (err) {}
+    }, 250);
+  }
+  function writeDraftFields(d) {
+    var keys = ["eventName","eventDate","eventTime","eventTimeOut","callReceived","onScene","leavingScene","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","ageMode","ageMonths","gender","nationality","nationalityOther","eid","cellphone","complaint","description","allergies","medications","medicalHistory","condition","bpSys","bpDia","hr","rr","spo2","temp","hgt","gcsE","gcsV","gcsM","treatment","outcome","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign"];
+    keys.forEach(function (k) {
+      if (typeof d[k] === "string") {
+        state[k] = d[k];
+        var n = el(k);
+        if (n) n.value = d[k];
+      }
+    });
+  }
+  function restoreDraft() {
+    try {
+      var raw = localStorage.getItem(PD_STORAGE_KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (!d || typeof d !== "object") return;
+      writeDraftFields(d);
+      if (Array.isArray(d.extraVitals)) {
+        state.extraVitals = d.extraVitals.filter(function (row) { return row && typeof row === "object"; }).map(function (row) {
+          return {
+            id: row.id || newExtraVitalsRow().id,
+            time: String(row.time || ""),
+            bpSys: String(row.bpSys || ""),
+            bpDia: String(row.bpDia || ""),
+            hr: String(row.hr || ""),
+            rr: String(row.rr || ""),
+            spo2: String(row.spo2 || ""),
+            temp: String(row.temp || ""),
+            hgt: String(row.hgt || "")
+          };
+        });
+      }
+    } catch (err) {}
+  }
+  function renderExtraVitals() {
+    var root = el("extraVitals");
+    if (!root) return;
+    root.innerHTML = "";
+    state.extraVitals.forEach(function (row) {
+      var wrap = document.createElement("div");
+      wrap.className = "extra-vitals";
+      wrap.setAttribute("data-id", row.id);
+      var fields = [
+        ["bpSys", "BP sys", "120", "numeric"],
+        ["bpDia", "BP dia", "80", "numeric"],
+        ["hr", "HR", "88", "numeric"],
+        ["rr", "RR", "18", "numeric"],
+        ["spo2", "SpO2", "98", "numeric"],
+        ["temp", "Temp", "37.2", "decimal"],
+        ["hgt", "HGT", "6.2", "decimal"]
+      ];
+      var head = document.createElement("div");
+      head.className = "extra-vitals-head";
+      head.innerHTML = "<span>Vitals at " + (row.time || "—") + '</span>';
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.textContent = "Remove";
+      rm.addEventListener("click", function () {
+        state.extraVitals = state.extraVitals.filter(function (item) { return item.id !== row.id; });
+        touchForm();
+        renderExtraVitals();
+        refresh();
+      });
+      head.appendChild(rm);
+      wrap.appendChild(head);
+      var grid = document.createElement("div");
+      grid.className = "vitals-grid";
+      fields.forEach(function (f) {
+        var lab = document.createElement("label");
+        lab.className = "field";
+        lab.innerHTML = "<span>" + f[1] + "</span>";
+        var inp = document.createElement("input");
+        inp.type = "text";
+        inp.inputMode = f[3];
+        inp.autocomplete = "off";
+        inp.placeholder = f[2];
+        inp.setAttribute("aria-label", f[1]);
+        inp.value = row[f[0]] || "";
+        inp.addEventListener("input", function () {
+          row[f[0]] = inp.value;
+          touchForm();
+          refresh();
+        });
+        lab.appendChild(inp);
+        grid.appendChild(lab);
+      });
+      wrap.appendChild(grid);
+      root.appendChild(wrap);
+    });
+  }
+  function syncPreviewButtons() {
+    document.querySelectorAll("#quickTimes [data-time-key]").forEach(function (btn) {
+      var key = btn.getAttribute("data-time-key");
+      var value = state[key] || "";
+      btn.textContent = btn.getAttribute("data-label") + (value ? (": " + value) : "");
+      btn.classList.toggle("is-on", Boolean(value));
+    });
+    var nkda = el("nkdaBtn");
+    if (nkda) nkda.classList.toggle("is-on", String(state.allergies || "").trim().toLowerCase() === NKDA_TEXT.toLowerCase());
+    var nomeds = el("noMedsBtn");
+    if (nomeds) nomeds.classList.toggle("is-on", String(state.medications || "").trim().toLowerCase() === "no meds");
+    var total = el("gcsPadTotal");
+    if (total) total.textContent = formatGcsShort(state.gcsE, state.gcsV, state.gcsM) || "GCS not set";
+    document.querySelectorAll("#gcsPad [data-gcs][data-val]").forEach(function (btn) {
+      var axis = btn.getAttribute("data-gcs");
+      var val = btn.getAttribute("data-val");
+      var cur = axis === "E" ? state.gcsE : axis === "V" ? state.gcsV : state.gcsM;
+      btn.classList.toggle("is-on", cur === val);
+    });
+  }
+
+    function clearForm() {
+    if (!confirm("Clear this form? This also clears the saved draft.")) return;
+    try { localStorage.removeItem(PD_STORAGE_KEY); } catch (err) {}
+    const keys = ["eventName","eventDate","eventTime","eventTimeOut","callReceived","onScene","leavingScene","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","eid","eidPaste","cellphone","complaint","description","allergies","medications","medicalHistory","bpSys","bpDia","hr","rr","spo2","temp","hgt","treatment","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign","nationalityOther"];
+    keys.forEach(function (k) { state[k] = ""; const n = el(k); if (n) n.value = ""; });
+    state.dateBlurred = false;
+    state.timeBlurred = false;
+    state.timeOutBlurred = false;
+    state.dobBlurred = false;
+    state.ageMode = "";
+    state.ageMonths = "";
+    state.gender = "";
+    state.nationality = "";
+    state.condition = "";
+    state.outcome = "";
+    state.gcsE = "";
+    state.gcsV = "";
+    state.gcsM = "";
+    state.extraVitals = [];
+    state.messageEdit = "";
+    state.messageDirty = false;
+    el("participantType").value = "";
+    el("ageMode").value = "";
+    el("ageMonths").value = "";
+    el("gender").value = "";
+    el("nationality").value = "";
+    el("condition").value = "";
+    el("outcome").value = "";
+    el("copyMessage").textContent = "Copy message";
+    clearAttachments();
+    showShareNote("");
+    renderExtraVitals();
+    refresh();
+  }
+
+
+  function fieldIsEmpty(value, emptyValues) {
+    const x = String(value || "").trim();
+    if (!x) return true;
+    if (emptyValues && emptyValues.indexOf(x) !== -1) return true;
+    return false;
+  }
+  function applyParsedToEmptyFields(parsed) {
+    const filledNames = [];
+    const skipped = [];
+    function take(label, key, elId, val) {
+      if (!val) return;
+      if (!fieldIsEmpty(state[key])) { skipped.push(label); return; }
+      state[key] = val;
+      if (elId && el(elId)) el(elId).value = val;
+      filledNames.push(label);
+    }
+    take("Name", "patientName", "patientName", parsed.name);
+    take("Surname", "patientSurname", "patientSurname", parsed.surname);
+    take("EID / ID / Passport", "eid", "eid", parsed.eid);
+    if (parsed.nationality) {
+      if (fieldIsEmpty(state.nationality)) {
+        state.nationality = parsed.nationality;
+        el("nationality").value = parsed.nationality;
+        state.nationalityOther = parsed.nationality === "Other" ? parsed.nationalityOther : "";
+        el("nationalityOther").value = state.nationalityOther;
+        filledNames.push("Nationality");
+      } else skipped.push("Nationality");
+    }
+    take("Gender", "gender", "gender", parsed.gender);
+    if (parsed.dob) {
+      if (fieldIsEmpty(state.dateOfBirth) || !isDobValid(state.dateOfBirth)) {
+        state.dateOfBirth = parsed.dob;
+        state.dobBlurred = true;
+        el("dateOfBirth").value = parsed.dob;
+        filledNames.push("Date of birth");
+        if (fieldIsEmpty(state.ageMode)) {
+          const sel = ageFromDobSelection(parsed.dob);
+          state.ageMode = sel.mode;
+          state.ageMonths = sel.months;
+          el("ageMode").value = sel.mode;
+          el("ageMonths").value = sel.months;
+          if (sel.mode) filledNames.push("Age");
+        }
+      } else skipped.push("Date of birth");
+    }
+    if ((parsed.age || parsed.eid) && fieldIsEmpty(state.ageMode)) {
+      if (parsed.dob && isDobValid(parsed.dob)) {
+        /* already handled */
+      } else {
+        const year = birthYearFromEid(parsed.eid || state.eid);
+        const a = year ? ageFromBirthYear(year) : "";
+        const n = Number(a);
+        if (a && isFinite(n) && n >= 1) {
+          state.ageMode = String(Math.min(n, 110));
+          state.ageMonths = "";
+          el("ageMode").value = state.ageMode;
+          el("ageMonths").value = "";
+          filledNames.push("Age");
+        }
+      }
+    } else if (parsed.age && !fieldIsEmpty(state.ageMode) && filledNames.indexOf("Age") === -1) {
+      skipped.push("Age");
+    }
+    return { filledNames: filledNames, skipped: skipped };
+  }
+  var TESS_JS_VERSION = "5.1.1";
+  var TESS_CORE_VERSION = "5.1.0";
+  var TESS_SCRIPT_URLS = [
+    "https://cdn.jsdelivr.net/npm/tesseract.js@" + TESS_JS_VERSION + "/dist/tesseract.min.js",
+    "https://unpkg.com/tesseract.js@" + TESS_JS_VERSION + "/dist/tesseract.min.js"
+  ];
+  var TESS_WORKER_PATH = "https://cdn.jsdelivr.net/npm/tesseract.js@" + TESS_JS_VERSION + "/dist/worker.min.js";
+  var TESS_CORE_PATH = "https://cdn.jsdelivr.net/npm/tesseract.js-core@" + TESS_CORE_VERSION + "/tesseract-core.wasm.js";
+  var TESS_LANG_PATH = "https://tessdata.projectnaptha.com/4.0.0_fast";
+  var EID_OCR_MIN_SIDE = 1800;
+  var EID_OCR_MAX_SIDE = 2400;
+  var EID_OCR_TARGET_SIDE = 2000;
+  var EID_OCR_WORKER_MS = 60000;
+  var EID_OCR_RECOGNIZE_MS = 60000;
+
+  function isProbablyImage(file) {
+    if (!file) return false;
+    var type = String(file.type || "").toLowerCase();
+    if (type.indexOf("image/") === 0) return true;
+    var name = String(file.name || "").toLowerCase();
+    if (/\.(jpe?g|png|webp|gif|bmp|heic|heif|tif{1,2})$/.test(name)) return true;
+    if (type && type !== "application/octet-stream" && type !== "application/download") return false;
+    if (file.size >= 8) return true;
+    return false;
+  }
+
+  function eidOcrStatusTargets() {
+    var nodes = [];
+    var main = el("eidFillNote");
+    if (main) nodes.push(main);
+    var extra = el("eidFillNotePaste");
+    if (extra && extra !== main) nodes.push(extra);
+    return nodes;
+  }
+
+  function showEidOcrStatus(msg) {
+    var nodes = eidOcrStatusTargets();
+    for (var i = 0; i < nodes.length; i++) {
+      var note = nodes[i];
+      note.textContent = msg;
+      note.classList.remove("hidden");
+      note.classList.add("is-on");
+    }
+    if (nodes[0] && nodes[0].scrollIntoView) {
+      try { nodes[0].scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {
+        try { nodes[0].scrollIntoView(); } catch (e2) {}
+      }
+    }
+  }
+
+  function withTimeout(promise, ms, message) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var timer = setTimeout(function () {
+        if (done) return;
+        done = true;
+        reject(new Error(message));
+      }, ms);
+      promise.then(function (value) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(value);
+      }, function (err) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
+
+  function loadScriptSrc(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.async = true;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error("script failed: " + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadTesseractLibrary(onStatus) {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    if (onStatus) onStatus("Loading reader...");
+    var chain = Promise.reject(new Error("start"));
+    for (var i = 0; i < TESS_SCRIPT_URLS.length; i++) {
+      (function (src) {
+        chain = chain.catch(function () { return loadScriptSrc(src); });
+      })(TESS_SCRIPT_URLS[i]);
+    }
+    return chain.then(function () {
+      if (window.Tesseract) return window.Tesseract;
+      throw new Error("The on-device reader did not start.");
+    }).catch(function (err) {
+      var orig = err && err.message ? err.message : "";
+      throw new Error("Could not load the on-device reader. Open this file in Chrome with an internet connection the first time (the pictures stay on this device). If you opened it from a chat app, use Open in Chrome. " + (orig && orig.indexOf("script failed") === -1 ? orig : ""));
+    });
+  }
+
+  function createEidOcrWorker(Tesseract, onStatus) {
+    var optsBlob = {
+      workerPath: TESS_WORKER_PATH,
+      corePath: TESS_CORE_PATH,
+      langPath: TESS_LANG_PATH,
+      workerBlobURL: true,
+      cacheMethod: "none",
+      logger: function (m) {
+        if (!onStatus || !m || !m.status) return;
+        var status = String(m.status);
+        if (status.indexOf("loading") !== -1 || status.indexOf("initializing") !== -1 || status.indexOf("loaded") !== -1) {
+          onStatus("Loading reader...");
+        }
+      }
+    };
+    function tryCreate(opts) {
+      return Tesseract.createWorker("eng", 1, opts);
+    }
+    return withTimeout(tryCreate(optsBlob), EID_OCR_WORKER_MS, "Loading the reader timed out. Open this file in Chrome with an internet connection, then try again.")
+      .catch(function (err) {
+        var optsDirect = {
+          workerPath: TESS_WORKER_PATH,
+          corePath: TESS_CORE_PATH,
+          langPath: TESS_LANG_PATH,
+          workerBlobURL: false,
+          cacheMethod: "none"
+        };
+        return withTimeout(tryCreate(optsDirect), EID_OCR_WORKER_MS, "Loading the reader timed out. Open this file in Chrome with an internet connection, then try again.")
+          .catch(function () {
+            var msg = err && err.message ? err.message : "Could not start the on-device reader.";
+            throw new Error("Could not start the on-device reader. Open this file in Chrome with an internet connection the first time (the pictures stay on this device). If you opened it from a chat app, use Open in Chrome. " + msg);
+          });
+      });
+  }
+
+  function jpegSizeAndOrientation(bytes) {
+    if (!bytes || bytes.length < 4 || bytes[0] !== 0xFF || bytes[1] !== 0xD8) return null;
+    var offset = 2;
+    var orientation = 1;
+    var width = 0;
+    var height = 0;
+    function u16(i, le) {
+      return le ? (bytes[i] | (bytes[i + 1] << 8)) : ((bytes[i] << 8) | bytes[i + 1]);
+    }
+    function u32(i, le) {
+      return le ? (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0
+        : ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0;
+    }
+    while (offset + 4 <= bytes.length) {
+      if (bytes[offset] !== 0xFF) break;
+      var marker = bytes[offset + 1];
+      if (marker === 0xDA) break;
+      var size = u16(offset + 2, false);
+      if (size < 2 || offset + 2 + size > bytes.length) break;
+      if (marker === 0xE1 && !orientation) orientation = 1;
+      if (marker === 0xE1 && size >= 10) {
+        var start = offset + 4;
+        if (bytes[start] === 0x45 && bytes[start + 1] === 0x78 && bytes[start + 2] === 0x69 && bytes[start + 3] === 0x66 && bytes[start + 4] === 0 && bytes[start + 5] === 0) {
+          var tiff = start + 6;
+          var le = bytes[tiff] === 0x49 && bytes[tiff + 1] === 0x49;
+          if ((le || (bytes[tiff] === 0x4D && bytes[tiff + 1] === 0x4D)) && tiff + 8 <= bytes.length) {
+            var ifd = tiff + u32(tiff + 4, le);
+            if (ifd + 2 <= bytes.length) {
+              var n = u16(ifd, le);
+              for (var i = 0; i < n && ifd + 2 + i * 12 + 12 <= bytes.length; i++) {
+                var entry = ifd + 2 + i * 12;
+                if (u16(entry, le) === 0x0112) {
+                  orientation = u16(entry + 8, le) || 1;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      if ((marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC5 && marker <= 0xC7) || (marker >= 0xC9 && marker <= 0xCB) || (marker >= 0xCD && marker <= 0xCF)) {
+        if (offset + 9 <= bytes.length) {
+          height = u16(offset + 5, false);
+          width = u16(offset + 7, false);
+        }
+        break;
+      }
+      offset += 2 + size;
+    }
+    if (!width || !height) return null;
+    return { width: width, height: height, orientation: orientation || 1 };
+  }
+
+  function pngSize(bytes) {
+    if (!bytes || bytes.length < 24) return null;
+    if (!(bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47)) return null;
+    var width = ((bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19]) >>> 0;
+    var height = ((bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23]) >>> 0;
+    if (!width || !height) return null;
+    return { width: width, height: height, orientation: 1 };
+  }
+
+  async function readFileBytes(file) {
+    var buf = await file.arrayBuffer();
+    return new Uint8Array(buf);
+  }
+
+  function resizeOptionsFor(size) {
+    if (!size) return null;
+    var w = size.width;
+    var h = size.height;
+    if (size.orientation >= 5 && size.orientation <= 8) {
+      w = size.height;
+      h = size.width;
+    }
+    var longSide = Math.max(w, h);
+    if (longSide <= EID_OCR_MAX_SIDE) return { width: w, height: h };
+    var scale = EID_OCR_MAX_SIDE / longSide;
+    return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
+  }
+
+  async function bitmapFromFile(file) {
+    var bytes = null;
+    try { bytes = await readFileBytes(file); } catch (e) { bytes = null; }
+    var size = bytes ? (jpegSizeAndOrientation(bytes) || pngSize(bytes)) : null;
+    var resized = resizeOptionsFor(size);
+    var optsBase = { imageOrientation: "from-image" };
+    if (typeof createImageBitmap === "function") {
+      try {
+        var opts = { imageOrientation: "from-image" };
+        if (resized) {
+          opts.resizeWidth = resized.width;
+          opts.resizeHeight = resized.height;
+          opts.resizeQuality = "high";
+        }
+        return await createImageBitmap(file, opts);
+      } catch (e1) {
+        try { return await createImageBitmap(file, optsBase); } catch (e2) {
+          try { return await createImageBitmap(file); } catch (e3) {}
+        }
+      }
+    }
+    return await new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error("This photo couldn't be opened. Try taking it again, or attach a JPEG or PNG."));
+      };
+      img.src = url;
+    });
+  }
+
+  function writeEidPasteBox(text) {
+    if (!text) return;
+    var box = el("eidPaste");
+    if (box) box.value = text;
+    if (typeof state !== "undefined" && state && Object.prototype.hasOwnProperty.call(state, "eidPaste")) {
+      state.eidPaste = text;
+    }
+  }
+
+  function contrastStretchGrayscale(ctx, w, h) {
+    var imageData = ctx.getImageData(0, 0, w, h);
+    var d = imageData.data;
+    var hist = new Array(256);
+    var i, y, p;
+    for (i = 0; i < 256; i++) hist[i] = 0;
+    var pixels = 0;
+    for (i = 0; i < d.length; i += 4) {
+      y = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+      d[i] = d[i + 1] = d[i + 2] = y;
+      hist[y] += 1;
+      pixels += 1;
+    }
+    var loCut = pixels * 0.02, hiCut = pixels * 0.98, acc = 0, lo = 0, hi = 255;
+    for (i = 0; i < 256; i++) { acc += hist[i]; if (acc >= loCut) { lo = i; break; } }
+    acc = 0;
+    for (i = 0; i < 256; i++) { acc += hist[i]; if (acc >= hiCut) { hi = i; break; } }
+    var span = hi - lo || 1;
+    for (i = 0; i < d.length; i += 4) {
+      y = d[i];
+      p = y <= lo ? 0 : y >= hi ? 255 : Math.round(255 * (y - lo) / span);
+      d[i] = d[i + 1] = d[i + 2] = p;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  function boostContrastGrayscale(ctx, w, h) {
+    contrastStretchGrayscale(ctx, w, h);
+  }
+
+  function otsuThresholdGrayscale(ctx, w, h) {
+    var imageData = ctx.getImageData(0, 0, w, h);
+    var d = imageData.data;
+    var hist = new Array(256);
+    var i, y;
+    for (i = 0; i < 256; i++) hist[i] = 0;
+    var total = 0;
+    for (i = 0; i < d.length; i += 4) {
+      y = d[i];
+      hist[y] += 1;
+      total += 1;
+    }
+    var sumTotal = 0;
+    for (i = 0; i < 256; i++) sumTotal += i * hist[i];
+    var sumB = 0, wB = 0, maxVar = -1, thresh = 127;
+    for (i = 0; i < 256; i++) {
+      wB += hist[i];
+      if (!wB) continue;
+      var wF = total - wB;
+      if (!wF) break;
+      sumB += i * hist[i];
+      var mB = sumB / wB, mF = (sumTotal - sumB) / wF;
+      var between = wB * wF * (mB - mF) * (mB - mF);
+      if (between > maxVar) { maxVar = between; thresh = i; }
+    }
+    for (i = 0; i < d.length; i += 4) {
+      y = d[i] > thresh ? 255 : 0;
+      d[i] = d[i + 1] = d[i + 2] = y;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  async function prepareEidImage(file, rotation, mode) {
+    var src = await bitmapFromFile(file);
+    var sw = src.width;
+    var sh = src.height;
+    if (!sw || !sh) throw new Error("This photo couldn't be opened. Try taking it again, or attach a JPEG or PNG.");
+    var longSide = Math.max(sw, sh);
+    var scale = 1;
+    if (longSide < EID_OCR_MIN_SIDE) scale = EID_OCR_TARGET_SIDE / longSide;
+    else if (longSide > EID_OCR_MAX_SIDE) scale = 2200 / longSide;
+    var dw = Math.max(1, Math.round(sw * scale));
+    var dh = Math.max(1, Math.round(sh * scale));
+    var angle = ((rotation || 0) % 360 + 360) % 360;
+    var canvas = document.createElement("canvas");
+    if (angle === 90 || angle === 270) {
+      canvas.width = dh;
+      canvas.height = dw;
+    } else {
+      canvas.width = dw;
+      canvas.height = dh;
+    }
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("This photo couldn't be prepared for reading.");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    if (angle === 90) {
+      ctx.translate(canvas.width, 0);
+      ctx.rotate(Math.PI / 2);
+    } else if (angle === 180) {
+      ctx.translate(canvas.width, canvas.height);
+      ctx.rotate(Math.PI);
+    } else if (angle === 270) {
+      ctx.translate(0, canvas.height);
+      ctx.rotate(-Math.PI / 2);
+    }
+    ctx.drawImage(src, 0, 0, dw, dh);
+    ctx.restore();
+    if (src.close) try { src.close(); } catch (e) {}
+    if (mode === "threshold") {
+      contrastStretchGrayscale(ctx, canvas.width, canvas.height);
+      otsuThresholdGrayscale(ctx, canvas.width, canvas.height);
+    } else if (mode === "plain") {
+      /* scaled original, no contrast boost */
+    } else {
+      contrastStretchGrayscale(ctx, canvas.width, canvas.height);
+    }
+    return canvas;
+  }
+
+  function countParsedFields(parsed) {
+    if (!parsed) return 0;
+    var keys = ["name", "surname", "eid", "nationality", "gender", "dob", "age"];
+    var n = 0;
+    for (var i = 0; i < keys.length; i++) {
+      if (parsed[keys[i]]) n += 1;
+    }
+    return n;
+  }
+
+  function parsedIsStrong(parsed, confidence) {
+    if (!parsed) return false;
+    if (parsed.eid && countParsedFields(parsed) >= 3 && confidence >= 30) return true;
+    if (parsed.eid && (parsed.name || parsed.dob) && confidence >= 40) return true;
+    return false;
+  }
+
+  function mergeOcrTexts(parts) {
+    var seen = {};
+    var lines = [];
+    for (var i = 0; i < parts.length; i++) {
+      var text = typeof parts[i] === "string" ? parts[i] : (parts[i] && parts[i].text) || "";
+      var chunk = String(text).split(/\r?\n/);
+      for (var j = 0; j < chunk.length; j++) {
+        var t = chunk[j].replace(/\s+/g, " ").trim();
+        if (!t) continue;
+        var key = t.toLowerCase();
+        if (seen[key]) continue;
+        seen[key] = 1;
+        lines.push(t);
+      }
+    }
+    return lines.join("\n");
+  }
+
+  async function recognizeCanvasPsm(worker, canvas, psm) {
+    if (worker.setParameters) {
+      await worker.setParameters({ tessedit_pageseg_mode: String(psm) });
+    }
+    var result = await withTimeout(
+      worker.recognize(canvas),
+      EID_OCR_RECOGNIZE_MS,
+      "Reading is taking too long. Try a clearer, closer photo of the card, then tap Read card again."
+    );
+    var text = result && result.data ? (result.data.text || "") : "";
+    var confidence = result && result.data ? Number(result.data.confidence) || 0 : 0;
+    return { text: text, confidence: confidence, psm: psm };
+  }
+
+  async function recognizePhotoBest(worker, file, onStatus, index, total) {
+    var angles = [0, 90, 180, 270];
+    var best = { text: "", confidence: -1, angle: 0, parsed: null, score: -1 };
+    var allParts = [];
+    for (var i = 0; i < angles.length; i++) {
+      if (onStatus) {
+        onStatus(i === 0
+          ? ("Reading photo " + (index + 1) + " of " + total + "...")
+          : ("Trying another angle on photo " + (index + 1) + "..."));
+      }
+      var modes = i === 0 ? ["plain", "contrast", "threshold"] : ["contrast"];
+      var psms = i === 0 ? [6, 11] : [6];
+      var angleParts = [];
+      for (var m = 0; m < modes.length; m++) {
+        var canvas = await prepareEidImage(file, angles[i], modes[m]);
+        for (var p = 0; p < psms.length; p++) {
+          var rec = await recognizeCanvasPsm(worker, canvas, psms[p]);
+          angleParts.push(rec);
+          allParts.push(rec);
+        }
+      }
+      var merged = mergeOcrTexts(angleParts);
+      var parsed = parseEidText(merged);
+      var confSum = 0;
+      for (var c = 0; c < angleParts.length; c++) confSum += angleParts[c].confidence || 0;
+      var confidence = angleParts.length ? confSum / angleParts.length : 0;
+      var score = countParsedFields(parsed) * 100 + confidence;
+      if (score > best.score) best = { text: merged, confidence: confidence, angle: angles[i], parsed: parsed, score: score };
+      if (i === 0 && parsedIsStrong(parsed, confidence)) break;
+      if (parsed.eid && countParsedFields(parsed) >= 5) break;
+    }
+    var allMerged = mergeOcrTexts(allParts);
+    var allParsed = parseEidText(allMerged);
+    if (countParsedFields(allParsed) > countParsedFields(best.parsed)) {
+      best = { text: allMerged, confidence: best.confidence, angle: best.angle, parsed: allParsed, score: countParsedFields(allParsed) * 100 + best.confidence };
+    } else if (countParsedFields(allParsed) === countParsedFields(best.parsed) && allMerged) {
+      best.text = allMerged;
+      best.parsed = allParsed;
+    }
+    return best;
+  }
+
+  function formatReadCardDone(applied, parsed) {
+    var filled = applied && applied.filledNames ? applied.filledNames : [];
+    var missing = [];
+    if (!parsed.name) missing.push("Name");
+    if (!parsed.surname) missing.push("Surname");
+    if (!parsed.eid) missing.push("EID / ID / Passport");
+    if (!parsed.nationality) missing.push("Nationality");
+    if (!parsed.gender) missing.push("Gender");
+    if (!parsed.dob) missing.push("Date of birth");
+    if (!parsed.age) missing.push("Age");
+    var foundAny = !!(parsed.eid || parsed.name || parsed.surname || parsed.dob || parsed.gender || parsed.nationality);
+    if (!filled.length && !foundAny) {
+      return "Done: couldn't read the card. Try a sharper picture of the front and back, and check every field by hand.";
+    }
+    var msg = "Done: " + (filled.length ? ("filled " + filled.join(", ")) : "no empty fields were filled");
+    if (applied && applied.skipped && applied.skipped.length) {
+      msg += ". Already had " + applied.skipped.join(", ") + " (left as they were)";
+    }
+    if (missing.length) msg += ", couldn't read " + missing.join(", ");
+    msg += ". Check every field by hand.";
+    return msg;
+  }
+
+  function collectImageItems(items) {
+    var out = [];
+    (items || []).forEach(function (item) {
+      var file = item && item.file ? item.file : item;
+      if (isProbablyImage(file)) out.push(item && item.file ? item : { file: file });
+    });
+    return out;
+  }
+
+
+  var READER_PASTE_FALLBACK = "The reader can't run on this page. Use Google Lens to copy the card text, paste it in the box below and tap Fill from card text.";
+  function isCspOrReaderLoadError(err) {
+    var m = err && err.message ? String(err.message) : String(err || "");
+    return /Content Security Policy|unsafe-eval|Evaluating a string as JavaScript|wasm-unsafe-eval|Could not load the on-device reader|Could not start the on-device reader|on-device reader did not start|timed out|internet connection/i.test(m);
+  }
+  function textDetectorAvailable() {
+    return typeof window.TextDetector === "function";
+  }
+  async function recognizeWithTextDetector(files, onStatus) {
+    if (!textDetectorAvailable()) return null;
+    try {
+      var detector = new window.TextDetector();
+      var parts = [];
+      for (var i = 0; i < files.length; i++) {
+        if (onStatus) onStatus("Reading photo " + (i + 1) + " of " + files.length + "...");
+        var file = files[i].file || files[i];
+        var src = null;
+        try {
+          src = await createImageBitmap(file, { imageOrientation: "from-image" });
+        } catch (e1) {
+          try { src = await bitmapFromFile(file); } catch (e2) { src = null; }
+        }
+        if (!src) continue;
+        var boxes = await detector.detect(src);
+        if (src.close) try { src.close(); } catch (e3) {}
+        var text = (boxes || []).map(function (b) { return b && (b.rawValue || ""); }).filter(Boolean).join("\n");
+        parts.push(text);
+      }
+      return parts.join("\n\n").trim() || null;
+    } catch (err) {
+      return null;
+    }
+  }
+  function parsedLooksUseful(parsed) {
+    if (!parsed) return false;
+    return !!(parsed.eid || parsed.name || parsed.surname || parsed.dob || parsed.gender || parsed.nationality || (countParsedFields(parsed) >= 2));
+  }
+  function applyCardText(raw, applyParsed) {
+    var text = String(raw || "").trim();
+    if (!text) {
+      showEidOcrStatus("Paste the card text first, then tap Fill from card text.");
+      return null;
+    }
+    if (typeof MrzTd1 !== "undefined" && MrzTd1.looksLikeMrz(text)) {
+      var mrzParsed = MrzTd1.parseTd1Mrz(text);
+      if (mrzParsed && mrzParsed.ok) {
+        if (mrzParsed.rawText) writeEidPasteBox(mrzParsed.rawText);
+        applyMrzToForm(mrzParsed);
+        showEidOcrStatus(formatMrzStatus(mrzParsed));
+        return mrzParsed;
+      }
+    }
+    var parsed = parseEidText(text);
+    var applied = applyParsed(parsed);
+    showEidOcrStatus(formatReadCardDone(applied, parsed));
+    return parsed;
+  }
+
+  async function runReadCard(getItems, applyParsed) {
+    showEidOcrStatus("Loading reader...");
+    var images = collectImageItems(typeof getItems === "function" ? getItems() : getItems);
+    if (!images.length) {
+      showEidOcrStatus("Take or attach a photo of the card first");
+      return;
+    }
+    var btn = el("readCard");
+    var prev = btn ? btn.textContent : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Reading…";
+    }
+    var worker = null;
+    try {
+      var detectorText = await recognizeWithTextDetector(images, showEidOcrStatus);
+      if (detectorText) {
+        var detected = parseEidText(detectorText);
+        if (parsedLooksUseful(detected)) {
+          writeEidPasteBox(detectorText);
+          var appliedDetector = applyParsed(detected);
+          showEidOcrStatus(formatReadCardDone(appliedDetector, detected));
+          return detected;
+        }
+      }
+      showEidOcrStatus("Loading reader...");
+      var Tesseract = await loadTesseractLibrary(showEidOcrStatus);
+      worker = await createEidOcrWorker(Tesseract, showEidOcrStatus);
+      var parts = [];
+      var bestParsed = null;
+      var bestScore = -1;
+      for (var i = 0; i < images.length; i++) {
+        var file = images[i].file || images[i];
+        var best = await recognizePhotoBest(worker, file, showEidOcrStatus, i, images.length);
+        parts.push(best.text || "");
+        if (best.score > bestScore && best.parsed) {
+          bestParsed = best.parsed;
+          bestScore = best.score;
+        }
+      }
+      if (worker && worker.terminate) await worker.terminate();
+      worker = null;
+      var rawOcrText = parts.join("\n\n").trim();
+      if (rawOcrText) writeEidPasteBox(rawOcrText);
+      var combined = parseEidText(rawOcrText);
+      var parsed = countParsedFields(combined) >= countParsedFields(bestParsed) ? combined : (bestParsed || combined);
+      var applied = applyParsed(parsed);
+      showEidOcrStatus(formatReadCardDone(applied, parsed));
+      return parsed;
+    } catch (err) {
+      if (worker && worker.terminate) try { await worker.terminate(); } catch (e) {}
+      if (isCspOrReaderLoadError(err)) showEidOcrStatus(READER_PASTE_FALLBACK);
+      else showEidOcrStatus(err && err.message ? err.message : "Could not read the card.");
+      return null;
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = prev || "Read card";
+      }
+    }
+  }
+
+
+
+/* TD1 MRZ parser (Emirates ID / ICAO 9303). Works in the browser and in Node. */
+(function (root) {
+  var ISO3_TO_FORM = {ARE:"Emirati (UAE)",ARG:"Argentinian",BGD:"Bangladeshi",BRA:"Brazilian",CAN:"Canadian",CHN:"Chinese",COL:"Colombian",DEU:"German",EGY:"Egyptian",ESP:"Spanish",FRA:"French",GBR:"UK",IND:"Indian",IRL:"Irish",IRN:"Iranian",ITA:"Italian",JPN:"Japanese",KOR:"Korean",LBN:"Lebanese",LKA:"Sri Lankan",MEX:"Mexican",NLD:"Dutch",NPL:"Nepali",PAK:"Pakistani",PHL:"Filipino",POL:"Polish",PRK:"Korean",RUS:"Russian",SAU:"Saudi Arabian",THA:"Thai",TUR:"Turkish",UKR:"Ukrainian",USA:"USA",VNM:"Vietnamese",ZAF:"South African",ZWE:"Zimbabwean"};
+  var ISO3_OTHER_NAMES = {ABW:"Aruban",AFG:"Afghan",AGO:"Angolan",AIA:"Anguillan",ALA:"Åland Islander",ALB:"Albanian",AND:"Andorran",ARM:"Armenian",ASM:"American Samoan",ATA:"Antarctican",ATG:"Antiguan",AUS:"Australian",AUT:"Austrian",AZE:"Azerbaijani",BDI:"Burundian",BEL:"Belgian",BEN:"Beninese",BFA:"Burkinabe",BGR:"Bulgarian",BHR:"Bahraini",BHS:"Bahamian",BIH:"Bosnian",BLM:"Barthélemois",BLR:"Belarusian",BLZ:"Belizean",BMU:"Bermudian",BOL:"Bolivian",BRB:"Barbadian",BRN:"Bruneian",BTN:"Bhutanese",BVT:"Bouvet",BWA:"Botswanan",CAF:"Central African",CHE:"Swiss",CHL:"Chilean",CIV:"Ivorian",CMR:"Cameroonian",COD:"Congolese",COG:"Congolese",COK:"Cook Islander",COM:"Comoran",CPV:"Cape Verdean",CRI:"Costa Rican",CUB:"Cuban",CUW:"Curaçaoan",CYM:"Caymanian",CYP:"Cypriot",CZE:"Czech",DJI:"Djiboutian",DMA:"Dominican",DNK:"Danish",DOM:"Dominican",DZA:"Algerian",ECU:"Ecuadorian",ERI:"Eritrean",ESH:"Sahrawi",EST:"Estonian",ETH:"Ethiopian",FIN:"Finnish",FJI:"Fijian",FLK:"Falkland Islander",FRO:"Faroese",FSM:"Micronesian",GAB:"Gabonese",GBD:"UK",GBN:"UK",GBO:"UK",GBP:"UK",GBS:"UK",GEO:"Georgian",GGY:"Guernsey",GHA:"Ghanaian",GIB:"Gibraltarian",GIN:"Guinean",GLP:"Guadeloupean",GMB:"Gambian",GNB:"Bissau-Guinean",GNQ:"Equatorial Guinean",GRC:"Greek",GRD:"Grenadian",GRL:"Greenlander",GTM:"Guatemalan",GUM:"Guamanian",GUY:"Guyanese",HKG:"Hong Konger",HMD:"Heard Islander",HND:"Honduran",HRV:"Croatian",HTI:"Haitian",HUN:"Hungarian",IDN:"Indonesian",IMN:"Manx",IOT:"British Indian Ocean Territory",IRQ:"Iraqi",ISL:"Icelander",ISR:"Israeli",JAM:"Jamaican",JEY:"Jersey",JOR:"Jordanian",KAZ:"Kazakh",KEN:"Kenyan",KGZ:"Kyrgyz",KHM:"Cambodian",KIR:"I-Kiribati",KNA:"Kittitian",KOS:"Kosovar",KWT:"Kuwaiti",LAO:"Lao",LBR:"Liberian",LBY:"Libyan",LCA:"Saint Lucian",LIE:"Liechtensteiner",LSO:"Basotho",LTU:"Lithuanian",LUX:"Luxembourger",LVA:"Latvian",MAC:"Macanese",MAF:"Saint-Martinois",MAR:"Moroccan",MCO:"Monégasque",MDA:"Moldovan",MDG:"Malagasy",MDV:"Maldivian",MHL:"Marshallese",MKD:"Macedonian",MLI:"Malian",MLT:"Maltese",MMR:"Myanmar",MNE:"Montenegrin",MNG:"Mongolian",MNP:"Northern Mariana Islander",MOZ:"Mozambican",MRT:"Mauritanian",MTQ:"Martinican",MUS:"Mauritian",MWI:"Malawian",MYS:"Malaysian",MYT:"Mahoran",NAM:"Namibian",NCL:"New Caledonian",NER:"Nigerien",NGA:"Nigerian",NIC:"Nicaraguan",NIU:"Niuean",NOR:"Norwegian",NRU:"Nauruan",NZL:"New Zealander",OMN:"Omani",PAN:"Panamanian",PCN:"Pitcairn Islander",PER:"Peruvian",PLW:"Palauan",PNG:"Papua New Guinean",PRI:"Puerto Rican",PRT:"Portuguese",PRY:"Paraguayan",PSE:"Palestinian",PYF:"French Polynesian",QAT:"Qatari",REU:"Reunionese",ROU:"Romanian",RWA:"Rwandan",SDN:"Sudanese",SEN:"Senegalese",SGP:"Singaporean",SGS:"South Georgian",SHN:"Saint Helenian",SJM:"Svalbard",SLB:"Solomon Islander",SLE:"Sierra Leonean",SLV:"Salvadoran",SMR:"Sammarinese",SOM:"Somali",SPM:"Saint-Pierrais",SRB:"Serbian",SSD:"South Sudanese",STP:"Sao Tomean",SUR:"Surinamese",SVK:"Slovak",SVN:"Slovenian",SWE:"Swedish",SWZ:"Eswatini",SXM:"Sint Maarten",SYC:"Seychellois",SYR:"Syrian",TCA:"Turks and Caicos Islander",TCD:"Chadian",TGO:"Togolese",TJK:"Tajik",TKL:"Tokelauan",TKM:"Turkmen",TLS:"Timorese",TON:"Tongan",TTO:"Trinidadian",TUN:"Tunisian",TUV:"Tuvaluan",TWN:"Taiwanese",TZA:"Tanzanian",UGA:"Ugandan",UMI:"US Minor Outlying Islands",URY:"Uruguayan",UZB:"Uzbek",VAT:"Vatican",VCT:"Vincentian",VEN:"Venezuelan",VGB:"British Virgin Islander",VIR:"US Virgin Islander",VUT:"Ni-Vanuatu",WLF:"Wallisian",WSM:"Samoan",XKX:"Kosovar",YEM:"Yemeni",ZMB:"Zambian"};
+
+  function mrzCharValue(ch) {
+    if (ch === "<") return 0;
+    if (ch >= "0" && ch <= "9") return ch.charCodeAt(0) - 48;
+    if (ch >= "A" && ch <= "Z") return ch.charCodeAt(0) - 65 + 10;
+    return -1;
+  }
+  function mrzCheckDigit(str) {
+    var weights = [7, 3, 1];
+    var sum = 0;
+    var i, v;
+    str = String(str || "");
+    for (i = 0; i < str.length; i++) {
+      v = mrzCharValue(str.charAt(i));
+      if (v < 0) return null;
+      sum += v * weights[i % 3];
+    }
+    return String(sum % 10);
+  }
+  function checkOk(str, digit) {
+    var expect = mrzCheckDigit(str);
+    return expect != null && String(digit) === expect;
+  }
+
+  function normalizeMrzLine(raw) {
+    var s = String(raw || "").toUpperCase();
+    s = s.replace(/[\u00AB\u00BB\u2039\u203A\u2329\u232A\u3008\u3009]/g, "<");
+    s = s.replace(/[\uFF1C]/g, "<");
+    s = s.replace(/[\s\-_.:,;|'"`]/g, "");
+    s = s.replace(/[«»]/g, "<");
+    return s;
+  }
+
+  function fixFillers(line) {
+    // Only clustered K/X are treated as < fillers. A single K can be a real letter (e.g. PAK).
+    return line.replace(/K{2,}/g, function (m) { return new Array(m.length + 1).join("<"); })
+               .replace(/X{3,}/g, function (m) { return new Array(m.length + 1).join("<"); });
+  }
+
+  function toDigitsField(s) {
+    return String(s || "")
+      .replace(/[OQ]/g, "0")
+      .replace(/[IL|!]/g, "1")
+      .replace(/B/g, "8")
+      .replace(/S/g, "5")
+      .replace(/Z/g, "2")
+      .replace(/G/g, "6")
+      .replace(/[A-Z]/g, function (ch) {
+        // leftover letters in a numeric field
+        if (ch === "D") return "0";
+        if (ch === "T") return "1";
+        return ch;
+      });
+  }
+  function toAlphaField(s) {
+    return String(s || "")
+      .replace(/0/g, "O")
+      .replace(/1/g, "I")
+      .replace(/5/g, "S")
+      .replace(/8/g, "B")
+      .replace(/2/g, "Z")
+      .replace(/6/g, "G");
+  }
+  function toNameField(s) {
+    return toAlphaField(String(s || "")).replace(/[^A-Z<]/g, "<");
+  }
+  function pad30(s) {
+    s = String(s || "");
+    if (s.length < 28) return s;
+    if (s.length < 30) s = s + new Array(31 - s.length).join("<");
+    if (s.length > 32) return s;
+    if (s.length > 30) s = s.slice(0, 30);
+    return s;
+  }
+
+  var NUM_SUBS = { "0": "O", "O": "0", "Q": "0", "1": "I", "I": "1", "L": "1", "8": "B", "B": "8", "5": "S", "S": "5", "2": "Z", "Z": "2", "6": "G", "G": "6" };
+
+  function correctWithCheck(field, checkDigit, numeric) {
+    field = String(field || "");
+    checkDigit = String(checkDigit || "");
+    if (checkOk(field, checkDigit)) return { value: field, check: checkDigit, ok: true, corrected: false };
+    var i, ch, alt, next, best = null;
+    function tryVal(val) {
+      if (checkOk(val, checkDigit)) return { value: val, check: checkDigit, ok: true, corrected: val !== field };
+      return null;
+    }
+    var first = tryVal(numeric ? toDigitsField(field) : toAlphaField(field));
+    if (first && first.ok) return first;
+    // Single-character substitutions
+    for (i = 0; i < field.length; i++) {
+      ch = field.charAt(i);
+      alt = NUM_SUBS[ch];
+      if (!alt) continue;
+      next = field.slice(0, i) + alt + field.slice(i + 1);
+      if (numeric) next = toDigitsField(next);
+      first = tryVal(next);
+      if (first) return first;
+    }
+    // If the check digit itself is the error, recompute it when field looks valid
+    var recomputed = mrzCheckDigit(numeric ? toDigitsField(field) : field);
+    if (recomputed != null) {
+      var cleaned = numeric ? toDigitsField(field) : field;
+      // only accept recomputed check if the field charset is already legal
+      if (/^[A-Z0-9<]+$/.test(cleaned)) {
+        return { value: cleaned, check: recomputed, ok: true, corrected: recomputed !== checkDigit || cleaned !== field, checkCorrected: recomputed !== checkDigit };
+      }
+    }
+    return { value: numeric ? toDigitsField(field) : field, check: checkDigit, ok: false, corrected: false };
+  }
+
+  function expandYear(yy) {
+    var n = Number(yy);
+    if (!isFinite(n) || n < 0 || n > 99) return null;
+    // ICAO: dates are YYMMDD; pick century that makes a plausible DOB (not in the future, not > 120 years)
+    var now = new Date();
+    var century2000 = 2000 + n;
+    var century1900 = 1900 + n;
+    var y = century2000;
+    if (century2000 > now.getFullYear()) y = century1900;
+    else if (now.getFullYear() - century2000 > 120) y = century2000; // infants in 2000s already handled
+    // If 2000+n is in the future, use 1900+n
+    return y;
+  }
+
+  function validYymmdd(s, asDob) {
+    if (!/^\d{6}$/.test(s)) return false;
+    var yy = s.slice(0, 2), mm = Number(s.slice(2, 4)), dd = Number(s.slice(4, 6));
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return false;
+    var year = expandYear(yy);
+    if (year == null) return false;
+    var dt = new Date(year, mm - 1, dd);
+    if (dt.getFullYear() !== year || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return false;
+    if (asDob) {
+      var now = new Date();
+      if (dt.getTime() > now.getTime()) return false;
+      if (now.getFullYear() - year > 120) return false;
+    }
+    return true;
+  }
+
+  function formatDobYymmdd(s) {
+    if (!validYymmdd(s, true)) return "";
+    var year = expandYear(s.slice(0, 2));
+    var mm = s.slice(2, 4);
+    var dd = s.slice(4, 6);
+    return dd + "/" + mm + "/" + year;
+  }
+
+  function extractEidFromLine1(line1) {
+    var s = String(line1 || "");
+    function fifteen(chunk) {
+      var d = toDigitsField(String(chunk || "")).replace(/[^\d]/g, "");
+      var m = d.match(/784\d{12}/);
+      return m ? m[0] : "";
+    }
+    // Prefer the official optional-data field (1-based 16-30) and the
+    // 15-29 pack used on many UAE cards, then doc-number + optional
+    // (skipping the MRZ check digit at position 15 so it is not pulled
+    // into the 15-digit EID).
+    var hit = fifteen(s.slice(15, 30)) || fifteen(s.slice(14, 29));
+    if (hit) return hit;
+    hit = fifteen(s.slice(5, 14) + s.slice(15));
+    if (hit) return hit;
+    hit = fifteen(s.slice(5, 20));
+    if (hit) return hit;
+    return fifteen(s);
+  }
+
+  function formatEid15(digits) {
+    var d = String(digits || "").replace(/\D/g, "");
+    if (!/^784\d{12}$/.test(d)) return "";
+    return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7, 14) + "-" + d.slice(14);
+  }
+
+  function mapIso3ToForm(code) {
+    code = toAlphaField(String(code || "").toUpperCase().replace(/</g, ""));
+    if (code.length === 3 && ISO3_TO_FORM[code]) return { nationality: ISO3_TO_FORM[code], nationalityOther: "", iso3: code };
+    if (code.length === 3 && ISO3_OTHER_NAMES[code]) return { nationality: "Other", nationalityOther: ISO3_OTHER_NAMES[code], iso3: code };
+    if (code && code.length === 3 && code !== "XXX") return { nationality: "Other", nationalityOther: code, iso3: code };
+    return { nationality: "", nationalityOther: "", iso3: code || "" };
+  }
+
+  function parseNameLine(line3) {
+    var s = toNameField(fixFillers(String(line3 || "")));
+    s = s.replace(/<+$/g, "");
+    var parts = s.split("<<");
+    var surname = (parts[0] || "").replace(/</g, " ").replace(/\s+/g, " ").trim();
+    var given = (parts.slice(1).join(" ") || "").replace(/</g, " ").replace(/\s+/g, " ").trim();
+    return { surname: surname, name: given };
+  }
+
+  function scoreTd1Triple(l1, l2, l3) {
+    var score = 0;
+    if (l1.length === 30) score += 2; else score -= 4;
+    if (l2.length === 30) score += 2; else score -= 4;
+    if (l3.length === 30) score += 2; else score -= 4;
+    if (/^I[A-Z<]ARE/.test(l1) || /^(IL|ID|I<)ARE/.test(l1)) score += 8;
+    else if (/^[IACPV]/.test(l1)) score += 2;
+    else score -= 6;
+    if (/ARE/.test(l1.slice(2, 5))) score += 2;
+    if (/784/.test(l1)) score += 4;
+    var dobDigits = toDigitsField(l2.slice(0, 6));
+    var dobMonth = Number(dobDigits.slice(2, 4));
+    var dobDay = Number(dobDigits.slice(4, 6));
+    if (/^\d{6}$/.test(dobDigits) && dobMonth >= 1 && dobMonth <= 12 && dobDay >= 1 && dobDay <= 31) score += 6;
+    else score -= 5;
+    if (/[MF<]/.test((l2.charAt(7) || "").replace("N", "M").replace("P", "F"))) score += 2;
+    if (/<</.test(l3)) score += 4;
+    if (/[A-Z]{2}/.test(l3)) score += 1;
+    return score;
+  }
+
+  function candidateLinesFromText(raw) {
+    var text = String(raw || "").replace(/\r/g, "\n");
+    var rawLines = text.split(/\n+/);
+    var lines = [];
+    var i, n, parts, p;
+    for (i = 0; i < rawLines.length; i++) {
+      n = fixFillers(normalizeMrzLine(rawLines[i]));
+      if (!n) continue;
+      if (n.length >= 50) {
+        // maybe two MRZ lines stuck together or spaces already stripped from a paragraph
+        parts = n.match(/.{28,32}/g) || [n];
+        for (p = 0; p < parts.length; p++) lines.push(parts[p]);
+      } else {
+        lines.push(n);
+      }
+    }
+    // also scan a compacted form for 90-char windows
+    var compact = fixFillers(normalizeMrzLine(text));
+    return { lines: lines, compact: compact };
+  }
+
+  function findTd1Lines(raw) {
+    var got = candidateLinesFromText(raw);
+    var lines = got.lines;
+    var best = null;
+    var i, a, b, c, l1, l2, l3, score;
+    for (i = 0; i < lines.length - 2; i++) {
+      l1 = pad30(lines[i]);
+      l2 = pad30(lines[i + 1]);
+      l3 = pad30(lines[i + 2]);
+      if (l1.length !== 30 || l2.length !== 30 || l3.length !== 30) continue;
+      score = scoreTd1Triple(l1, l2, l3);
+      if (!best || score > best.score) best = { lines: [l1, l2, l3], score: score };
+    }
+    // Prefer a known UAE / TD1 start, then a scored sliding window.
+    var compact = got.compact;
+    function consider(a, b, c, bonus) {
+      l1 = pad30(a); l2 = pad30(b); l3 = pad30(c);
+      if (l1.length !== 30 || l2.length !== 30 || l3.length !== 30) return;
+      score = scoreTd1Triple(l1, l2, l3) + (bonus || 0);
+      if (!best || score > best.score) best = { lines: [l1, l2, l3], score: score };
+    }
+    if (compact.length >= 84) {
+      var start = 0, idx;
+      while (start < compact.length) {
+        idx = compact.slice(start).search(/I[A-Z<]ARE/);
+        if (idx < 0) break;
+        idx += start;
+        consider(compact.slice(idx, idx + 30), compact.slice(idx + 30, idx + 60), compact.slice(idx + 60, idx + 90), 4);
+        start = idx + 1;
+      }
+      for (i = 0; i <= compact.length - 90; i++) {
+        consider(compact.slice(i, i + 30), compact.slice(i + 30, i + 60), compact.slice(i + 60, i + 90), 0);
+      }
+    }
+    if (best && best.score >= 10) return best.lines;
+    return null;
+  }
+
+  function parseTd1Mrz(raw, now) {
+    now = now || new Date();
+    var found = findTd1Lines(raw);
+    var result = {
+      ok: false,
+      rawLines: found,
+      rawText: found ? found.join("\n") : "",
+      name: "",
+      surname: "",
+      eid: "",
+      docNumber: "",
+      gender: "",
+      dob: "",
+      expiry: "",
+      nationality: "",
+      nationalityOther: "",
+      iso3: "",
+      checks: { document: false, dob: false, expiry: false, composite: false },
+      corrected: [],
+      confidence: "fail"
+    };
+    if (!found) return result;
+    var l1 = found[0], l2 = found[1], l3 = found[2];
+
+    var docNum = l1.slice(5, 14);
+    var docCheck = l1.charAt(14);
+    var doc = correctWithCheck(docNum, toDigitsField(docCheck).charAt(0), false);
+    // document number is alphanumeric; try numeric-leaning corrections too
+    if (!doc.ok) doc = correctWithCheck(toDigitsField(docNum), toDigitsField(docCheck).charAt(0), true);
+    result.checks.document = !!doc.ok;
+    result.docNumber = (doc.value || docNum).replace(/<+$/g, "");
+    if (doc.corrected) result.corrected.push("document number");
+
+    var eidDigits = extractEidFromLine1(l1);
+    if (!eidDigits && doc.value) eidDigits = extractEidFromLine1(l1.slice(0, 5) + doc.value + l1.slice(14));
+    result.eid = formatEid15(eidDigits);
+
+    var dobField = toDigitsField(l2.slice(0, 6));
+    var dobChk = toDigitsField(l2.charAt(6)).charAt(0);
+    var dob = correctWithCheck(dobField, dobChk, true);
+    if (dob.ok && !validYymmdd(dob.value, true)) {
+      // check passed but invalid date — treat as fail
+      dob.ok = false;
+    }
+    if (!dob.ok) {
+      // brute a few substitutions already tried; keep cleaned digits if valid date
+      if (validYymmdd(dobField, true)) dob = { value: dobField, check: dobChk, ok: false, corrected: false };
+    }
+    result.checks.dob = !!(dob.ok && validYymmdd(dob.value, true));
+    result.dob = formatDobYymmdd(dob.value) || formatDobYymmdd(dobField);
+    if (dob.corrected) result.corrected.push("date of birth");
+
+    var sexCh = l2.charAt(7).toUpperCase();
+    if (sexCh === "N") sexCh = "M"; // rare OCR
+    if (sexCh === "P") sexCh = "F";
+    if (sexCh === "H") sexCh = "M";
+    if (sexCh === "E") sexCh = "F";
+    if (sexCh === "M" || sexCh === "F") result.gender = sexCh === "M" ? "Male" : "Female";
+
+    var expField = toDigitsField(l2.slice(8, 14));
+    var expChk = toDigitsField(l2.charAt(14)).charAt(0);
+    var exp = correctWithCheck(expField, expChk, true);
+    result.checks.expiry = !!exp.ok;
+    if (validYymmdd(exp.value, false)) {
+      var ey = expandYear(exp.value.slice(0, 2));
+      // expiry in the past 20y or next 20y: if year came out 19xx and that's before 2010, try 20xx
+      if (ey < 2010) {
+        var alt = 2000 + Number(exp.value.slice(0, 2));
+        if (alt >= 2010 && alt <= new Date().getFullYear() + 20) ey = alt;
+      }
+      result.expiry = exp.value.slice(4, 6) + "/" + exp.value.slice(2, 4) + "/" + ey;
+    }
+    if (exp.corrected) result.corrected.push("expiry");
+
+    var nat = mapIso3ToForm(l2.slice(15, 18));
+    result.nationality = nat.nationality;
+    result.nationalityOther = nat.nationalityOther;
+    result.iso3 = nat.iso3;
+
+    var names = parseNameLine(l3);
+    result.name = names.name;
+    result.surname = names.surname;
+
+    var optional2 = l2.slice(18, 29);
+    var compositeSrc = l1.slice(5, 30) + (dob.value || dobField) + (dob.ok ? dob.check : dobChk) + (exp.value || expField) + (exp.ok ? exp.check : expChk) + optional2;
+    // Official formula uses original characters; use reconstructed line pieces when we corrected
+    var l1doc = (doc.value || docNum);
+    if (l1doc.length < 9) l1doc = (l1doc + "<<<<<<<<<").slice(0, 9);
+    var l1recon = l1.slice(0, 5) + l1doc + (doc.ok ? doc.check : docCheck) + l1.slice(15);
+    compositeSrc = l1recon.slice(5, 30) + (dob.value || dobField) + (dob.check || dobChk) + (exp.value || expField) + (exp.check || expChk) + optional2;
+    result.checks.composite = checkOk(compositeSrc, l2.charAt(29));
+
+    var passCount = 0;
+    if (result.checks.document) passCount += 1;
+    if (result.checks.dob) passCount += 1;
+    if (result.checks.expiry) passCount += 1;
+    if (result.checks.composite) passCount += 1;
+    if (passCount === 4) result.confidence = "pass";
+    else if (passCount >= 2 || result.checks.dob || result.eid) result.confidence = "mixed";
+    else result.confidence = "fail";
+    result.ok = !!(result.eid || result.dob || result.surname || result.name);
+    result.rawText = found.join("\n");
+    result.checkSummary = "Document " + (result.checks.document ? "pass" : "fail") +
+      ", DOB " + (result.checks.dob ? "pass" : "fail") +
+      ", expiry " + (result.checks.expiry ? "pass" : "fail") +
+      ", composite " + (result.checks.composite ? "pass" : "fail");
+    return result;
+  }
+
+  function looksLikeMrz(raw) {
+    return !!findTd1Lines(raw);
+  }
+
+  var api = {
+    mrzCheckDigit: mrzCheckDigit,
+    checkOk: checkOk,
+    normalizeMrzLine: normalizeMrzLine,
+    findTd1Lines: findTd1Lines,
+    parseTd1Mrz: parseTd1Mrz,
+    looksLikeMrz: looksLikeMrz,
+    mapIso3ToForm: mapIso3ToForm,
+    formatEid15: formatEid15,
+    formatDobYymmdd: formatDobYymmdd,
+    ISO3_TO_FORM: ISO3_TO_FORM,
+    ISO3_OTHER_NAMES: ISO3_OTHER_NAMES
+  };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.MrzTd1 = api;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+
+  var MRZ_OCRB_LANG_PATHS = [
+    "https://cdn.jsdelivr.net/gh/uwolfer/tesseract-mrz@master/lang",
+    "https://cdn.jsdelivr.net/gh/uwolfer/tesseract-mrz@HEAD/lang"
+  ];
+  var MRZ_WHITELIST = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<";
+  var MRZ_TARGET_WIDTH = 1600;
+
+  function formatMrzStatus(parsed) {
+    if (!parsed || !parsed.ok) {
+      return "MRZ: couldn't find three TD1 lines. Try a sharper, closer photo of the back of the card (the three lines at the bottom), or paste those lines in the box below and tap Fill from card text.";
+    }
+    var bits = [];
+    if (parsed.eid) bits.push("EID " + parsed.eid);
+    if (parsed.surname || parsed.name) bits.push("name " + [parsed.surname, parsed.name].filter(Boolean).join(", "));
+    if (parsed.dob) bits.push("DOB " + parsed.dob);
+    if (parsed.gender) bits.push(parsed.gender);
+    if (parsed.nationality) {
+      bits.push(parsed.nationality === "Other" && parsed.nationalityOther ? parsed.nationalityOther : parsed.nationality);
+    }
+    var conf = "Check digits: fail (" + (parsed.checkSummary || "none") + ")";
+    if (parsed.confidence === "pass") conf = "Check digits: pass";
+    else if (parsed.confidence === "mixed") conf = "Check digits: mixed (" + parsed.checkSummary + ")";
+    var msg = "MRZ: read " + (bits.length ? bits.join("; ") : "partial data") + ". " + conf + ".";
+    if (parsed.corrected && parsed.corrected.length) msg += " Corrected " + parsed.corrected.join(", ") + ".";
+    msg += " Raw MRZ is in the paste box. Check every field by hand.";
+    return msg;
+  }
+
+  function applyMrzToForm(parsed) {
+    var filled = [];
+    function put(label, key, id, val) {
+      if (!val) return;
+      state[key] = val;
+      if (id && el(id)) el(id).value = val;
+      filled.push(label);
+    }
+    put("Name", "patientName", "patientName", parsed.name);
+    put("Surname", "patientSurname", "patientSurname", parsed.surname);
+    put("EID / ID / Passport", "eid", "eid", parsed.eid);
+    if (parsed.nationality) {
+      state.nationality = parsed.nationality;
+      if (el("nationality")) el("nationality").value = parsed.nationality;
+      state.nationalityOther = parsed.nationality === "Other" ? (parsed.nationalityOther || "") : "";
+      if (el("nationalityOther")) el("nationalityOther").value = state.nationalityOther;
+      filled.push("Nationality");
+    }
+    if (parsed.gender) {
+      state.gender = parsed.gender;
+      if (el("gender")) el("gender").value = parsed.gender;
+      filled.push("Gender");
+    }
+    if (parsed.dob) {
+      state.dateOfBirth = parsed.dob;
+      state.dobBlurred = true;
+      if (el("dateOfBirth")) el("dateOfBirth").value = parsed.dob;
+      filled.push("Date of birth");
+      var sel = ageFromDobSelection(parsed.dob);
+      if (sel && sel.mode) {
+        state.ageMode = sel.mode;
+        state.ageMonths = sel.months || "";
+        if (el("ageMode")) el("ageMode").value = sel.mode;
+        if (el("ageMonths")) el("ageMonths").value = state.ageMonths;
+        filled.push("Age");
+      }
+    }
+    if (typeof syncGenderButtons === "function") syncGenderButtons();
+    if (typeof touchForm === "function") touchForm();
+    if (typeof refresh === "function") refresh();
+    return { filledNames: filled, skipped: [] };
+  }
+
+  async function prepareMrzImage(file, rotation, mode, cropBottom) {
+    var src = await bitmapFromFile(file);
+    var sw = src.width;
+    var sh = src.height;
+    if (!sw || !sh) throw new Error("This photo couldn't be opened. Try taking it again, or attach a JPEG or PNG.");
+    var angle = ((rotation || 0) % 360 + 360) % 360;
+    var dw = sw;
+    var dh = sh;
+    var outW = (angle === 90 || angle === 270) ? dh : dw;
+    var outH = (angle === 90 || angle === 270) ? dw : dh;
+    var scale = MRZ_TARGET_WIDTH / outW;
+    outW = Math.max(1, Math.round(outW * scale));
+    outH = Math.max(1, Math.round(outH * scale));
+    var rotated = document.createElement("canvas");
+    rotated.width = outW;
+    rotated.height = outH;
+    var ctx = rotated.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("This photo couldn't be prepared for reading.");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, outW, outH);
+    ctx.save();
+    if (angle === 90) {
+      ctx.translate(outW, 0);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(src, 0, 0, outH, outW);
+    } else if (angle === 180) {
+      ctx.translate(outW, outH);
+      ctx.rotate(Math.PI);
+      ctx.drawImage(src, 0, 0, outW, outH);
+    } else if (angle === 270) {
+      ctx.translate(0, outH);
+      ctx.rotate(-Math.PI / 2);
+      ctx.drawImage(src, 0, 0, outH, outW);
+    } else {
+      ctx.drawImage(src, 0, 0, outW, outH);
+    }
+    ctx.restore();
+    if (src.close) try { src.close(); } catch (e) {}
+    var canvas = rotated;
+    if (cropBottom) {
+      var cropH = Math.max(1, Math.round(rotated.height * 0.4));
+      var cropped = document.createElement("canvas");
+      cropped.width = rotated.width;
+      cropped.height = cropH;
+      var cctx = cropped.getContext("2d", { willReadFrequently: true });
+      cctx.drawImage(rotated, 0, rotated.height - cropH, rotated.width, cropH, 0, 0, rotated.width, cropH);
+      canvas = cropped;
+    }
+    var pctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (mode === "threshold") {
+      contrastStretchGrayscale(pctx, canvas.width, canvas.height);
+      otsuThresholdGrayscale(pctx, canvas.width, canvas.height);
+    } else {
+      contrastStretchGrayscale(pctx, canvas.width, canvas.height);
+    }
+    return canvas;
+  }
+
+  async function createMrzOcrWorker(Tesseract, onStatus) {
+    function optsFor(langPath, blobUrl) {
+      var opts = {
+        workerPath: TESS_WORKER_PATH,
+        corePath: TESS_CORE_PATH,
+        workerBlobURL: blobUrl,
+        cacheMethod: "none",
+        logger: function (m) {
+          if (!onStatus || !m || !m.status) return;
+          var status = String(m.status);
+          if (status.indexOf("loading") !== -1 || status.indexOf("initializing") !== -1 || status.indexOf("loaded") !== -1) {
+            onStatus("Loading MRZ reader...");
+          }
+        }
+      };
+      if (langPath) opts.langPath = langPath;
+      return opts;
+    }
+    async function tryLang(lang, langPath) {
+      var worker = await withTimeout(
+        Tesseract.createWorker(lang, 1, optsFor(langPath, true)),
+        EID_OCR_WORKER_MS,
+        "Loading the MRZ reader timed out."
+      );
+      return worker;
+    }
+    var lastErr = null;
+    var i;
+    if (onStatus) onStatus("Loading MRZ reader...");
+    for (i = 0; i < MRZ_OCRB_LANG_PATHS.length; i++) {
+      try {
+        return await tryLang("OCRB", MRZ_OCRB_LANG_PATHS[i]);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    if (onStatus) onStatus("Using English reader for MRZ...");
+    try {
+      return await createEidOcrWorker(Tesseract, onStatus);
+    } catch (err2) {
+      throw lastErr || err2;
+    }
+  }
+
+  async function recognizeMrzCanvas(worker, canvas) {
+    if (worker.setParameters) {
+      await worker.setParameters({
+        tessedit_char_whitelist: MRZ_WHITELIST,
+        tessedit_pageseg_mode: "6"
+      });
+    }
+    var result = await withTimeout(
+      worker.recognize(canvas),
+      EID_OCR_RECOGNIZE_MS,
+      "Reading the MRZ is taking too long. Try a closer photo of the three lines at the bottom of the back of the card."
+    );
+    var text = result && result.data ? (result.data.text || "") : "";
+    var confidence = result && result.data ? Number(result.data.confidence) || 0 : 0;
+    return { text: text, confidence: confidence };
+  }
+
+  function mrzParseScore(parsed) {
+    if (!parsed || !parsed.ok) return -1;
+    var n = 0;
+    if (parsed.eid) n += 5;
+    if (parsed.dob) n += 3;
+    if (parsed.gender) n += 2;
+    if (parsed.nationality) n += 2;
+    if (parsed.surname) n += 2;
+    if (parsed.name) n += 2;
+    if (parsed.checks.document) n += 1;
+    if (parsed.checks.dob) n += 2;
+    if (parsed.checks.expiry) n += 1;
+    if (parsed.checks.composite) n += 2;
+    if (parsed.confidence === "pass") n += 4;
+    else if (parsed.confidence === "mixed") n += 1;
+    return n;
+  }
+
+  async function recognizeMrzPhoto(worker, file, onStatus) {
+    var best = { text: "", parsed: null, score: -1, confidence: -1 };
+    async function runVariant(rotation, cropBottom, mode, label) {
+      if (onStatus) onStatus(label);
+      var canvas = await prepareMrzImage(file, rotation, mode, cropBottom);
+      var rec = await recognizeMrzCanvas(worker, canvas);
+      var parsed = MrzTd1.parseTd1Mrz(rec.text);
+      var score = mrzParseScore(parsed);
+      if (score > best.score || (score === best.score && rec.confidence > best.confidence)) {
+        best = { text: rec.text, parsed: parsed, score: score, confidence: rec.confidence };
+      }
+      return parsed && parsed.ok && parsed.confidence === "pass";
+    }
+    var modes = ["contrast", "threshold"];
+    var crops = [true, false];
+    var m, c, passed = false;
+    for (c = 0; c < crops.length && !passed; c++) {
+      for (m = 0; m < modes.length && !passed; m++) {
+        passed = await runVariant(0, crops[c], modes[m], crops[c] ? "Reading the MRZ at the bottom of the photo..." : "Reading the whole photo...");
+      }
+    }
+    if (!passed) {
+      for (c = 0; c < crops.length && !passed; c++) {
+        for (m = 0; m < modes.length && !passed; m++) {
+          passed = await runVariant(180, crops[c], modes[m], "Trying the photo upside down...");
+        }
+      }
+    }
+    return best;
+  }
+
+  async function readMrz() {
+    showEidOcrStatus("Loading MRZ reader...");
+    var images = collectImageItems(state.attachments || []);
+    if (!images.length) {
+      showEidOcrStatus("Take or attach a photo of the back of the Emirates ID first (the three MRZ lines at the bottom).");
+      return;
+    }
+    var btn = el("readMrz");
+    var other = el("readCard");
+    var prev = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "Reading MRZ…"; }
+    if (other) other.disabled = true;
+    var worker = null;
+    try {
+      var Tesseract = await loadTesseractLibrary(showEidOcrStatus);
+      worker = await createMrzOcrWorker(Tesseract, showEidOcrStatus);
+      var best = { text: "", parsed: null, score: -1 };
+      var i;
+      for (i = 0; i < images.length; i++) {
+        var file = images[i].file || images[i];
+        if (onStatusBusy()) showEidOcrStatus("Reading photo " + (i + 1) + " of " + images.length + "...");
+        var one = await recognizeMrzPhoto(worker, file, showEidOcrStatus);
+        if (one.score > best.score) best = one;
+      }
+      if (worker && worker.terminate) await worker.terminate();
+      worker = null;
+      var parsed = best.parsed || MrzTd1.parseTd1Mrz(best.text || "");
+      var raw = (parsed && parsed.rawText) ? parsed.rawText : (best.text || "");
+      if (raw) writeEidPasteBox(raw);
+      else if (best.text) writeEidPasteBox(best.text);
+      if (parsed && parsed.ok) applyMrzToForm(parsed);
+      showEidOcrStatus(formatMrzStatus(parsed));
+      return parsed;
+    } catch (err) {
+      if (worker && worker.terminate) try { await worker.terminate(); } catch (e) {}
+      if (isCspOrReaderLoadError(err)) showEidOcrStatus(READER_PASTE_FALLBACK);
+      else showEidOcrStatus(err && err.message ? err.message : "Could not read the MRZ.");
+      return null;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = prev || "Read back of card (MRZ)"; }
+      if (other) other.disabled = false;
+    }
+  }
+  function onStatusBusy() { return true; }
+
+
+  async function readCard() {
+    try {
+      await runReadCard(function () { return state.attachments || []; }, function (parsed) {
+        var applied = applyParsedToEmptyFields(parsed);
+        touchForm();
+        refresh();
+        return applied;
+      });
+    } catch (err) {
+      /* Status is already shown on the page. */
+    }
+  }
+
+  const AGE_YEAR_OPTIONS = [{ value: "", label: "Select..." }];
+  for (let i = 0; i <= 110; i++) AGE_YEAR_OPTIONS.push({ value: String(i), label: String(i) });
+  AGE_YEAR_OPTIONS.push({ value: "infant", label: "Infant (months)" });
+  const AGE_MONTH_OPTIONS = [{ value: "", label: "Select..." }];
+  for (let i = 0; i <= 11; i++) AGE_MONTH_OPTIONS.push({ value: String(i), label: i === 1 ? "1 month" : i + " months" });
+  fillSelect(el("ageMode"), AGE_YEAR_OPTIONS);
+  fillSelect(el("ageMonths"), AGE_MONTH_OPTIONS);
+  fillSelect(el("participantType"), PARTICIPANT_TYPE_OPTIONS);
+  fillSelect(el("nationality"), NATIONALITY_OPTIONS);
+  el("nationality").value = "";
+  fillSelect(el("condition"), CONDITION_OPTIONS);
+  fillSelect(el("outcome"), OUTCOME_OPTIONS);
+
+  bind("eventName", "eventName");
+  el("eventDate").addEventListener("input", function () {
+    state.eventDate = formatDateDigits(el("eventDate").value);
+    el("eventDate").value = state.eventDate;
+    touchForm();
+    refresh();
+  });
+  el("eventDate").addEventListener("blur", function () { state.dateBlurred = true; refresh(); });
+  el("dateToday").addEventListener("click", function () {
+    state.eventDate = formatTodayDate();
+    state.dateBlurred = true;
+    el("eventDate").value = state.eventDate;
+    touchForm();
+    refresh();
+  });
+  el("eventTime").addEventListener("input", function () {
+    state.eventTime = formatTimeDigits(el("eventTime").value);
+    el("eventTime").value = state.eventTime;
+    touchForm();
+    refresh();
+  });
+  el("eventTime").addEventListener("blur", function () {
+    state.eventTime = finalizeTimeDigits(state.eventTime);
+    state.timeBlurred = true;
+    el("eventTime").value = state.eventTime;
+    touchForm();
+    refresh();
+  });
+  el("timeNow").addEventListener("click", function () {
+    state.eventTime = formatNowTime();
+    state.timeBlurred = true;
+    el("eventTime").value = state.eventTime;
+    touchForm();
+    refresh();
+  });
+  el("eventTimeOut").addEventListener("input", function () {
+    state.eventTimeOut = formatTimeDigits(el("eventTimeOut").value);
+    el("eventTimeOut").value = state.eventTimeOut;
+    touchForm();
+    refresh();
+  });
+  el("eventTimeOut").addEventListener("blur", function () {
+    state.eventTimeOut = finalizeTimeDigits(state.eventTimeOut);
+    state.timeOutBlurred = true;
+    el("eventTimeOut").value = state.eventTimeOut;
+    touchForm();
+    refresh();
+  });
+  el("timeOutNow").addEventListener("click", function () {
+    state.eventTimeOut = formatNowTime();
+    state.timeOutBlurred = true;
+    el("eventTimeOut").value = state.eventTimeOut;
+    touchForm();
+    refresh();
+  });
+  el("quickTimes").addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-time-key]");
+    if (!btn) return;
+    var key = btn.getAttribute("data-time-key");
+    state[key] = formatNowTime();
+    touchForm();
+    refresh();
+  });
+  bind("location", "location");
+  el("participantType").addEventListener("change", function () { state.participantType = el("participantType").value; touchForm(); refresh(); });
+  bind("participantTypeOther", "participantTypeOther");
+  bind("patientName", "patientName");
+  bind("patientSurname", "patientSurname");
+  el("dateOfBirth").addEventListener("input", function () {
+    state.dateOfBirth = formatDateDigits(el("dateOfBirth").value);
+    el("dateOfBirth").value = state.dateOfBirth;
+    if (isDobValid(state.dateOfBirth)) {
+      const sel = ageFromDobSelection(state.dateOfBirth);
+      state.ageMode = sel.mode;
+      state.ageMonths = sel.months;
+      el("ageMode").value = sel.mode;
+      el("ageMonths").value = sel.months;
+    }
+    touchForm();
+    refresh();
+  });
+  el("dateOfBirth").addEventListener("blur", function () { state.dobBlurred = true; refresh(); });
+  el("ageMode").addEventListener("change", function () {
+    state.ageMode = el("ageMode").value;
+    if (state.ageMode !== "infant") {
+      state.ageMonths = "";
+      el("ageMonths").value = "";
+    }
+    touchForm();
+    refresh();
+  });
+  el("ageMonths").addEventListener("change", function () {
+    state.ageMonths = el("ageMonths").value;
+    touchForm();
+    refresh();
+  });
+  bindGenderButtons();
+  bindFastFill();
+  el("nationality").addEventListener("change", function () { state.nationality = el("nationality").value; touchForm(); refresh(); });
+  bind("nationalityOther", "nationalityOther");
+  el("eid").addEventListener("input", function () {
+    state.eid = el("eid").value;
+    const formatted = parseEidNumber(state.eid);
+    if (formatted) {
+      state.eid = formatted;
+      el("eid").value = formatted;
+      if (!state.ageMode) {
+        const year = birthYearFromEid(formatted);
+        const a = year ? ageFromBirthYear(year) : "";
+        if (a) {
+          const n = Number(a);
+          if (isFinite(n) && n >= 1) {
+            state.ageMode = String(Math.min(n, 110));
+            state.ageMonths = "";
+            el("ageMode").value = state.ageMode;
+            el("ageMonths").value = "";
+          }
+        }
+      }
+    }
+    touchForm();
+    refresh();
+    maybeAdvanceEid();
+  });
+  el("readCard").addEventListener("click", function () { readCard(); });
+  el("readMrz").addEventListener("click", function () { readMrz(); });
+  el("fillFromCardText").addEventListener("click", function () {
+    applyCardText(el("eidPaste").value, function (parsed) {
+      var applied = applyParsedToEmptyFields(parsed);
+      touchForm();
+      refresh();
+      return applied;
+    });
+  });
+  el("eidFile").addEventListener("change", function () {
+    if (el("eidFile").files && el("eidFile").files.length) addFiles(el("eidFile").files);
+    else resetFileInputs();
+  });
+  el("eidCamera").addEventListener("change", function () {
+    if (el("eidCamera").files && el("eidCamera").files.length) addFiles(el("eidCamera").files);
+    else resetFileInputs();
+  });
+  bind("cellphone", "cellphone");
+  bind("complaint", "complaint");
+  COMPLAINT_CHIPS.forEach(function (chip) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.textContent = chip;
+    b.addEventListener("click", function () {
+      state.complaint = appendChip(state.complaint, chip);
+      el("complaint").value = state.complaint;
+      touchForm();
+      refresh();
+    });
+    el("complaintChips").appendChild(b);
+  });
+  bind("description", "description");
+  bind("allergies", "allergies");
+  el("nkdaBtn").addEventListener("click", function () {
+    state.allergies = NKDA_TEXT;
+    el("allergies").value = NKDA_TEXT;
+    touchForm();
+    refresh();
+  });
+  bind("medications", "medications");
+  el("noMedsBtn").addEventListener("click", function () {
+    state.medications = "No meds";
+    el("medications").value = "No meds";
+    touchForm();
+    refresh();
+  });
+  bind("medicalHistory", "medicalHistory");
+  el("condition").addEventListener("change", function () { state.condition = el("condition").value; touchForm(); refresh(); });
+  bind("bpSys", "bpSys");
+  bind("bpDia", "bpDia");
+  bind("hr", "hr");
+  bind("rr", "rr");
+  bind("spo2", "spo2");
+  bind("temp", "temp");
+  bind("hgt", "hgt");
+  el("repeatVitals").addEventListener("click", function () {
+    state.extraVitals.push(newExtraVitalsRow());
+    touchForm();
+    renderExtraVitals();
+    refresh();
+  });
+  el("gcsPad").addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-gcs][data-val]");
+    if (!btn) return;
+    var axis = btn.getAttribute("data-gcs");
+    var val = btn.getAttribute("data-val");
+    if (axis === "E") state.gcsE = val;
+    else if (axis === "V") state.gcsV = val;
+    else state.gcsM = val;
+    touchForm();
+    refresh();
+  });
+  bind("treatment", "treatment");
+  el("outcome").addEventListener("change", function () { state.outcome = el("outcome").value; touchForm(); refresh(); });
+  bind("hospital", "hospital");
+  bind("outcomeOther", "outcomeOther");
+  bind("nextOfKinName", "nextOfKinName");
+  bind("relationship", "relationship");
+  bind("nextOfKinNumber", "nextOfKinNumber");
+  bind("completedBy", "completedBy");
+  bind("callSign", "callSign");
+  el("messagePreview").addEventListener("input", function () {
+    state.messageEdit = el("messagePreview").value;
+    state.messageDirty = true;
+  });
+  el("copyMessage").addEventListener("click", copyMessage);
+  el("shareMessage").addEventListener("click", shareMessage);
+  el("clearForm").addEventListener("click", clearForm);
+  el("darkModeToggle").addEventListener("click", function () {
+    var dark = document.documentElement.getAttribute("data-theme") !== "dark";
+    applyTheme(dark ? "dark" : "light");
+  });
+  loadTheme();
+  restoreDraft();
+  renderExtraVitals();
+  draftReady = true;
+
+  window.__quickinfo = {
+    state: state,
+    buildMessage: buildMessage,
+    generatedMessage: generatedMessage,
+    currentMessage: currentMessage,
+    ageFromDobSelection: ageFromDobSelection,
+    formatAgeMessage: formatAgeMessage,
+    isDobValid: isDobValid,
+    formatDateDigits: formatDateDigits,
+    formatTimeDigits: formatTimeDigits,
+    finalizeTimeDigits: finalizeTimeDigits,
+    parseHHMM: parseHHMM,
+    clearForm: clearForm,
+    refresh: refresh,
+    parseTd1Mrz: (typeof MrzTd1 !== "undefined" ? MrzTd1.parseTd1Mrz : null),
+    readMrz: readMrz,
+  };
+  refresh();
+})();
+  </script>
+</body>
+</html>
