@@ -111,7 +111,7 @@ section > h2 { font-size: 1.25rem; margin: 0 0 10px; }
 .stack { display: flex; flex-direction: column; gap: 12px; }
 .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
 .grow { flex: 1 1 220px; }
-label.field, .field-label {
+label.field, .field-label, .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -299,11 +299,31 @@ li { margin: 6px 0; }
 hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
 .back-top { margin-top: 8px; }
 
-  </style>
+  
+.field > span { color: var(--muted); }
+.gender-toggle {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.gender-btn {
+  flex: 1 1 0;
+  width: 50%;
+  min-height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+.gender-btn.is-on, .gender-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+</style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
 <body>
-  <div class="wrap">
+  <div class="wrap" data-fast-fill="1">
     <header>
       <h1>EMT hospital pre-alert</h1>
       <p class="lede">A quick map of NGC work bases in the UAE, the nearest public emergency hospitals, and a form that writes a hospital pre-notification message. Locations are approximate. There is no official public catchment map. Compiled 11 Nov 2026.</p>
@@ -447,7 +467,14 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
       <label class="field" style="margin-top:12px"><span>Surname</span><input id="patientSurname" type="text" placeholder="e.g. Ali"></label>
       <div class="grid grid-2" style="margin-top:12px">
         <label class="field"><span>Nationality</span><select id="nationality"></select></label>
-        <label class="field"><span>Gender</span><select id="gender"></select></label>
+                <div class="field" id="genderField">
+          <span>Gender</span>
+          <div class="gender-toggle" role="group" aria-label="Gender">
+            <button type="button" class="gender-btn" id="genderMale" data-gender="M" aria-pressed="false">Male</button>
+            <button type="button" class="gender-btn" id="genderFemale" data-gender="F" aria-pressed="false">Female</button>
+          </div>
+          <input type="hidden" id="gender" value="Not stated">
+        </div>
         <div>
           <div class="field-label"><span>Date of birth</span>
             <input id="dateOfBirth" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="e.g. 11/11/1990">
@@ -1414,7 +1441,7 @@ function splitPersonName(full) {
   if (parts.length === 1) return { name: parts[0], surname: "" };
   return { name: parts.slice(0, -1).join(" "), surname: parts[parts.length - 1] };
 }
-var EID_NAT_ALIASES = ["indian", "india", "indlan", "indain", "pakistani", "pakistan", "paklstan", "nepali", "nepalese", "nepal", "south african", "south africa", "emirati", "united arab emirates", "uae", "u a e", "lebanese", "lebanon", "bangladeshi", "bangladesh", "filipino", "filipina", "philippines", "philippine", "egyptian", "egypt", "syrian", "syria", "jordanian", "jordan", "sudanese", "sudan", "ethiopian", "ethiopia", "kenyan", "kenya", "canadian", "canada", "american", "usa", "united states", "british", "united kingdom", "uk", "chinese", "china", "iraqi", "iraq", "iranian", "iran", "saudi", "saudi arabian", "saudi arabia", "yemeni", "yemen", "omani", "oman", "kuwaiti", "kuwait", "sri lankan", "sri lanka", "indonesian", "indonesia", "moroccan", "morocco", "tunisian", "tunisia", "algerian", "algeria", "turkish", "turkey", "russian", "russia", "ukrainian", "ukraine", "french", "france", "german", "germany", "italian", "italy", "irish", "ireland", "australian", "australia", "nigerian", "nigeria", "ghanaian", "ghana", "zimbabwean", "zimbabwe"];
+var EID_NAT_ALIASES = ["indian", "india", "indlan", "indain", "pakistani", "pakistan", "paklstan", "nepali", "nepalese", "nepal", "south african", "south africa", "emirati", "united arab emirates", "uae", "u a e", "lebanese", "lebanon", "bangladeshi", "bangladesh", "filipino", "filipina", "philippines", "philippine", "egyptian", "egypt", "syrian", "syria", "jordanian", "jordan", "sudanese", "sudan", "ethiopian", "ethiopia", "kenyan", "kenya", "canadian", "canada", "american", "usa", "united states", "british", "united kingdom", "uk", "chinese", "china", "iraqi", "iraq", "iranian", "iran", "saudi", "saudi arabian", "saudi arabia", "yemeni", "yemen", "omani", "oman", "kuwaiti", "kuwait", "sri lankan", "sri lanka", "indonesian", "indonesia", "moroccan", "morocco", "tunisian", "tunisia", "algerian", "algeria", "turkish", "turkey", "russian", "russia", "ukrainian", "ukraine", "french", "france", "german", "germany", "italian", "italy", "irish", "ireland", "australian", "australia", "nigerian", "nigeria", "ghanaian", "ghana", "zimbabwean", "zimbabwe", "mexican", "mexico", "brazilian", "brazil", "argentinian", "argentine", "argentina", "colombian", "colombia", "scottish", "scotland", "spanish", "spain", "dutch", "netherlands", "holland", "polish", "poland", "japanese", "japan", "korean", "korea", "south korean", "south korea", "thai", "thailand", "vietnamese", "vietnam"];
 function fuzzyNationalityRaw(raw) {
   var token = normalizeOcrLine(raw).toLowerCase().replace(/\./g, "");
   if (!token) return "";
@@ -1504,20 +1531,71 @@ function ageFromParsedDob(dob, now) {
   return "";
 }
 function mapEidNationality(raw) {
-  const n = raw.trim().replace(/\./g, "").replace(/\s+/g, " ").toLowerCase();
-  if (/\b(emirati|uae|u a e|united arab emirates)\b/.test(n) || n === "emirates") return { nationality: "Emirati", nationalityOther: "" };
-  if (/\b(indian|india)\b/.test(n)) return { nationality: "Indian", nationalityOther: "" };
-  if (/\b(nepali|nepalese|nepal)\b/.test(n)) return { nationality: "Nepali", nationalityOther: "" };
-  if (/\b(south african|south africa)\b/.test(n)) return { nationality: "South African", nationalityOther: "" };
-  if (/\b(pakistani|pakistan)\b/.test(n)) return { nationality: "Pakistani", nationalityOther: "" };
-  if (/\b(lebanese|lebanon)\b/.test(n)) return { nationality: "Lebanese", nationalityOther: "" };
-  
-  if (typeof fuzzyNationalityRaw === "function") {
-    var fuzzyNat = fuzzyNationalityRaw(raw);
-    if (fuzzyNat && fuzzyNat.toLowerCase() !== n) return mapEidNationality(fuzzyNat);
+    const n = raw.trim().replace(/\./g, "").replace(/\s+/g, " ").toLowerCase();
+    const aliasMap = {
+      "Emirati (UAE)": ["emirati (uae)", "emirati", "united arab emirates", "u a e", "uae", "emirates"],
+      "Emirati": ["emirati", "united arab emirates", "u a e", "uae", "emirates"],
+      "Indian": ["indian", "india"],
+      "Pakistani": ["pakistani", "pakistan"],
+      "Bangladeshi": ["bangladeshi", "bangladesh"],
+      "Filipino": ["filipino", "filipina", "philippines", "philippine"],
+      "Nepali": ["nepali", "nepalese", "nepal"],
+      "Sri Lankan": ["sri lankan", "sri lanka"],
+      "Egyptian": ["egyptian", "egypt"],
+      "USA": ["usa", "u s a", "united states of america", "united states", "american"],
+      "Canadian": ["canadian", "canada"],
+      "Mexican": ["mexican", "mexico"],
+      "Brazilian": ["brazilian", "brazil"],
+      "Argentinian": ["argentinian", "argentine", "argentina"],
+      "Colombian": ["colombian", "colombia"],
+      "UK": ["uk", "united kingdom", "great britain", "british", "england"],
+      "Scottish": ["scottish", "scotland"],
+      "Irish": ["irish", "ireland"],
+      "French": ["french", "france"],
+      "German": ["german", "germany"],
+      "Spanish": ["spanish", "spain"],
+      "Italian": ["italian", "italy"],
+      "Dutch": ["dutch", "netherlands", "holland"],
+      "Polish": ["polish", "poland"],
+      "Russian": ["russian", "russia"],
+      "Ukrainian": ["ukrainian", "ukraine"],
+      "Chinese": ["chinese", "china"],
+      "Japanese": ["japanese", "japan"],
+      "Korean": ["korean", "korea", "south korean", "south korea"],
+      "Thai": ["thai", "thailand"],
+      "Vietnamese": ["vietnamese", "vietnam"],
+      "Turkish": ["turkish", "turkey"],
+      "Zimbabwean": ["zimbabwean", "zimbabwe"],
+      "South African": ["south african", "south africa"],
+      "Iranian": ["iranian", "iran"],
+      "Saudi Arabian": ["saudi arabian", "saudi arabia", "saudi"],
+      "Lebanese": ["lebanese", "lebanon"]
+    };
+    const options = NATIONALITY_OPTIONS.filter(function (o) {
+      return o.value && o.value !== "Other" && o.value !== "Not stated" && !o.disabled;
+    });
+    function esc(al) {
+      return al.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+");
+    }
+    for (var i = 0; i < options.length; i++) {
+      var val = options[i].value;
+      var aliases = (aliasMap[val] || []).concat([val.toLowerCase(), String(options[i].label || "").toLowerCase()]);
+      var seen = {};
+      for (var j = 0; j < aliases.length; j++) {
+        var al = aliases[j];
+        if (!al || seen[al]) continue;
+        seen[al] = true;
+        if (n === al || new RegExp("\\b" + esc(al) + "\\b").test(n)) {
+          return { nationality: val, nationalityOther: "" };
+        }
+      }
+    }
+    if (typeof fuzzyNationalityRaw === "function") {
+      var fuzzyNat = fuzzyNationalityRaw(raw);
+      if (fuzzyNat && fuzzyNat.toLowerCase() !== n) return mapEidNationality(fuzzyNat);
+    }
+    return { nationality: "Other", nationalityOther: prettyEidName(raw.trim()) };
   }
-  return { nationality: "Other", nationalityOther: prettyEidName(raw.trim()) };
-}
 function parseEidText(text, now) {
   now = now || new Date();
   var empty = { name: "", surname: "", eid: "", nationality: "", nationalityOther: "", gender: "", dob: "", age: "", occupation: "", employer: "", issuingPlace: "" };
@@ -1595,10 +1673,41 @@ const NATIONALITY_OPTIONS = [
   { value: "Not stated", label: "Not stated" },
   { value: "Emirati", label: "Emirati" },
   { value: "Indian", label: "Indian" },
-  { value: "Nepali", label: "Nepali" },
-  { value: "South African", label: "South African" },
   { value: "Pakistani", label: "Pakistani" },
+  { value: "Bangladeshi", label: "Bangladeshi" },
+  { value: "Filipino", label: "Filipino" },
+  { value: "Nepali", label: "Nepali" },
+  { value: "Sri Lankan", label: "Sri Lankan" },
+  { value: "Egyptian", label: "Egyptian" },
+  { value: "__sep__", label: "──────", disabled: true },
+  { value: "Argentinian", label: "Argentinian" },
+  { value: "Brazilian", label: "Brazilian" },
+  { value: "Canadian", label: "Canadian" },
+  { value: "Chinese", label: "Chinese" },
+  { value: "Colombian", label: "Colombian" },
+  { value: "Dutch", label: "Dutch" },
+  { value: "French", label: "French" },
+  { value: "German", label: "German" },
+  { value: "Iranian", label: "Iranian" },
+  { value: "Irish", label: "Irish" },
+  { value: "Italian", label: "Italian" },
+  { value: "Japanese", label: "Japanese" },
+  { value: "Korean", label: "Korean" },
   { value: "Lebanese", label: "Lebanese" },
+  { value: "Mexican", label: "Mexican" },
+  { value: "Polish", label: "Polish" },
+  { value: "Russian", label: "Russian" },
+  { value: "Saudi Arabian", label: "Saudi Arabian" },
+  { value: "Scottish", label: "Scottish" },
+  { value: "South African", label: "South African" },
+  { value: "Spanish", label: "Spanish" },
+  { value: "Thai", label: "Thai" },
+  { value: "Turkish", label: "Turkish" },
+  { value: "UK", label: "UK" },
+  { value: "Ukrainian", label: "Ukrainian" },
+  { value: "USA", label: "USA" },
+  { value: "Vietnamese", label: "Vietnamese" },
+  { value: "Zimbabwean", label: "Zimbabwean" },
   { value: "Other", label: "Other" },
 ];
 const GCS_EYE_OPTIONS = [
@@ -1837,12 +1946,150 @@ if (typeof module !== "undefined" && module.exports) {
 
   function el(id) { return document.getElementById(id); }
   function show(node, on) { if (node) node.classList.toggle("hidden", !on); }
+  function syncGenderButtons() {
+    var buttons = document.querySelectorAll(".gender-btn");
+    var val = state.gender;
+    for (var i = 0; i < buttons.length; i++) {
+      var on = buttons[i].getAttribute("data-gender") === val;
+      buttons[i].setAttribute("aria-pressed", on ? "true" : "false");
+      buttons[i].classList.toggle("is-on", on);
+    }
+    var hidden = el("gender");
+    if (hidden) hidden.value = val || "";
+  }
+  function isFastFillSkip(node) {
+    if (!node || !node.tagName) return true;
+    var typ = (node.type || "").toLowerCase();
+    if (typ === "hidden" || typ === "file" || typ === "checkbox" || typ === "radio" || typ === "button" || typ === "submit" || typ === "reset") return true;
+    if (node.classList && node.classList.contains("gender-btn")) return false;
+    var id = node.id || "";
+    if (id === "copyFallback" || id === "messagePreview" || id === "eidPaste" || id === "eidFile" || id === "eidCamera") return true;
+    return false;
+  }
+  function isFastFillVisible(node) {
+    if (!node) return false;
+    var p = node;
+    while (p && p !== document.body) {
+      if (p.classList && p.classList.contains("hidden")) return false;
+      if (p.type === "hidden") return false;
+      if (p.nodeType === 1 && p.getAttribute && p.getAttribute("aria-hidden") === "true") return false;
+      var style = p.style;
+      if (style && (style.display === "none" || style.visibility === "hidden")) return false;
+      p = p.parentElement;
+    }
+    if (node.offsetParent === null && node.getClientRects && node.getClientRects().length === 0) return false;
+    return true;
+  }
+  function fastFillRoot() {
+    return document.querySelector("[data-fast-fill]") || document.querySelector(".wrap") || document.body;
+  }
+  function fastFillFields() {
+    var root = fastFillRoot();
+    var nodes = root.querySelectorAll("input, select, textarea, .gender-btn");
+    var list = [];
+    var seenGender = false;
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.classList && n.classList.contains("gender-btn")) {
+        if (seenGender) continue;
+        if (!isFastFillVisible(n)) continue;
+        seenGender = true;
+        list.push(el("genderField") || n);
+        continue;
+      }
+      if (isFastFillSkip(n) || !isFastFillVisible(n)) continue;
+      list.push(n);
+    }
+    return list;
+  }
+  function focusNextField(from) {
+    var start = from;
+    if (from && from.classList && from.classList.contains("gender-btn")) start = el("genderField") || from;
+    if (from && from.id === "gender") start = el("genderField") || from;
+    var list = fastFillFields();
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] === start || (start && list[i].contains && (list[i] === start || list[i].contains(start) || (start.contains && start.contains(list[i]))))) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0) return;
+    var next = list[idx + 1];
+    if (!next) return;
+    var target = next;
+    if (next.id === "genderField") {
+      var pressed = next.querySelector(".gender-btn[aria-pressed='true']") || next.querySelector(".gender-btn");
+      target = pressed || next;
+    }
+    if (target && typeof target.focus === "function") {
+      try { target.focus(); } catch (e) {}
+    }
+  }
+  function bindFastFill() {
+    var root = fastFillRoot();
+    var inputs = root.querySelectorAll("input[type='text'], input[type='number'], input[type='tel'], input[type='email'], input:not([type]), input[inputmode]");
+    for (var i = 0; i < inputs.length; i++) {
+      var inp = inputs[i];
+      if (isFastFillSkip(inp)) continue;
+      if (!inp.getAttribute("enterkeyhint")) inp.setAttribute("enterkeyhint", "next");
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.keyCode === 13) {
+          e.preventDefault();
+          focusNextField(e.currentTarget);
+        }
+      });
+    }
+    var selects = root.querySelectorAll("select");
+    for (var s = 0; s < selects.length; s++) {
+      selects[s].addEventListener("change", function (e) {
+        var sel = e.currentTarget;
+        if (sel.value === "__sep__") return;
+        window.setTimeout(function () {
+          if (sel.id === "nationality" && sel.value === "Other" && el("nationalityOther") && isFastFillVisible(el("nationalityOther"))) {
+            try { el("nationalityOther").focus(); } catch (err) {}
+            return;
+          }
+          focusNextField(sel);
+        }, 0);
+      });
+    }
+  }
+  var eidAdvanceArmed = true;
+  function maybeAdvanceEid() {
+    var field = el("eid");
+    if (!field) return;
+    var digits = String(state.eid || field.value || "").replace(/\D/g, "");
+    if (digits.length >= 15) {
+      if (eidAdvanceArmed) {
+        eidAdvanceArmed = false;
+        focusNextField(field);
+      }
+    } else {
+      eidAdvanceArmed = true;
+    }
+  }
+  function bindGenderButtons() {
+    var buttons = document.querySelectorAll(".gender-btn");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].addEventListener("click", function (e) {
+        var btn = e.currentTarget;
+        state.gender = btn.getAttribute("data-gender") || "";
+        if (typeof touchForm === "function") touchForm();
+        syncGenderButtons();
+        refresh();
+        focusNextField(btn);
+      });
+    }
+  }
+
   function fillSelect(select, options) {
     select.innerHTML = "";
     options.forEach(function (opt) {
       const o = document.createElement("option");
       o.value = opt.value;
       o.textContent = opt.label;
+      if (opt.disabled) o.disabled = true;
       select.appendChild(o);
     });
   }
@@ -2212,6 +2459,7 @@ if (typeof module !== "undefined" && module.exports) {
   }
 
   function refresh() {
+    syncGenderButtons();
     updateHospitalOptions();
     updateConditional();
     renderHospitalList();
@@ -3381,7 +3629,6 @@ if (typeof module !== "undefined" && module.exports) {
     fillSelect(el("subClass"), SUB_CLASS_OPTIONS);
     fillSelect(el("incidentType"), INCIDENT_TYPE_OPTIONS);
     fillSelect(el("nationality"), NATIONALITY_OPTIONS);
-    fillSelect(el("gender"), [{ value: "Not stated", label: "Not stated" }, { value: "M", label: "M" }, { value: "F", label: "F" }]);
     fillSelect(el("primaryA"), PRIMARY_A_OPTIONS);
     fillSelect(el("primaryB"), PRIMARY_B_OPTIONS);
     fillSelect(el("primaryC"), PRIMARY_C_OPTIONS);
@@ -3452,13 +3699,15 @@ if (typeof module !== "undefined" && module.exports) {
     bindValue("hospitalNumber", "hospitalNumber");
     el("nationality").addEventListener("change", function () { state.nationality = el("nationality").value; refresh(); });
     bindValue("nationalityOther", "nationalityOther");
-    el("gender").addEventListener("change", function () { state.gender = el("gender").value; refresh(); });
+    bindGenderButtons();
+    bindFastFill();
     bindValue("age", "age");
     el("eid").addEventListener("input", function () {
       state.eid = el("eid").value;
       applyBirthYearFromEidField();
       el("eid").value = state.eid;
       refresh();
+      maybeAdvanceEid();
     });
     el("eid").addEventListener("blur", function () {
       applyBirthYearFromEidField();

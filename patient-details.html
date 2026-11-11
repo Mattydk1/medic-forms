@@ -58,7 +58,7 @@ h2 { font-size: 1.2rem; margin: 28px 0 10px; }
   margin: 12px 0;
 }
 .callout .lead { font-weight: 700; margin-bottom: 4px; }
-label.field, .field-label {
+label.field, .field-label, .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -135,10 +135,30 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-  </style>
+  
+.field > span { color: var(--muted); }
+.gender-toggle {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.gender-btn {
+  flex: 1 1 0;
+  width: 50%;
+  min-height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+.gender-btn.is-on, .gender-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+</style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="wrap" data-fast-fill="1">
     <header>
       <h1>Patient details</h1>
       <p class="lede">A short form to capture patient details at an event, or when someone needs a quick handover. Fill in what you know, edit anything before you copy, and send it the way you need to. Nothing is saved or sent.</p>
@@ -220,7 +240,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       <label class="field"><span>Issuing place</span><input id="issuingPlace" type="text" placeholder="e.g. Abu Dhabi"></label>
     </div>
     <div class="grid grid-2" style="margin-top:12px">
-      <label class="field"><span>Gender</span><select id="gender"></select></label>
+            <div class="field" id="genderField">
+        <span>Gender</span>
+        <div class="gender-toggle" role="group" aria-label="Gender">
+          <button type="button" class="gender-btn" id="genderMale" data-gender="Male" aria-pressed="false">Male</button>
+          <button type="button" class="gender-btn" id="genderFemale" data-gender="Female" aria-pressed="false">Female</button>
+        </div>
+        <input type="hidden" id="gender" value="">
+      </div>
       <div>
         <label class="field"><span>Nationality</span><select id="nationality"></select></label>
         <label class="field hidden" id="nationalityOtherWrap" style="margin-top:12px"><span>Nationality (other)</span><input id="nationalityOther" type="text" placeholder="Type the nationality"></label>
@@ -284,39 +311,45 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   "use strict";
   const NATIONALITY_OPTIONS = [
     { value: "", label: "Select..." },
-    { value: "USA", label: "USA" },
-    { value: "Canadian", label: "Canadian" },
-    { value: "Mexican", label: "Mexican" },
-    { value: "Brazilian", label: "Brazilian" },
+    { value: "Emirati (UAE)", label: "Emirati (UAE)" },
+    { value: "Indian", label: "Indian" },
+    { value: "Pakistani", label: "Pakistani" },
+    { value: "Bangladeshi", label: "Bangladeshi" },
+    { value: "Filipino", label: "Filipino" },
+    { value: "Nepali", label: "Nepali" },
+    { value: "Sri Lankan", label: "Sri Lankan" },
+    { value: "Egyptian", label: "Egyptian" },
+    { value: "__sep__", label: "──────", disabled: true },
     { value: "Argentinian", label: "Argentinian" },
+    { value: "Brazilian", label: "Brazilian" },
+    { value: "Canadian", label: "Canadian" },
+    { value: "Chinese", label: "Chinese" },
     { value: "Colombian", label: "Colombian" },
-    { value: "UK", label: "UK" },
-    { value: "Scottish", label: "Scottish" },
-    { value: "Irish", label: "Irish" },
+    { value: "Dutch", label: "Dutch" },
     { value: "French", label: "French" },
     { value: "German", label: "German" },
-    { value: "Spanish", label: "Spanish" },
+    { value: "Iranian", label: "Iranian" },
+    { value: "Irish", label: "Irish" },
     { value: "Italian", label: "Italian" },
-    { value: "Dutch", label: "Dutch" },
+    { value: "Japanese", label: "Japanese" },
+    { value: "Korean", label: "Korean" },
+    { value: "Lebanese", label: "Lebanese" },
+    { value: "Mexican", label: "Mexican" },
     { value: "Polish", label: "Polish" },
     { value: "Russian", label: "Russian" },
-    { value: "Ukrainian", label: "Ukrainian" },
-    { value: "Chinese", label: "Chinese" },
-    { value: "Japanese", label: "Japanese" },
-    { value: "Indian", label: "Indian" },
-    { value: "Korean", label: "Korean" },
-    { value: "Thai", label: "Thai" },
-    { value: "Vietnamese", label: "Vietnamese" },
-    { value: "Turkish", label: "Turkish" },
-    { value: "Pakistani", label: "Pakistani" },
-    { value: "Emirati (UAE)", label: "Emirati (UAE)" },
-    { value: "Nepali", label: "Nepali" },
-    { value: "Zimbabwean", label: "Zimbabwean" },
-    { value: "South African", label: "South African" },
-    { value: "Iranian", label: "Iranian" },
     { value: "Saudi Arabian", label: "Saudi Arabian" },
+    { value: "Scottish", label: "Scottish" },
+    { value: "South African", label: "South African" },
+    { value: "Spanish", label: "Spanish" },
+    { value: "Thai", label: "Thai" },
+    { value: "Turkish", label: "Turkish" },
+    { value: "UK", label: "UK" },
+    { value: "Ukrainian", label: "Ukrainian" },
+    { value: "USA", label: "USA" },
+    { value: "Vietnamese", label: "Vietnamese" },
+    { value: "Zimbabwean", label: "Zimbabwean" },
     { value: "Other", label: "Other" },
-  ];
+];
   const GENDER_OPTIONS = [
     { value: "", label: "Select..." },
     { value: "Male", label: "Male" },
@@ -737,7 +770,7 @@ function parseEidGender(raw) {
     if (parts.length === 1) return { name: parts[0], surname: "" };
     return { name: parts.slice(0, -1).join(" "), surname: parts[parts.length - 1] };
   }
-  var EID_NAT_ALIASES = ["indian", "india", "indlan", "indain", "pakistani", "pakistan", "paklstan", "nepali", "nepalese", "nepal", "south african", "south africa", "emirati", "united arab emirates", "uae", "u a e", "lebanese", "lebanon", "bangladeshi", "bangladesh", "filipino", "filipina", "philippines", "philippine", "egyptian", "egypt", "syrian", "syria", "jordanian", "jordan", "sudanese", "sudan", "ethiopian", "ethiopia", "kenyan", "kenya", "canadian", "canada", "american", "usa", "united states", "british", "united kingdom", "uk", "chinese", "china", "iraqi", "iraq", "iranian", "iran", "saudi", "saudi arabian", "saudi arabia", "yemeni", "yemen", "omani", "oman", "kuwaiti", "kuwait", "sri lankan", "sri lanka", "indonesian", "indonesia", "moroccan", "morocco", "tunisian", "tunisia", "algerian", "algeria", "turkish", "turkey", "russian", "russia", "ukrainian", "ukraine", "french", "france", "german", "germany", "italian", "italy", "irish", "ireland", "australian", "australia", "nigerian", "nigeria", "ghanaian", "ghana", "zimbabwean", "zimbabwe"];
+  var EID_NAT_ALIASES = ["indian", "india", "indlan", "indain", "pakistani", "pakistan", "paklstan", "nepali", "nepalese", "nepal", "south african", "south africa", "emirati", "united arab emirates", "uae", "u a e", "lebanese", "lebanon", "bangladeshi", "bangladesh", "filipino", "filipina", "philippines", "philippine", "egyptian", "egypt", "syrian", "syria", "jordanian", "jordan", "sudanese", "sudan", "ethiopian", "ethiopia", "kenyan", "kenya", "canadian", "canada", "american", "usa", "united states", "british", "united kingdom", "uk", "chinese", "china", "iraqi", "iraq", "iranian", "iran", "saudi", "saudi arabian", "saudi arabia", "yemeni", "yemen", "omani", "oman", "kuwaiti", "kuwait", "sri lankan", "sri lanka", "indonesian", "indonesia", "moroccan", "morocco", "tunisian", "tunisia", "algerian", "algeria", "turkish", "turkey", "russian", "russia", "ukrainian", "ukraine", "french", "france", "german", "germany", "italian", "italy", "irish", "ireland", "australian", "australia", "nigerian", "nigeria", "ghanaian", "ghana", "zimbabwean", "zimbabwe", "mexican", "mexico", "brazilian", "brazil", "argentinian", "argentine", "argentina", "colombian", "colombia", "scottish", "scotland", "spanish", "spain", "dutch", "netherlands", "holland", "polish", "poland", "japanese", "japan", "korean", "korea", "south korean", "south korea", "thai", "thailand", "vietnamese", "vietnam"];
   function fuzzyNationalityRaw(raw) {
     var token = normalizeOcrLine(raw).toLowerCase().replace(/\./g, "");
     if (!token) return "";
@@ -828,43 +861,64 @@ function parseEidGender(raw) {
   }
 function mapEidNationality(raw) {
     const n = raw.trim().replace(/\./g, "").replace(/\s+/g, " ").toLowerCase();
-    const pairs = [
-      [/\b(united states of america|united states|american|usa|u s a)\b/, "USA"],
-      [/\b(canadian|canada)\b/, "Canadian"],
-      [/\b(mexican|mexico)\b/, "Mexican"],
-      [/\b(brazilian|brazil)\b/, "Brazilian"],
-      [/\b(argentinian|argentine|argentina)\b/, "Argentinian"],
-      [/\b(colombian|colombia)\b/, "Colombian"],
-      [/\b(united kingdom|great britain|british|england|uk)\b/, "UK"],
-      [/\b(scottish|scotland)\b/, "Scottish"],
-      [/\b(irish|ireland)\b/, "Irish"],
-      [/\b(french|france)\b/, "French"],
-      [/\b(german|germany)\b/, "German"],
-      [/\b(spanish|spain)\b/, "Spanish"],
-      [/\b(italian|italy)\b/, "Italian"],
-      [/\b(dutch|netherlands|holland)\b/, "Dutch"],
-      [/\b(polish|poland)\b/, "Polish"],
-      [/\b(russian|russia)\b/, "Russian"],
-      [/\b(ukrainian|ukraine)\b/, "Ukrainian"],
-      [/\b(chinese|china)\b/, "Chinese"],
-      [/\b(japanese|japan)\b/, "Japanese"],
-      [/\b(indian|india)\b/, "Indian"],
-      [/\b(south korean|south korea|korean|korea)\b/, "Korean"],
-      [/\b(thai|thailand)\b/, "Thai"],
-      [/\b(vietnamese|vietnam)\b/, "Vietnamese"],
-      [/\b(turkish|turkey)\b/, "Turkish"],
-      [/\b(pakistani|pakistan)\b/, "Pakistani"],
-      [/\b(emirati|united arab emirates|u a e|uae|emirates)\b/, "Emirati (UAE)"],
-      [/\b(nepali|nepalese|nepal)\b/, "Nepali"],
-      [/\b(zimbabwean|zimbabwe)\b/, "Zimbabwean"],
-      [/\b(south african|south africa)\b/, "South African"],
-      [/\b(iranian|iran)\b/, "Iranian"],
-      [/\b(saudi arabian|saudi arabia|saudi)\b/, "Saudi Arabian"],
-    ];
-    for (let i = 0; i < pairs.length; i++) {
-      if (pairs[i][0].test(n)) return { nationality: pairs[i][1], nationalityOther: "" };
+    const aliasMap = {
+      "Emirati (UAE)": ["emirati (uae)", "emirati", "united arab emirates", "u a e", "uae", "emirates"],
+      "Emirati": ["emirati", "united arab emirates", "u a e", "uae", "emirates"],
+      "Indian": ["indian", "india"],
+      "Pakistani": ["pakistani", "pakistan"],
+      "Bangladeshi": ["bangladeshi", "bangladesh"],
+      "Filipino": ["filipino", "filipina", "philippines", "philippine"],
+      "Nepali": ["nepali", "nepalese", "nepal"],
+      "Sri Lankan": ["sri lankan", "sri lanka"],
+      "Egyptian": ["egyptian", "egypt"],
+      "USA": ["usa", "u s a", "united states of america", "united states", "american"],
+      "Canadian": ["canadian", "canada"],
+      "Mexican": ["mexican", "mexico"],
+      "Brazilian": ["brazilian", "brazil"],
+      "Argentinian": ["argentinian", "argentine", "argentina"],
+      "Colombian": ["colombian", "colombia"],
+      "UK": ["uk", "united kingdom", "great britain", "british", "england"],
+      "Scottish": ["scottish", "scotland"],
+      "Irish": ["irish", "ireland"],
+      "French": ["french", "france"],
+      "German": ["german", "germany"],
+      "Spanish": ["spanish", "spain"],
+      "Italian": ["italian", "italy"],
+      "Dutch": ["dutch", "netherlands", "holland"],
+      "Polish": ["polish", "poland"],
+      "Russian": ["russian", "russia"],
+      "Ukrainian": ["ukrainian", "ukraine"],
+      "Chinese": ["chinese", "china"],
+      "Japanese": ["japanese", "japan"],
+      "Korean": ["korean", "korea", "south korean", "south korea"],
+      "Thai": ["thai", "thailand"],
+      "Vietnamese": ["vietnamese", "vietnam"],
+      "Turkish": ["turkish", "turkey"],
+      "Zimbabwean": ["zimbabwean", "zimbabwe"],
+      "South African": ["south african", "south africa"],
+      "Iranian": ["iranian", "iran"],
+      "Saudi Arabian": ["saudi arabian", "saudi arabia", "saudi"],
+      "Lebanese": ["lebanese", "lebanon"]
+    };
+    const options = NATIONALITY_OPTIONS.filter(function (o) {
+      return o.value && o.value !== "Other" && o.value !== "Not stated" && !o.disabled;
+    });
+    function esc(al) {
+      return al.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+");
     }
-    
+    for (var i = 0; i < options.length; i++) {
+      var val = options[i].value;
+      var aliases = (aliasMap[val] || []).concat([val.toLowerCase(), String(options[i].label || "").toLowerCase()]);
+      var seen = {};
+      for (var j = 0; j < aliases.length; j++) {
+        var al = aliases[j];
+        if (!al || seen[al]) continue;
+        seen[al] = true;
+        if (n === al || new RegExp("\\b" + esc(al) + "\\b").test(n)) {
+          return { nationality: val, nationalityOther: "" };
+        }
+      }
+    }
     if (typeof fuzzyNationalityRaw === "function") {
       var fuzzyNat = fuzzyNationalityRaw(raw);
       if (fuzzyNat && fuzzyNat.toLowerCase() !== n) return mapEidNationality(fuzzyNat);
@@ -1015,12 +1069,150 @@ function mapEidNationality(raw) {
 
   function el(id) { return document.getElementById(id); }
   function show(node, on) { if (node) node.classList.toggle("hidden", !on); }
+  function syncGenderButtons() {
+    var buttons = document.querySelectorAll(".gender-btn");
+    var val = state.gender;
+    for (var i = 0; i < buttons.length; i++) {
+      var on = buttons[i].getAttribute("data-gender") === val;
+      buttons[i].setAttribute("aria-pressed", on ? "true" : "false");
+      buttons[i].classList.toggle("is-on", on);
+    }
+    var hidden = el("gender");
+    if (hidden) hidden.value = val || "";
+  }
+  function isFastFillSkip(node) {
+    if (!node || !node.tagName) return true;
+    var typ = (node.type || "").toLowerCase();
+    if (typ === "hidden" || typ === "file" || typ === "checkbox" || typ === "radio" || typ === "button" || typ === "submit" || typ === "reset") return true;
+    if (node.classList && node.classList.contains("gender-btn")) return false;
+    var id = node.id || "";
+    if (id === "copyFallback" || id === "messagePreview" || id === "eidPaste" || id === "eidFile" || id === "eidCamera") return true;
+    return false;
+  }
+  function isFastFillVisible(node) {
+    if (!node) return false;
+    var p = node;
+    while (p && p !== document.body) {
+      if (p.classList && p.classList.contains("hidden")) return false;
+      if (p.type === "hidden") return false;
+      if (p.nodeType === 1 && p.getAttribute && p.getAttribute("aria-hidden") === "true") return false;
+      var style = p.style;
+      if (style && (style.display === "none" || style.visibility === "hidden")) return false;
+      p = p.parentElement;
+    }
+    if (node.offsetParent === null && node.getClientRects && node.getClientRects().length === 0) return false;
+    return true;
+  }
+  function fastFillRoot() {
+    return document.querySelector("[data-fast-fill]") || document.querySelector(".wrap") || document.body;
+  }
+  function fastFillFields() {
+    var root = fastFillRoot();
+    var nodes = root.querySelectorAll("input, select, textarea, .gender-btn");
+    var list = [];
+    var seenGender = false;
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.classList && n.classList.contains("gender-btn")) {
+        if (seenGender) continue;
+        if (!isFastFillVisible(n)) continue;
+        seenGender = true;
+        list.push(el("genderField") || n);
+        continue;
+      }
+      if (isFastFillSkip(n) || !isFastFillVisible(n)) continue;
+      list.push(n);
+    }
+    return list;
+  }
+  function focusNextField(from) {
+    var start = from;
+    if (from && from.classList && from.classList.contains("gender-btn")) start = el("genderField") || from;
+    if (from && from.id === "gender") start = el("genderField") || from;
+    var list = fastFillFields();
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] === start || (start && list[i].contains && (list[i] === start || list[i].contains(start) || (start.contains && start.contains(list[i]))))) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0) return;
+    var next = list[idx + 1];
+    if (!next) return;
+    var target = next;
+    if (next.id === "genderField") {
+      var pressed = next.querySelector(".gender-btn[aria-pressed='true']") || next.querySelector(".gender-btn");
+      target = pressed || next;
+    }
+    if (target && typeof target.focus === "function") {
+      try { target.focus(); } catch (e) {}
+    }
+  }
+  function bindFastFill() {
+    var root = fastFillRoot();
+    var inputs = root.querySelectorAll("input[type='text'], input[type='number'], input[type='tel'], input[type='email'], input:not([type]), input[inputmode]");
+    for (var i = 0; i < inputs.length; i++) {
+      var inp = inputs[i];
+      if (isFastFillSkip(inp)) continue;
+      if (!inp.getAttribute("enterkeyhint")) inp.setAttribute("enterkeyhint", "next");
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.keyCode === 13) {
+          e.preventDefault();
+          focusNextField(e.currentTarget);
+        }
+      });
+    }
+    var selects = root.querySelectorAll("select");
+    for (var s = 0; s < selects.length; s++) {
+      selects[s].addEventListener("change", function (e) {
+        var sel = e.currentTarget;
+        if (sel.value === "__sep__") return;
+        window.setTimeout(function () {
+          if (sel.id === "nationality" && sel.value === "Other" && el("nationalityOther") && isFastFillVisible(el("nationalityOther"))) {
+            try { el("nationalityOther").focus(); } catch (err) {}
+            return;
+          }
+          focusNextField(sel);
+        }, 0);
+      });
+    }
+  }
+  var eidAdvanceArmed = true;
+  function maybeAdvanceEid() {
+    var field = el("eid");
+    if (!field) return;
+    var digits = String(state.eid || field.value || "").replace(/\D/g, "");
+    if (digits.length >= 15) {
+      if (eidAdvanceArmed) {
+        eidAdvanceArmed = false;
+        focusNextField(field);
+      }
+    } else {
+      eidAdvanceArmed = true;
+    }
+  }
+  function bindGenderButtons() {
+    var buttons = document.querySelectorAll(".gender-btn");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].addEventListener("click", function (e) {
+        var btn = e.currentTarget;
+        state.gender = btn.getAttribute("data-gender") || "";
+        if (typeof touchForm === "function") touchForm();
+        syncGenderButtons();
+        refresh();
+        focusNextField(btn);
+      });
+    }
+  }
+
   function fillSelect(select, options) {
     select.innerHTML = "";
     options.forEach(function (opt) {
       const o = document.createElement("option");
       o.value = opt.value;
       o.textContent = opt.label;
+      if (opt.disabled) o.disabled = true;
       select.appendChild(o);
     });
   }
@@ -1078,6 +1270,7 @@ function mapEidNationality(raw) {
   }
   function touchForm() { state.messageDirty = false; }
   function refresh() {
+    syncGenderButtons();
     show(el("ageMonthsWrap"), state.ageMode === "infant");
     show(el("participantTypeOtherWrap"), state.participantType === "Other");
     show(el("nationalityOtherWrap"), state.nationality === "Other");
@@ -1974,7 +2167,6 @@ function mapEidNationality(raw) {
   fillSelect(el("ageMode"), AGE_YEAR_OPTIONS);
   fillSelect(el("ageMonths"), AGE_MONTH_OPTIONS);
   fillSelect(el("participantType"), PARTICIPANT_TYPE_OPTIONS);
-  fillSelect(el("gender"), GENDER_OPTIONS);
   fillSelect(el("nationality"), NATIONALITY_OPTIONS);
   el("nationality").value = "";
   fillSelect(el("condition"), CONDITION_OPTIONS);
@@ -2068,7 +2260,8 @@ function mapEidNationality(raw) {
     touchForm();
     refresh();
   });
-  el("gender").addEventListener("change", function () { state.gender = el("gender").value; touchForm(); refresh(); });
+  bindGenderButtons();
+  bindFastFill();
   el("nationality").addEventListener("change", function () { state.nationality = el("nationality").value; touchForm(); refresh(); });
   bind("nationalityOther", "nationalityOther");
   el("eid").addEventListener("input", function () {
@@ -2093,6 +2286,7 @@ function mapEidNationality(raw) {
     }
     touchForm();
     refresh();
+    maybeAdvanceEid();
   });
   bind("occupation", "occupation");
   bind("employer", "employer");
