@@ -24,7 +24,7 @@
   --tap: 44px;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not([data-theme="light"]) {
     --bg: #101215;
     --bg-card: #1a1d22;
     --bg-subtle: #15181d;
@@ -35,6 +35,17 @@
     --accent-fg: #0b1220;
     --warning: #f0c36b;
   }
+}
+html[data-theme="dark"] {
+  --bg: #101215;
+  --bg-card: #1a1d22;
+  --bg-subtle: #15181d;
+  --fg: #f2f4f7;
+  --muted: #b0b7c3;
+  --border: #3a404a;
+  --accent: #6ea0ff;
+  --accent-fg: #0b1220;
+  --warning: #f0c36b;
 }
 * { box-sizing: border-box; }
 body {
@@ -174,18 +185,67 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .bp-pair { display: flex; align-items: center; gap: 6px; width: 100%; }
 .bp-pair input { flex: 1; min-width: 0; text-align: center; }
 .bp-slash { font-weight: 600; color: var(--fg); }
+
+.chip-row, .quick-times { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.quick-times { margin-top: 12px; }
+button.chip, .chip-row button, .quick-times button, button.gcs-btn {
+  font-weight: 700;
+}
+button.chip.is-on, .quick-times button.is-on, button.gcs-btn.is-on, #nkdaBtn.is-on, #noMedsBtn.is-on {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+.extra-vitals {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.extra-vitals-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.gcs-pad { margin-top: 8px; }
+.gcs-pad-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.gcs-pad-row .lab { width: 20px; font-weight: 700; color: var(--muted); }
+button.gcs-btn { min-width: 44px; }
+.gcs-pad-total { margin-top: 8px; font-weight: 700; }
+button.clear-form-btn {
+  min-height: 52px;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+.theme-toggle {
+  margin: 8px 0 12px;
+  font-weight: 600;
+}
 </style>
 </head>
 <body>
   <div class="wrap" data-fast-fill="1">
     <header>
       <h1>Patient details</h1>
-      <p class="lede">A short form to capture patient details at an event, or when someone needs a quick handover. Fill in what you know, edit anything before you copy, and send it the way you need to. Nothing is saved or sent.</p>
+      <p class="lede">A short form to capture patient details at an event, or when someone needs a quick handover. Fill in what you know, edit anything before you copy, and send it the way you need to.</p>
     </header>
     <div class="callout">
-      <div class="lead">Nothing is saved or sent</div>
-      This file runs only on this device. Patient details stay in the form until you copy or clear them. You can change any field, including Age, and you can edit the message itself before you copy it.
+      <div class="lead">Nothing is sent</div>
+      This file runs only on this device. A draft is kept on this device until you clear the form. You can change any field, including Age, and you can edit the message itself before you copy it.
     </div>
+    <button type="button" id="darkModeToggle" class="theme-toggle" aria-pressed="false">Dark mode: off</button>
     <p>Leave blank what you do not know — blank fields are left out of the message. If you change a form field after editing the message, the message is rebuilt from the form.</p>
 
     <h2>Event</h2>
@@ -220,6 +280,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
           </div>
         </div>
       </div>
+    </div>
+    <div class="quick-times" id="quickTimes">
+      <button type="button" data-time-key="callReceived" data-label="Call received">Call received</button>
+      <button type="button" data-time-key="onScene" data-label="On scene">On scene</button>
+      <button type="button" data-time-key="leavingScene" data-label="Leaving scene">Leaving scene</button>
     </div>
     <label class="field" style="margin-top:12px"><span>Location / area</span><input id="location" type="text" placeholder="e.g. Hall A, west entrance"></label>
 
@@ -279,11 +344,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
     <h2>What happened</h2>
     <label class="field"><span>Chief complaint</span><input id="complaint" type="text" placeholder="e.g. dizziness, collapse"></label>
+    <div class="chip-row" id="complaintChips"></div>
     <label class="field" style="margin-top:12px"><span>Short description</span><textarea id="description" rows="4" placeholder="What happened, in a few lines"></textarea></label>
 
     <h2>History</h2>
-    <label class="field"><span>Allergies</span><input id="allergies" type="text" placeholder="e.g. NKDA, or penicillin"></label>
+    <label class="field"><span>Allergies</span><input id="allergies" type="text" placeholder="e.g. No known drug allergies, or penicillin"></label>
+    <div class="chip-row"><button type="button" id="nkdaBtn">No known drug allergies</button></div>
     <label class="field" style="margin-top:12px"><span>Medications</span><input id="medications" type="text" placeholder="Current medicines"></label>
+    <div class="chip-row"><button type="button" id="noMedsBtn">No meds</button></div>
     <label class="field" style="margin-top:12px"><span>Medical history</span><input id="medicalHistory" type="text" placeholder="Past medical history"></label>
 
     <h2>Condition</h2>
@@ -314,6 +382,15 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
         <span class="vital-input"><input id="hgt" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="6.2"><span class="vital-unit">mmol/L</span></span>
       </label>
     </div>
+    <div id="extraVitals"></div>
+    <div style="margin-top:10px"><button type="button" id="repeatVitals">+ Repeat vitals</button></div>
+    <div class="field-label" style="margin-top:12px"><span>GCS</span></div>
+    <div class="gcs-pad" id="gcsPad">
+      <div class="gcs-pad-row" data-axis="E"><span class="lab">E</span><button type="button" class="gcs-btn" data-gcs="E" data-val="1">1</button><button type="button" class="gcs-btn" data-gcs="E" data-val="2">2</button><button type="button" class="gcs-btn" data-gcs="E" data-val="3">3</button><button type="button" class="gcs-btn" data-gcs="E" data-val="4">4</button></div>
+      <div class="gcs-pad-row" data-axis="V"><span class="lab">V</span><button type="button" class="gcs-btn" data-gcs="V" data-val="1">1</button><button type="button" class="gcs-btn" data-gcs="V" data-val="2">2</button><button type="button" class="gcs-btn" data-gcs="V" data-val="3">3</button><button type="button" class="gcs-btn" data-gcs="V" data-val="4">4</button><button type="button" class="gcs-btn" data-gcs="V" data-val="5">5</button></div>
+      <div class="gcs-pad-row" data-axis="M"><span class="lab">M</span><button type="button" class="gcs-btn" data-gcs="M" data-val="1">1</button><button type="button" class="gcs-btn" data-gcs="M" data-val="2">2</button><button type="button" class="gcs-btn" data-gcs="M" data-val="3">3</button><button type="button" class="gcs-btn" data-gcs="M" data-val="4">4</button><button type="button" class="gcs-btn" data-gcs="M" data-val="5">5</button><button type="button" class="gcs-btn" data-gcs="M" data-val="6">6</button></div>
+      <div class="gcs-pad-total" id="gcsPadTotal">GCS not set</div>
+    </div>
     <label class="field" style="margin-top:12px"><span>Treatment given</span><textarea id="treatment" rows="3" placeholder="Treatment given"></textarea></label>
 
     <h2>Outcome</h2>
@@ -341,8 +418,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div class="actions">
       <button type="button" class="primary" id="copyMessage">Copy message</button>
       <button type="button" id="shareMessage">Share</button>
-      <button type="button" id="clearForm">Clear form</button>
     </div>
+    <button type="button" id="clearForm" class="clear-form-btn">Clear form</button>
     <div id="shareNote" class="hint hidden" style="margin-top:8px"></div>
   </div>
   <script>
@@ -1033,6 +1110,40 @@ function mapEidNationality(raw) {
     const d = new Date();
     return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   }
+  var COMPLAINT_CHIPS = ["Chest pain", "Shortness of breath", "Trauma", "Fall", "Abdominal pain", "Seizure", "Altered LOC", "Syncope", "Burns", "Allergic reaction"];
+  var THEME_KEY = "matty-forms-theme";
+  var PD_STORAGE_KEY = "matty-forms-patient-details-v1";
+  var NKDA_TEXT = "No known drug allergies";
+  var draftReady = false;
+  var saveTimer = null;
+  function appendChip(current, chip) {
+    var cur = String(current || "").trim();
+    if (!cur) return chip;
+    var parts = cur.split(",").map(function (p) { return p.trim().toLowerCase(); });
+    if (parts.indexOf(chip.toLowerCase()) !== -1) return current;
+    return cur + ", " + chip;
+  }
+  function formatGcsShort(e, v, m) {
+    if (!e && !v && !m) return "";
+    var parts = (e ? ("E" + e) : "E?") + (v ? ("V" + v) : "V?") + (m ? ("M" + m) : "M?");
+    if (e && v && m) {
+      if (v === "T") return "GCS " + (Number(e) + Number(m)) + "T (" + parts + ")";
+      return "GCS " + (Number(e) + Number(v) + Number(m)) + " (" + parts + ")";
+    }
+    return "GCS (" + parts + ")";
+  }
+  function newExtraVitalsRow() {
+    return { id: Date.now() + "-" + Math.random().toString(36).slice(2, 8), time: formatNowTime(), bpSys: "", bpDia: "", hr: "", rr: "", spo2: "", temp: "", hgt: "" };
+  }
+  function extraVitalLines(rows) {
+    return (rows || []).map(function (row) {
+      var line = formatVitalsLine(row);
+      if (!line && !row.time) return "";
+      if (!line) return "Vitals at " + row.time + ":";
+      return row.time ? ("Vitals at " + row.time + ": " + line) : ("Vitals: " + line);
+    }).filter(Boolean);
+  }
+
   function parseHHMM(value) {
     const match = filled(value).match(/^(\d{1,2}):(\d{2})$/);
     if (!match) return null;
@@ -1070,6 +1181,9 @@ function mapEidNationality(raw) {
     if (parseDateDDMMYYYY(opts.eventDate)) addLine(event, "Date", opts.eventDate);
     if (parseHHMM(opts.eventTime) != null) addLine(event, "Time in", opts.eventTime);
     if (parseHHMM(opts.eventTimeOut) != null) addLine(event, "Time out", opts.eventTimeOut);
+    if (parseHHMM(opts.callReceived) != null) addLine(event, "Call received", opts.callReceived);
+    if (parseHHMM(opts.onScene) != null) addLine(event, "On scene", opts.onScene);
+    if (parseHHMM(opts.leavingScene) != null) addLine(event, "Leaving scene", opts.leavingScene);
     addLine(event, "Location", opts.location);
     addSection(lines, "EVENT", event);
     const patient = [];
@@ -1095,6 +1209,8 @@ function mapEidNationality(raw) {
     const condition = [];
     addLine(condition, "Condition", opts.condition);
     addLine(condition, "Vitals", formatVitalsLine(opts));
+    if (opts.gcs) condition.push(opts.gcs);
+    (opts.extraVitalLines || []).forEach(function (line) { condition.push(line); });
     addSection(lines, "CONDITION", condition);
     const treatment = [];
     addLine(treatment, "Treatment given", opts.treatment);
@@ -1267,11 +1383,11 @@ function mapEidNationality(raw) {
   }
 
   const state = {
-    eventName: "", eventDate: "", dateBlurred: false, eventTime: "", timeBlurred: false, eventTimeOut: "", timeOutBlurred: false, location: "",
+    eventName: "", eventDate: "", dateBlurred: false, eventTime: "", timeBlurred: false, eventTimeOut: "", timeOutBlurred: false, callReceived: "", onScene: "", leavingScene: "", location: "",
     participantType: "", participantTypeOther: "", patientName: "", patientSurname: "", dateOfBirth: "", dobBlurred: false, ageMode: "", ageMonths: "", gender: "",
     nationality: "", nationalityOther: "", eid: "", attachments: [], cellphone: "",
     complaint: "", description: "", allergies: "", medications: "", medicalHistory: "",
-    condition: "", bpSys: "", bpDia: "", hr: "", rr: "", spo2: "", temp: "", hgt: "", treatment: "", outcome: "", outcomeOther: "", hospital: "",
+    condition: "", bpSys: "", bpDia: "", hr: "", rr: "", spo2: "", temp: "", hgt: "", extraVitals: [], gcsE: "", gcsV: "", gcsM: "", treatment: "", outcome: "", outcomeOther: "", hospital: "",
     nextOfKinName: "", relationship: "", nextOfKinNumber: "", completedBy: "", callSign: "",
     messageEdit: "", messageDirty: false
   };
@@ -1283,6 +1399,9 @@ function mapEidNationality(raw) {
       eventDate: state.eventDate,
       eventTime: state.eventTime,
       eventTimeOut: state.eventTimeOut,
+      callReceived: state.callReceived,
+      onScene: state.onScene,
+      leavingScene: state.leavingScene,
       location: state.location,
       participantType: state.participantType === "Other" ? state.participantTypeOther : state.participantType,
       patientName: state.patientName,
@@ -1301,6 +1420,8 @@ function mapEidNationality(raw) {
       medicalHistory: state.medicalHistory,
       condition: state.condition,
       bpSys: state.bpSys, bpDia: state.bpDia, hr: state.hr, rr: state.rr, spo2: state.spo2, temp: state.temp, hgt: state.hgt,
+      gcs: formatGcsShort(state.gcsE, state.gcsV, state.gcsM),
+      extraVitalLines: extraVitalLines(state.extraVitals),
       treatment: state.treatment,
       outcome: state.outcome === "Other" ? state.outcomeOther.trim() : state.outcome,
       hospital: state.outcome === "Transported" ? state.hospital : "",
@@ -1339,6 +1460,8 @@ function mapEidNationality(raw) {
     else if (!state.messageDirty) el("messagePreview").value = msg;
     if (!state.messageDirty) el("messagePreview").value = msg;
     el("copyFallback").value = msg;
+    syncPreviewButtons();
+    scheduleSave();
   }
   function bind(id, key) {
     el(id).addEventListener("input", function () {
@@ -1483,8 +1606,170 @@ function mapEidNationality(raw) {
     await copyMessage();
     showShareNote("Sharing not supported here, message copied; attach the files in WhatsApp yourself.");
   }
+
+  function applyTheme(mode) {
+    var dark = mode === "dark";
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+    try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch (err) {}
+    var btn = el("darkModeToggle");
+    if (btn) {
+      btn.setAttribute("aria-pressed", dark ? "true" : "false");
+      btn.textContent = dark ? "Dark mode: on" : "Dark mode: off";
+    }
+  }
+  function loadTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (err) {}
+    if (saved === "dark" || saved === "light") applyTheme(saved);
+    else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      document.documentElement.setAttribute("data-theme", "dark");
+      var btn = el("darkModeToggle");
+      if (btn) {
+        btn.setAttribute("aria-pressed", "true");
+        btn.textContent = "Dark mode: on";
+      }
+    } else {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  }
+  function scheduleSave() {
+    if (!draftReady) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try {
+        localStorage.setItem(PD_STORAGE_KEY, JSON.stringify({
+          eventName: state.eventName, eventDate: state.eventDate, eventTime: state.eventTime, eventTimeOut: state.eventTimeOut,
+          callReceived: state.callReceived, onScene: state.onScene, leavingScene: state.leavingScene,
+          location: state.location, participantType: state.participantType, participantTypeOther: state.participantTypeOther,
+          patientName: state.patientName, patientSurname: state.patientSurname, dateOfBirth: state.dateOfBirth,
+          ageMode: state.ageMode, ageMonths: state.ageMonths, gender: state.gender, nationality: state.nationality,
+          nationalityOther: state.nationalityOther, eid: state.eid, cellphone: state.cellphone, complaint: state.complaint,
+          description: state.description, allergies: state.allergies, medications: state.medications, medicalHistory: state.medicalHistory,
+          condition: state.condition, bpSys: state.bpSys, bpDia: state.bpDia, hr: state.hr, rr: state.rr, spo2: state.spo2,
+          temp: state.temp, hgt: state.hgt, extraVitals: state.extraVitals, gcsE: state.gcsE, gcsV: state.gcsV, gcsM: state.gcsM,
+          treatment: state.treatment, outcome: state.outcome, outcomeOther: state.outcomeOther, hospital: state.hospital,
+          nextOfKinName: state.nextOfKinName, relationship: state.relationship, nextOfKinNumber: state.nextOfKinNumber,
+          completedBy: state.completedBy, callSign: state.callSign
+        }));
+      } catch (err) {}
+    }, 250);
+  }
+  function writeDraftFields(d) {
+    var keys = ["eventName","eventDate","eventTime","eventTimeOut","callReceived","onScene","leavingScene","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","ageMode","ageMonths","gender","nationality","nationalityOther","eid","cellphone","complaint","description","allergies","medications","medicalHistory","condition","bpSys","bpDia","hr","rr","spo2","temp","hgt","gcsE","gcsV","gcsM","treatment","outcome","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign"];
+    keys.forEach(function (k) {
+      if (typeof d[k] === "string") {
+        state[k] = d[k];
+        var n = el(k);
+        if (n) n.value = d[k];
+      }
+    });
+  }
+  function restoreDraft() {
+    try {
+      var raw = localStorage.getItem(PD_STORAGE_KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (!d || typeof d !== "object") return;
+      writeDraftFields(d);
+      if (Array.isArray(d.extraVitals)) {
+        state.extraVitals = d.extraVitals.filter(function (row) { return row && typeof row === "object"; }).map(function (row) {
+          return {
+            id: row.id || newExtraVitalsRow().id,
+            time: String(row.time || ""),
+            bpSys: String(row.bpSys || ""),
+            bpDia: String(row.bpDia || ""),
+            hr: String(row.hr || ""),
+            rr: String(row.rr || ""),
+            spo2: String(row.spo2 || ""),
+            temp: String(row.temp || ""),
+            hgt: String(row.hgt || "")
+          };
+        });
+      }
+    } catch (err) {}
+  }
+  function renderExtraVitals() {
+    var root = el("extraVitals");
+    if (!root) return;
+    root.innerHTML = "";
+    state.extraVitals.forEach(function (row) {
+      var wrap = document.createElement("div");
+      wrap.className = "extra-vitals";
+      wrap.setAttribute("data-id", row.id);
+      var fields = [
+        ["bpSys", "BP sys", "120", "numeric"],
+        ["bpDia", "BP dia", "80", "numeric"],
+        ["hr", "HR", "88", "numeric"],
+        ["rr", "RR", "18", "numeric"],
+        ["spo2", "SpO2", "98", "numeric"],
+        ["temp", "Temp", "37.2", "decimal"],
+        ["hgt", "HGT", "6.2", "decimal"]
+      ];
+      var head = document.createElement("div");
+      head.className = "extra-vitals-head";
+      head.innerHTML = "<span>Vitals at " + (row.time || "—") + '</span>';
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.textContent = "Remove";
+      rm.addEventListener("click", function () {
+        state.extraVitals = state.extraVitals.filter(function (item) { return item.id !== row.id; });
+        touchForm();
+        renderExtraVitals();
+        refresh();
+      });
+      head.appendChild(rm);
+      wrap.appendChild(head);
+      var grid = document.createElement("div");
+      grid.className = "vitals-grid";
+      fields.forEach(function (f) {
+        var lab = document.createElement("label");
+        lab.className = "field";
+        lab.innerHTML = "<span>" + f[1] + "</span>";
+        var inp = document.createElement("input");
+        inp.type = "text";
+        inp.inputMode = f[3];
+        inp.autocomplete = "off";
+        inp.placeholder = f[2];
+        inp.setAttribute("aria-label", f[1]);
+        inp.value = row[f[0]] || "";
+        inp.addEventListener("input", function () {
+          row[f[0]] = inp.value;
+          touchForm();
+          refresh();
+        });
+        lab.appendChild(inp);
+        grid.appendChild(lab);
+      });
+      wrap.appendChild(grid);
+      root.appendChild(wrap);
+    });
+  }
+  function syncPreviewButtons() {
+    document.querySelectorAll("#quickTimes [data-time-key]").forEach(function (btn) {
+      var key = btn.getAttribute("data-time-key");
+      var value = state[key] || "";
+      btn.textContent = btn.getAttribute("data-label") + (value ? (": " + value) : "");
+      btn.classList.toggle("is-on", Boolean(value));
+    });
+    var nkda = el("nkdaBtn");
+    if (nkda) nkda.classList.toggle("is-on", String(state.allergies || "").trim().toLowerCase() === NKDA_TEXT.toLowerCase());
+    var nomeds = el("noMedsBtn");
+    if (nomeds) nomeds.classList.toggle("is-on", String(state.medications || "").trim().toLowerCase() === "no meds");
+    var total = el("gcsPadTotal");
+    if (total) total.textContent = formatGcsShort(state.gcsE, state.gcsV, state.gcsM) || "GCS not set";
+    document.querySelectorAll("#gcsPad [data-gcs][data-val]").forEach(function (btn) {
+      var axis = btn.getAttribute("data-gcs");
+      var val = btn.getAttribute("data-val");
+      var cur = axis === "E" ? state.gcsE : axis === "V" ? state.gcsV : state.gcsM;
+      btn.classList.toggle("is-on", cur === val);
+    });
+  }
+
     function clearForm() {
-    const keys = ["eventName","eventDate","eventTime","eventTimeOut","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","eid","eidPaste","cellphone","complaint","description","allergies","medications","medicalHistory","bpSys","bpDia","hr","rr","spo2","temp","hgt","treatment","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign","nationalityOther"];
+    if (!confirm("Clear this form? This also clears the saved draft.")) return;
+    try { localStorage.removeItem(PD_STORAGE_KEY); } catch (err) {}
+    const keys = ["eventName","eventDate","eventTime","eventTimeOut","callReceived","onScene","leavingScene","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","eid","eidPaste","cellphone","complaint","description","allergies","medications","medicalHistory","bpSys","bpDia","hr","rr","spo2","temp","hgt","treatment","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign","nationalityOther"];
     keys.forEach(function (k) { state[k] = ""; const n = el(k); if (n) n.value = ""; });
     state.dateBlurred = false;
     state.timeBlurred = false;
@@ -1496,6 +1781,10 @@ function mapEidNationality(raw) {
     state.nationality = "";
     state.condition = "";
     state.outcome = "";
+    state.gcsE = "";
+    state.gcsV = "";
+    state.gcsM = "";
+    state.extraVitals = [];
     state.messageEdit = "";
     state.messageDirty = false;
     el("participantType").value = "";
@@ -1508,6 +1797,7 @@ function mapEidNationality(raw) {
     el("copyMessage").textContent = "Copy message";
     clearAttachments();
     showShareNote("");
+    renderExtraVitals();
     refresh();
   }
 
@@ -2267,6 +2557,14 @@ function mapEidNationality(raw) {
     touchForm();
     refresh();
   });
+  el("quickTimes").addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-time-key]");
+    if (!btn) return;
+    var key = btn.getAttribute("data-time-key");
+    state[key] = formatNowTime();
+    touchForm();
+    refresh();
+  });
   bind("location", "location");
   el("participantType").addEventListener("change", function () { state.participantType = el("participantType").value; touchForm(); refresh(); });
   bind("participantTypeOther", "participantTypeOther");
@@ -2347,9 +2645,34 @@ function mapEidNationality(raw) {
   });
   bind("cellphone", "cellphone");
   bind("complaint", "complaint");
+  COMPLAINT_CHIPS.forEach(function (chip) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.textContent = chip;
+    b.addEventListener("click", function () {
+      state.complaint = appendChip(state.complaint, chip);
+      el("complaint").value = state.complaint;
+      touchForm();
+      refresh();
+    });
+    el("complaintChips").appendChild(b);
+  });
   bind("description", "description");
   bind("allergies", "allergies");
+  el("nkdaBtn").addEventListener("click", function () {
+    state.allergies = NKDA_TEXT;
+    el("allergies").value = NKDA_TEXT;
+    touchForm();
+    refresh();
+  });
   bind("medications", "medications");
+  el("noMedsBtn").addEventListener("click", function () {
+    state.medications = "No meds";
+    el("medications").value = "No meds";
+    touchForm();
+    refresh();
+  });
   bind("medicalHistory", "medicalHistory");
   el("condition").addEventListener("change", function () { state.condition = el("condition").value; touchForm(); refresh(); });
   bind("bpSys", "bpSys");
@@ -2359,6 +2682,23 @@ function mapEidNationality(raw) {
   bind("spo2", "spo2");
   bind("temp", "temp");
   bind("hgt", "hgt");
+  el("repeatVitals").addEventListener("click", function () {
+    state.extraVitals.push(newExtraVitalsRow());
+    touchForm();
+    renderExtraVitals();
+    refresh();
+  });
+  el("gcsPad").addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-gcs][data-val]");
+    if (!btn) return;
+    var axis = btn.getAttribute("data-gcs");
+    var val = btn.getAttribute("data-val");
+    if (axis === "E") state.gcsE = val;
+    else if (axis === "V") state.gcsV = val;
+    else state.gcsM = val;
+    touchForm();
+    refresh();
+  });
   bind("treatment", "treatment");
   el("outcome").addEventListener("change", function () { state.outcome = el("outcome").value; touchForm(); refresh(); });
   bind("hospital", "hospital");
@@ -2375,6 +2715,14 @@ function mapEidNationality(raw) {
   el("copyMessage").addEventListener("click", copyMessage);
   el("shareMessage").addEventListener("click", shareMessage);
   el("clearForm").addEventListener("click", clearForm);
+  el("darkModeToggle").addEventListener("click", function () {
+    var dark = document.documentElement.getAttribute("data-theme") !== "dark";
+    applyTheme(dark ? "dark" : "light");
+  });
+  loadTheme();
+  restoreDraft();
+  renderExtraVitals();
+  draftReady = true;
 
   window.__quickinfo = {
     state: state,

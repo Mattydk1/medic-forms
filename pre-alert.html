@@ -35,7 +35,7 @@
   --tap: 44px;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not([data-theme="light"]) {
     --bg: #101215;
     --bg-card: #1a1d22;
     --bg-subtle: #15181d;
@@ -57,6 +57,28 @@
     --pin: #5dcc8d;
     --shadow: 0 1px 2px rgba(0,0,0,.35);
   }
+}
+html[data-theme="dark"] {
+  --bg: #101215;
+  --bg-card: #1a1d22;
+  --bg-subtle: #15181d;
+  --fg: #f2f4f7;
+  --muted: #b0b7c3;
+  --border: #3a404a;
+  --border-strong: #5b6370;
+  --accent: #6ea0ff;
+  --accent-fg: #0b1220;
+  --accent-subtle: #1a2740;
+  --danger: #f07171;
+  --warning: #f0c36b;
+  --warning-bg: #3a2d12;
+  --success: #5dcc8d;
+  --success-bg: #163324;
+  --military: #f0a94a;
+  --hospital: #f07171;
+  --base: #6ea0ff;
+  --pin: #5dcc8d;
+  --shadow: 0 1px 2px rgba(0,0,0,.35);
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -338,6 +360,54 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
 .bp-pair { display: flex; align-items: center; gap: 6px; width: 100%; }
 .bp-pair input { flex: 1; min-width: 0; text-align: center; }
 .bp-slash { font-weight: 600; color: var(--fg); }
+
+.chip-row, .quick-times { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.quick-times { margin-top: 12px; }
+button.chip, .chip-row button, .quick-times button, button.gcs-btn {
+  font-weight: 700;
+}
+button.chip.is-on, .quick-times button.is-on, button.gcs-btn.is-on, #nkdaBtn.is-on, #noMedsBtn.is-on {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+.extra-vitals {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.extra-vitals-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.gcs-pad { margin-top: 8px; }
+.gcs-pad-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.gcs-pad-row .lab { width: 20px; font-weight: 700; color: var(--muted); }
+button.gcs-btn { min-width: 44px; }
+.gcs-pad-total { margin-top: 8px; font-weight: 700; }
+button.clear-form-btn {
+  min-height: 52px;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+.theme-toggle {
+  margin: 8px 0 12px;
+  font-weight: 600;
+}
 </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
@@ -346,8 +416,9 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
     <header>
       <h1>EMT hospital pre-alert</h1>
       <p class="lede">A quick map of NGC work bases in the UAE, the nearest public emergency hospitals, and a form that writes a hospital pre-notification message. Locations are approximate. There is no official public catchment map. Compiled 11 Nov 2026.</p>
-      <p class="hint">This file runs in your browser only. Patient details are not saved or sent anywhere. The map needs internet; the form and hospital list work offline.</p>
+      <p class="hint">This file runs in your browser only. A draft is kept on this device until you clear the form. Nothing is sent anywhere. The map needs internet; the form and hospital list work offline.</p>
     </header>
+    <button type="button" id="darkModeToggle" class="theme-toggle" aria-pressed="false">Dark mode: off</button>
 
     <nav class="toc" aria-label="Contents">
       <strong>On this page</strong>
@@ -447,6 +518,12 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
       <label class="field hidden" id="hospitalOtherWrap" style="margin-top:12px"><span>Hospital transported to (other)</span><input id="hospitalOther" type="text" placeholder="Type the hospital name"></label>
 
       <p style="margin:12px 0 8px;font-weight:600">Times</p>
+      <div class="quick-times" id="quickTimes">
+        <button type="button" data-time-key="callReceived" data-label="Call received">Call received</button>
+        <button type="button" data-time-key="onScene" data-label="On scene">On scene</button>
+        <button type="button" data-time-key="leavingScene" data-label="Leaving scene">Leaving scene</button>
+        <button type="button" data-time-key="arrivalHospital" data-label="Arrival at hospital">Arrival at hospital</button>
+      </div>
       <div id="timesGrid" class="grid grid-2"></div>
 
       <div style="margin-top:12px">
@@ -509,11 +586,18 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
       <label class="field hidden" id="nationalityOtherWrap" style="margin-top:12px"><span>Nationality (other)</span><input id="nationalityOther" type="text" placeholder="Type the nationality"></label>
 
       <label class="field" style="margin-top:12px"><span>Chief complaint / diagnosis</span><input id="complaint" type="text" placeholder="e.g. chest pain, suspected STEMI"></label>
+      <div class="chip-row" id="complaintChips"></div>
       <label class="field" style="margin-top:12px"><span>Event / mechanism history</span><input id="eventHistory" type="text" placeholder="e.g. sudden onset at work, no trauma"></label>
       <label class="field" style="margin-top:12px"><span>Signs and symptoms</span><input id="signs" type="text" placeholder="e.g. pale, diaphoretic, radiating pain"></label>
       <div class="grid grid-2" style="margin-top:12px">
-        <label class="field"><span>Allergies</span><input id="allergies" type="text" placeholder="e.g. NKDA, or penicillin"></label>
-        <label class="field"><span>Medications</span><input id="medications" type="text" placeholder="Current medicines"></label>
+        <div>
+          <label class="field"><span>Allergies</span><input id="allergies" type="text" placeholder="e.g. No known drug allergies, or penicillin"></label>
+          <div class="chip-row"><button type="button" id="nkdaBtn">No known drug allergies</button></div>
+        </div>
+        <div>
+          <label class="field"><span>Medications</span><input id="medications" type="text" placeholder="Current medicines"></label>
+          <div class="chip-row"><button type="button" id="noMedsBtn">No meds</button></div>
+        </div>
         <label class="field"><span>Past med</span><input id="pastMed" type="text" placeholder="Past medical history"></label>
         <label class="field"><span>Last meal</span><input id="lastMeal" type="text" placeholder="e.g. 12:00"></label>
       </div>
@@ -561,6 +645,8 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
           <span class="vital-input"><input id="hgt" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="6.2"><span class="vital-unit">mmol/L</span></span>
         </label>
       </div>
+      <div id="extraVitals"></div>
+      <div style="margin-top:10px"><button type="button" id="repeatVitals">+ Repeat vitals</button></div>
       <div class="grid grid-3" style="margin-top:12px">
         <label class="field"><span>Cap refill</span><input id="capRefill" type="text" placeholder="e.g. under 2 sec"></label>
         <label class="field"><span>ECG rhythm</span><input id="ecg" type="text" placeholder="e.g. sinus tach"></label>
@@ -570,6 +656,12 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
       </div>
 
       <p style="margin:12px 0 8px;font-weight:600">GCS</p>
+      <div class="gcs-pad" id="gcsPad">
+        <div class="gcs-pad-row"><span class="lab">E</span><button type="button" class="gcs-btn" data-gcs="E" data-val="1">1</button><button type="button" class="gcs-btn" data-gcs="E" data-val="2">2</button><button type="button" class="gcs-btn" data-gcs="E" data-val="3">3</button><button type="button" class="gcs-btn" data-gcs="E" data-val="4">4</button></div>
+        <div class="gcs-pad-row"><span class="lab">V</span><button type="button" class="gcs-btn" data-gcs="V" data-val="1">1</button><button type="button" class="gcs-btn" data-gcs="V" data-val="2">2</button><button type="button" class="gcs-btn" data-gcs="V" data-val="3">3</button><button type="button" class="gcs-btn" data-gcs="V" data-val="4">4</button><button type="button" class="gcs-btn" data-gcs="V" data-val="5">5</button><button type="button" class="gcs-btn" data-gcs="V" data-val="T">T</button></div>
+        <div class="gcs-pad-row"><span class="lab">M</span><button type="button" class="gcs-btn" data-gcs="M" data-val="1">1</button><button type="button" class="gcs-btn" data-gcs="M" data-val="2">2</button><button type="button" class="gcs-btn" data-gcs="M" data-val="3">3</button><button type="button" class="gcs-btn" data-gcs="M" data-val="4">4</button><button type="button" class="gcs-btn" data-gcs="M" data-val="5">5</button><button type="button" class="gcs-btn" data-gcs="M" data-val="6">6</button></div>
+        <div class="gcs-pad-total" id="gcsPadTotal">GCS not set</div>
+      </div>
       <div class="stack">
         <label class="field"><span>Eye Opening (E), Max 4</span><select id="gcsE"></select></label>
         <label class="field"><span>Verbal Response (V), Max 5</span><select id="gcsV"></select></label>
@@ -597,8 +689,8 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
         <div class="actions">
           <button type="button" class="primary" id="copyMessage">Copy message</button>
           <button type="button" id="shareMessage">Share</button>
-          <button type="button" id="clearForm">Clear form</button>
         </div>
+        <button type="button" id="clearForm" class="clear-form-btn">Clear form</button>
         <div id="shareNote" class="hint hidden" style="margin-top:8px"></div>
       </div>
     </section>
@@ -944,40 +1036,49 @@ const SUB_CLASS_OPTIONS = [
   { value: "Other", label: "Other" },
 ];
 const TIME_FIELD_DEFS = [
+  { key: "callReceived", label: "Call received" },
   { key: "callRecorded", label: "Call recorded" },
   { key: "callDispatched", label: "Call dispatched" },
   { key: "mobileToCall", label: "Mobile to call" },
   { key: "onScene", label: "On scene" },
+  { key: "leavingScene", label: "Leaving scene" },
   { key: "atClinic", label: "At clinic", allowNA: true },
   { key: "leftClinic", label: "Left clinic", allowNA: true },
   { key: "toDestination", label: "To destination" },
   { key: "atDestination", label: "At destination" },
+  { key: "arrivalHospital", label: "Arrival at hospital" },
   { key: "handover", label: "Handover" },
   { key: "available", label: "Available" },
   { key: "backAtSite", label: "Back at site" },
 ];
 const EMPTY_TIMES = {
+  callReceived: "",
   callRecorded: "",
   callDispatched: "",
   mobileToCall: "",
   onScene: "",
+  leavingScene: "",
   atClinic: "",
   leftClinic: "",
   toDestination: "",
   atDestination: "",
+  arrivalHospital: "",
   handover: "",
   available: "",
   backAtSite: "",
 };
 const EMPTY_TIME_BLURRED = {
+  callReceived: false,
   callRecorded: false,
   callDispatched: false,
   mobileToCall: false,
   onScene: false,
+  leavingScene: false,
   atClinic: false,
   leftClinic: false,
   toDestination: false,
   atDestination: false,
+  arrivalHospital: false,
   handover: false,
   available: false,
   backAtSite: false,
@@ -986,6 +1087,40 @@ function formatNowTime() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
+  var COMPLAINT_CHIPS = ["Chest pain", "Shortness of breath", "Trauma", "Fall", "Abdominal pain", "Seizure", "Altered LOC", "Syncope", "Burns", "Allergic reaction"];
+  var THEME_KEY = "matty-forms-theme";
+  var PA_STORAGE_KEY = "matty-forms-pre-alert-v1";
+  var NKDA_TEXT = "No known drug allergies";
+  var draftReady = false;
+  var saveTimer = null;
+  function appendChip(current, chip) {
+    var cur = String(current || "").trim();
+    if (!cur) return chip;
+    var parts = cur.split(",").map(function (p) { return p.trim().toLowerCase(); });
+    if (parts.indexOf(chip.toLowerCase()) !== -1) return current;
+    return cur + ", " + chip;
+  }
+  function formatGcsShort(e, v, m) {
+    if (!e && !v && !m) return "";
+    var parts = (e ? ("E" + e) : "E?") + (v ? ("V" + v) : "V?") + (m ? ("M" + m) : "M?");
+    if (e && v && m) {
+      if (v === "T") return "GCS " + (Number(e) + Number(m)) + "T (" + parts + ")";
+      return "GCS " + (Number(e) + Number(v) + Number(m)) + " (" + parts + ")";
+    }
+    return "GCS (" + parts + ")";
+  }
+  function newExtraVitalsRow() {
+    return { id: Date.now() + "-" + Math.random().toString(36).slice(2, 8), time: formatNowTime(), bpSys: "", bpDia: "", hr: "", rr: "", spo2: "", temp: "", hgt: "" };
+  }
+  function extraVitalLines(rows) {
+    return (rows || []).map(function (row) {
+      var line = formatVitalsLine(row);
+      if (!line && !row.time) return "";
+      if (!line) return "Vitals at " + row.time + ":";
+      return row.time ? ("Vitals at " + row.time + ": " + line) : ("Vitals: " + line);
+    }).filter(Boolean);
+  }
+
 function parseHHMM(value) {
   const text = filled(value);
   const match = text.match(/^(\d{1,2}):(\d{2})$/);
@@ -1837,36 +1972,10 @@ function formatSurveyChoice(choice, other, details) {
   return choice;
 }
 function formatGcs(e, v, m) {
-  const eye = filled(e);
-  const verbal = filled(v);
-  const motor = filled(m);
-  const parts = [eye && `E${eye}`, verbal && `V${verbal}`, motor && `M${motor}`].filter(Boolean);
-  if (!parts.length) return "";
-  if (eye && verbal && motor) {
-    if (verbal === "T") {
-      const total = Number(eye) + Number(motor);
-      return `${total}T (${parts.join(" ")})`;
-    }
-    const total = Number(eye) + Number(verbal) + Number(motor);
-    return `${total}/15 (${parts.join(" ")})`;
-  }
-  return parts.join(" ");
+  return formatGcsShort(e, v, m);
 }
 function formatGcsTotalLabel(e, v, m) {
-  const eye = filled(e);
-  const verbal = filled(v);
-  const motor = filled(m);
-  const parts = [`E${eye || "?"}`, `V${verbal || "?"}`, `M${motor || "?"}`];
-  if (eye && verbal && motor) {
-    if (verbal === "T") {
-      const total = Number(eye) + Number(motor);
-      return `GCS total: ${total}T (${parts.join(" ")})`;
-    }
-    const total = Number(eye) + Number(verbal) + Number(motor);
-    return `GCS total: ${total}/15 (${parts.join(" ")})`;
-  }
-  if (!eye && !verbal && !motor) return "GCS total: incomplete";
-  return `GCS total: incomplete (${parts.join(" ")})`;
+  return formatGcsShort(e, v, m) || "GCS not set";
 }
 function buildMessage(opts) {
   const lines = ["HOSPITAL PRE-NOTIFICATION", ""];
@@ -1931,10 +2040,15 @@ function buildMessage(opts) {
     lines.push("");
     lines.push("Vitals: " + vitalLine);
   }
+  const extraLines = (opts.extraVitalLines || []).filter(Boolean);
+  if (extraLines.length) {
+    if (!vitalLine) lines.push("");
+    extraLines.forEach(function (line) { lines.push(line); });
+  }
   const otherVitals = [
     filled(opts.capRefill) && ("Cap refill: " + filled(opts.capRefill)),
     filled(opts.ecg) && ("ECG rhythm: " + filled(opts.ecg)),
-    gcs && ("GCS: " + gcs),
+    gcs,
     filled(opts.pupils) && ("Pupils: " + filled(opts.pupils)),
     filled(opts.pain) && ("Pain: " + filled(opts.pain)),
     filled(opts.etco2) && ("ETCO2: " + filled(opts.etco2)),
@@ -2226,6 +2340,7 @@ if (typeof module !== "undefined" && module.exports) {
     condition: "Not stated",
     clinicalNotes: "",
     copied: false,
+    extraVitals: [],
   };
 
   let map = null;
@@ -2317,6 +2432,7 @@ if (typeof module !== "undefined" && module.exports) {
       procedures: state.procedures,
       condition: state.condition,
       clinicalNotes: state.clinicalNotes,
+      extraVitalLines: extraVitalLines(state.extraVitals),
     });
   }
 
@@ -2505,6 +2621,8 @@ if (typeof module !== "undefined" && module.exports) {
     el("messagePreview").textContent = currentMessage();
     el("copyFallback").value = currentMessage();
     updateMapMarkers();
+    syncPreviewButtons();
+    scheduleSave();
   }
 
   function bindValue(id, key, ev) {
@@ -3363,7 +3481,163 @@ if (typeof module !== "undefined" && module.exports) {
     showShareNote("Sharing not supported here, message copied; attach the files in WhatsApp yourself.");
   }
 
+
+  function applyTheme(mode) {
+    var dark = mode === "dark";
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+    try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch (err) {}
+    var btn = el("darkModeToggle");
+    if (btn) {
+      btn.setAttribute("aria-pressed", dark ? "true" : "false");
+      btn.textContent = dark ? "Dark mode: on" : "Dark mode: off";
+    }
+  }
+  function loadTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (err) {}
+    if (saved === "dark" || saved === "light") applyTheme(saved);
+    else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      document.documentElement.setAttribute("data-theme", "dark");
+      var btn = el("darkModeToggle");
+      if (btn) {
+        btn.setAttribute("aria-pressed", "true");
+        btn.textContent = "Dark mode: on";
+      }
+    } else {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  }
+  var PA_DRAFT_KEYS = ["hospitalId","hospitalOther","alertBaseId","alertBaseOther","callSign","incidentDate","projectName","caseNumber","epcrNumber","callClass","subClass","subClassOther","patientName","patientSurname","dateOfBirth","hospitalNumber","incidentLocation","incidentType","incidentTypeOther","nationality","nationalityOther","gender","age","cellphone","email","eid","complaint","eventHistory","signs","allergies","medications","pastMed","lastMeal","primaryA","primaryAOther","primaryADetails","primaryB","primaryBOther","primaryBDetails","primaryC","primaryCOther","primaryCDetails","primaryD","primaryDFallout","primaryDDetails","primaryEExam","primaryEFindings","primaryEDetails","respRate","spo2","heartRate","bpSys","bpDia","capRefill","ecg","gcsE","gcsV","gcsM","pupils","hgt","temp","pain","etco2","medicines","iv","airway","circulation","procedures","condition","clinicalNotes"];
+  function scheduleSave() {
+    if (!draftReady) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try {
+        var data = { times: state.times, timeAtClinicNA: state.timeAtClinicNA, timeLeftClinicNA: state.timeLeftClinicNA, extraVitals: state.extraVitals };
+        PA_DRAFT_KEYS.forEach(function (k) { data[k] = state[k]; });
+        localStorage.setItem(PA_STORAGE_KEY, JSON.stringify(data));
+      } catch (err) {}
+    }, 250);
+  }
+  function restoreDraft() {
+    try {
+      var raw = localStorage.getItem(PA_STORAGE_KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (!d || typeof d !== "object") return;
+      PA_DRAFT_KEYS.forEach(function (k) {
+        if (typeof d[k] === "string") {
+          state[k] = d[k];
+          var n = el(k);
+          if (n && n.type !== "checkbox") n.value = d[k];
+        }
+      });
+      if (d.times && typeof d.times === "object") {
+        var next = Object.assign({}, EMPTY_TIMES);
+        TIME_FIELD_DEFS.forEach(function (field) {
+          if (typeof d.times[field.key] === "string") next[field.key] = d.times[field.key];
+        });
+        state.times = next;
+      }
+      if (typeof d.timeAtClinicNA === "boolean") state.timeAtClinicNA = d.timeAtClinicNA;
+      if (typeof d.timeLeftClinicNA === "boolean") state.timeLeftClinicNA = d.timeLeftClinicNA;
+      if (el("timeAtClinicNA")) el("timeAtClinicNA").checked = state.timeAtClinicNA;
+      if (el("timeLeftClinicNA")) el("timeLeftClinicNA").checked = state.timeLeftClinicNA;
+      if (Array.isArray(d.extraVitals)) {
+        state.extraVitals = d.extraVitals.filter(function (row) { return row && typeof row === "object"; }).map(function (row) {
+          return {
+            id: row.id || newExtraVitalsRow().id,
+            time: String(row.time || ""),
+            bpSys: String(row.bpSys || ""),
+            bpDia: String(row.bpDia || ""),
+            hr: String(row.hr || ""),
+            rr: String(row.rr || ""),
+            spo2: String(row.spo2 || ""),
+            temp: String(row.temp || ""),
+            hgt: String(row.hgt || "")
+          };
+        });
+      }
+    } catch (err) {}
+  }
+  function renderExtraVitals() {
+    var root = el("extraVitals");
+    if (!root) return;
+    root.innerHTML = "";
+    state.extraVitals.forEach(function (row) {
+      var wrap = document.createElement("div");
+      wrap.className = "extra-vitals";
+      var fields = [
+        ["bpSys", "BP sys", "120", "numeric"],
+        ["bpDia", "BP dia", "80", "numeric"],
+        ["hr", "HR", "88", "numeric"],
+        ["rr", "RR", "18", "numeric"],
+        ["spo2", "SpO2", "98", "numeric"],
+        ["temp", "Temp", "37.2", "decimal"],
+        ["hgt", "HGT", "6.2", "decimal"]
+      ];
+      var head = document.createElement("div");
+      head.className = "extra-vitals-head";
+      head.innerHTML = "<span>Vitals at " + (row.time || "—") + "</span>";
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.textContent = "Remove";
+      rm.addEventListener("click", function () {
+        state.extraVitals = state.extraVitals.filter(function (item) { return item.id !== row.id; });
+        renderExtraVitals();
+        refresh();
+      });
+      head.appendChild(rm);
+      wrap.appendChild(head);
+      var grid = document.createElement("div");
+      grid.className = "vitals-grid";
+      fields.forEach(function (f) {
+        var lab = document.createElement("label");
+        lab.className = "field";
+        lab.innerHTML = "<span>" + f[1] + "</span>";
+        var inp = document.createElement("input");
+        inp.type = "text";
+        inp.inputMode = f[3];
+        inp.autocomplete = "off";
+        inp.placeholder = f[2];
+        inp.setAttribute("aria-label", f[1]);
+        inp.value = row[f[0]] || "";
+        inp.addEventListener("input", function () {
+          row[f[0]] = inp.value;
+          refresh();
+        });
+        lab.appendChild(inp);
+        grid.appendChild(lab);
+      });
+      wrap.appendChild(grid);
+      root.appendChild(wrap);
+    });
+  }
+  function syncPreviewButtons() {
+    document.querySelectorAll("#quickTimes [data-time-key]").forEach(function (btn) {
+      var key = btn.getAttribute("data-time-key");
+      var value = (state.times && state.times[key]) || "";
+      btn.textContent = btn.getAttribute("data-label") + (value ? (": " + value) : "");
+      btn.classList.toggle("is-on", Boolean(value));
+    });
+    var nkda = el("nkdaBtn");
+    if (nkda) nkda.classList.toggle("is-on", String(state.allergies || "").trim().toLowerCase() === NKDA_TEXT.toLowerCase());
+    var nomeds = el("noMedsBtn");
+    if (nomeds) nomeds.classList.toggle("is-on", String(state.medications || "").trim().toLowerCase() === "no meds");
+    document.querySelectorAll("#gcsPad [data-gcs][data-val]").forEach(function (btn) {
+      var axis = btn.getAttribute("data-gcs");
+      var val = btn.getAttribute("data-val");
+      var cur = axis === "E" ? state.gcsE : axis === "V" ? state.gcsV : state.gcsM;
+      btn.classList.toggle("is-on", cur === val);
+    });
+    var padTotal = el("gcsPadTotal");
+    if (padTotal) padTotal.textContent = formatGcsShort(state.gcsE, state.gcsV, state.gcsM) || "GCS not set";
+  }
+
   function clearForm() {
+    if (!confirm("Clear this form? This also clears the saved draft.")) return;
+    try { localStorage.removeItem(PA_STORAGE_KEY); } catch (err) {}
     state.hospitalId = "";
     state.hospitalOther = "";
     state.alertBaseId = state.baseId;
@@ -3444,6 +3718,7 @@ if (typeof module !== "undefined" && module.exports) {
     state.procedures = "";
     state.condition = "Not stated";
     state.clinicalNotes = "";
+    state.extraVitals = [];
     const ids = [
       "hospitalOther","alertBaseOther","callSign","incidentDate","projectName","caseNumber","epcrNumber",
       "subClassOther","patientName","patientSurname","dateOfBirth","hospitalNumber","eidPaste","incidentLocation","incidentTypeOther","nationalityOther",
@@ -3484,6 +3759,7 @@ if (typeof module !== "undefined" && module.exports) {
     }
     el("copyMessage").textContent = "Copy message";
     showShareNote("");
+    renderExtraVitals();
     refresh();
   }
 
@@ -3771,6 +4047,55 @@ if (typeof module !== "undefined" && module.exports) {
     el("gcsE").addEventListener("change", function () { state.gcsE = el("gcsE").value; refresh(); });
     el("gcsV").addEventListener("change", function () { state.gcsV = el("gcsV").value; refresh(); });
     el("gcsM").addEventListener("change", function () { state.gcsM = el("gcsM").value; refresh(); });
+    el("gcsPad").addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-gcs][data-val]");
+      if (!btn) return;
+      var axis = btn.getAttribute("data-gcs");
+      var val = btn.getAttribute("data-val");
+      if (axis === "E") { state.gcsE = val; el("gcsE").value = val; }
+      else if (axis === "V") { state.gcsV = val; el("gcsV").value = val; }
+      else { state.gcsM = val; el("gcsM").value = val; }
+      refresh();
+    });
+    el("repeatVitals").addEventListener("click", function () {
+      state.extraVitals.push(newExtraVitalsRow());
+      renderExtraVitals();
+      refresh();
+    });
+    el("quickTimes").addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-time-key]");
+      if (!btn) return;
+      var key = btn.getAttribute("data-time-key");
+      state.times[key] = formatNowTime();
+      if (state.timeBlurred) state.timeBlurred[key] = true;
+      refresh();
+    });
+    COMPLAINT_CHIPS.forEach(function (chip) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.textContent = chip;
+      b.addEventListener("click", function () {
+        state.complaint = appendChip(state.complaint, chip);
+        el("complaint").value = state.complaint;
+        refresh();
+      });
+      el("complaintChips").appendChild(b);
+    });
+    el("nkdaBtn").addEventListener("click", function () {
+      state.allergies = NKDA_TEXT;
+      el("allergies").value = NKDA_TEXT;
+      refresh();
+    });
+    el("noMedsBtn").addEventListener("click", function () {
+      state.medications = "No meds";
+      el("medications").value = "No meds";
+      refresh();
+    });
+    el("darkModeToggle").addEventListener("click", function () {
+      var dark = document.documentElement.getAttribute("data-theme") !== "dark";
+      applyTheme(dark ? "dark" : "light");
+    });
     el("condition").addEventListener("change", function () { state.condition = el("condition").value; refresh(); });
     el("copyMessage").addEventListener("click", copyMessage);
     el("shareMessage").addEventListener("click", shareMessage);
@@ -3814,6 +4139,10 @@ if (typeof module !== "undefined" && module.exports) {
   buildTimesGrid();
   initTables();
   wire();
+  loadTheme();
+  restoreDraft();
+  renderExtraVitals();
+  draftReady = true;
   refresh();
   initMap();
 })();
