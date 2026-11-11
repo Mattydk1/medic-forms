@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0b5fff">
+  <title>Patient details</title>
+  <style>
+:root {
+  --bg: #f4f5f7;
+  --bg-card: #ffffff;
+  --bg-subtle: #eef0f3;
+  --fg: #15181d;
+  --muted: #4b5563;
+  --border: #cfd4dc;
+  --accent: #0b5fff;
+  --accent-fg: #ffffff;
+  --warning: #9a6b00;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --tap: 44px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101215;
+    --bg-card: #1a1d22;
+    --bg-subtle: #15181d;
+    --fg: #f2f4f7;
+    --muted: #b0b7c3;
+    --border: #3a404a;
+    --accent: #6ea0ff;
+    --accent-fg: #0b1220;
+    --warning: #f0c36b;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.wrap { max-width: 920px; margin: 0 auto; padding: 16px 16px 80px; }
+h1 { font-size: 1.7rem; line-height: 1.25; margin: 0 0 8px; }
+h2 { font-size: 1.2rem; margin: 28px 0 10px; }
+.lede, .muted, .hint { color: var(--muted); }
+.lede { margin: 0 0 16px; }
+.callout {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.callout .lead { font-weight: 700; margin-bottom: 4px; }
+label.field, .field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  width: 100%;
+}
+input[type="text"], select, textarea {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--fg);
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.45;
+}
+textarea { min-height: 96px; resize: vertical; }
+#messagePreview { min-height: 220px; font-family: var(--mono); font-size: 14px; background: var(--bg-subtle); }
+.invalid { border-color: var(--warning) !important; }
+.hint { font-size: 12px; line-height: 1.4; margin-top: 4px; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 700px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.grow { flex: 1 1 140px; }
+button, .btn {
+  min-height: var(--tap);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--fg);
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
+.actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.hidden { display: none !important; }
+
+  #eidFillNote, #eidFillNotePaste, .eid-fill-note {
+    white-space: pre-wrap;
+  }
+  #eidFillNote.is-on, #eidFillNotePaste.is-on, .eid-fill-note.is-on {
+    display: block !important;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+.photo-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.photo-btn { position: relative; }
+.photo-btn input[type="file"] {
+  position: absolute;
+  width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+#attachmentList { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.attachment-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.attachment-item img {
+  width: 72px; height: 72px; object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.attachment-name { flex: 1 1 140px; color: var(--fg); font-size: 14px; line-height: 1.4; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Patient details</h1>
+      <p class="lede">A short form to capture patient details at an event, or when someone needs a quick handover. Fill in what you know, edit anything before you copy, and send it the way you need to. Nothing is saved or sent.</p>
+    </header>
+    <div class="callout">
+      <div class="lead">Nothing is saved or sent</div>
+      This file runs only on this device. Patient details stay in the form until you copy or clear them. You can change any field, including Age, and you can edit the message itself before you copy it.
+    </div>
+    <p>Leave blank what you do not know — blank fields are left out of the message. If you change a form field after editing the message, the message is rebuilt from the form.</p>
+
+    <h2>Event</h2>
+    <label class="field"><span>Event name</span><input id="eventName" type="text" placeholder="e.g. ADNOC family day"></label>
+    <div class="grid grid-2" style="margin-top:12px">
+      <div class="field-label"><span>Date</span>
+        <div class="row">
+          <div class="grow">
+            <input id="eventDate" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="e.g. 11/11/2026">
+            <div id="dateHint" class="hint hidden">Use a real date, dd/mm/yyyy</div>
+          </div>
+          <button type="button" id="dateToday">Today</button>
+        </div>
+      </div>
+      <div>
+        <div class="field-label"><span>Time in</span>
+          <div class="row">
+            <div class="grow">
+              <input id="eventTime" type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="e.g. 14:20">
+              <div id="timeHint" class="hint hidden">Use 00:00–23:59</div>
+            </div>
+            <button type="button" id="timeNow">Now</button>
+          </div>
+        </div>
+        <div class="field-label" style="margin-top:12px"><span>Time out</span>
+          <div class="row">
+            <div class="grow">
+              <input id="eventTimeOut" type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="e.g. 15:10">
+              <div id="timeOutHint" class="hint hidden">Use 00:00–23:59</div>
+            </div>
+            <button type="button" id="timeOutNow">Now</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <label class="field" style="margin-top:12px"><span>Location / area</span><input id="location" type="text" placeholder="e.g. Hall A, west entrance"></label>
+
+    <h2>Patient details</h2>
+    <label class="field"><span>Participant type</span><select id="participantType"></select></label>
+    <label class="field hidden" id="participantTypeOtherWrap" style="margin-top:12px"><span>Participant type (other)</span><input id="participantTypeOther" type="text" placeholder="Type the participant type"></label>
+    <label class="field" style="margin-top:12px"><span>Name</span><input id="patientName" type="text" placeholder="e.g. Ahmed"></label>
+    <label class="field" style="margin-top:12px"><span>Surname</span><input id="patientSurname" type="text" placeholder="e.g. Ali"></label>
+    <div style="margin-top:12px">
+      <label class="field"><span>EID / ID / Passport</span><input id="eid" type="text" placeholder="784-XXXX-XXXXXXX-X"></label>
+      <div class="photo-btns">
+        <label class="btn photo-btn">
+          <input id="eidFile" type="file" multiple>
+          Attach files
+        </label>
+        <label class="btn photo-btn">
+          <input id="eidCamera" type="file" accept="image/*" capture="environment">
+          Take photo
+        </label>
+      </div>
+      <div class="hint" style="margin-top:6px">On a computer, Take photo may just open the file picker.</div>
+      <div id="attachmentList"></div>
+      <div class="hint" style="margin-top:8px">Attached files are sent with Share, not with Copy. They stay on this device until you share or remove them.</div>
+      <div style="margin-top:10px"><button type="button" id="readCard">Read card</button></div>
+      <div id="eidFillNote" class="hint hidden" style="margin-top:8px"></div>
+      <label class="field" style="margin-top:10px">
+        <span>Paste card text</span>
+        <span class="hint">If Read card can't run, copy the card with Google Lens (front and back), paste it here, then tap Fill from card text.</span>
+        <textarea id="eidPaste" rows="6" placeholder="Paste the copied Emirates ID text (front and back)"></textarea>
+      </label>
+      <div style="margin-top:10px"><button type="button" id="fillFromCardText">Fill from card text</button></div>
+      <div class="hint" style="margin-top:8px">Read card can read more than one photo (front and back of the Emirates ID) on this device — the pictures are not sent anywhere. If the reader can't run on this page, paste the card text above. Check every field by hand.</div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px">
+      <label class="field"><span>Occupation</span><input id="occupation" type="text" placeholder="e.g. Engineer"></label>
+      <label class="field"><span>Employer</span><input id="employer" type="text" placeholder="e.g. ADNOC"></label>
+      <label class="field"><span>Issuing place</span><input id="issuingPlace" type="text" placeholder="e.g. Abu Dhabi"></label>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px">
+      <label class="field"><span>Gender</span><select id="gender"></select></label>
+      <div>
+        <label class="field"><span>Nationality</span><select id="nationality"></select></label>
+        <label class="field hidden" id="nationalityOtherWrap" style="margin-top:12px"><span>Nationality (other)</span><input id="nationalityOther" type="text" placeholder="Type the nationality"></label>
+      </div>
+      <div class="field-label"><span>Date of birth</span>
+        <input id="dateOfBirth" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="e.g. 11/11/1990">
+        <div id="dobHint" class="hint hidden">Use a real date, dd/mm/yyyy, not in the future</div>
+      </div>
+      <div>
+        <label class="field"><span>Age</span><select id="ageMode"></select></label>
+        <label class="field hidden" id="ageMonthsWrap" style="margin-top:12px"><span>Age in months</span><select id="ageMonths"></select></label>
+      </div>
+      <label class="field"><span>Cellphone</span><input id="cellphone" type="text" placeholder="e.g. +971 50 123 4567"></label>
+    </div>
+
+    <h2>What happened</h2>
+    <label class="field"><span>Chief complaint</span><input id="complaint" type="text" placeholder="e.g. dizziness, collapse"></label>
+    <label class="field" style="margin-top:12px"><span>Short description</span><textarea id="description" rows="4" placeholder="What happened, in a few lines"></textarea></label>
+
+    <h2>History</h2>
+    <label class="field"><span>Allergies</span><input id="allergies" type="text" placeholder="e.g. NKDA, or penicillin"></label>
+    <label class="field" style="margin-top:12px"><span>Medications</span><input id="medications" type="text" placeholder="Current medicines"></label>
+    <label class="field" style="margin-top:12px"><span>Medical history</span><input id="medicalHistory" type="text" placeholder="Past medical history"></label>
+
+    <h2>Condition</h2>
+    <label class="field"><span>Condition</span><select id="condition"></select></label>
+    <label class="field" style="margin-top:12px"><span>Vitals</span><input id="vitals" type="text" placeholder="e.g. BP 120/80, HR 88, RR 18, SpO2 98%, temp 37.2, HGT 6.2"></label>
+    <label class="field" style="margin-top:12px"><span>Treatment given</span><textarea id="treatment" rows="3" placeholder="Treatment given"></textarea></label>
+
+    <h2>Outcome</h2>
+    <label class="field"><span>Outcome</span><select id="outcome"></select></label>
+    <label class="field hidden" id="hospitalWrap" style="margin-top:12px"><span>Hospital</span><input id="hospital" type="text" placeholder="Hospital name"></label>
+    <label class="field hidden" id="outcomeOtherWrap" style="margin-top:12px"><span>Outcome (other)</span><input id="outcomeOther" type="text" placeholder="Type the outcome"></label>
+
+    <h2>Next of kin</h2>
+    <label class="field"><span>Name</span><input id="nextOfKinName" type="text" placeholder="Next of kin name"></label>
+    <div class="grid grid-2" style="margin-top:12px">
+      <label class="field"><span>Relationship</span><input id="relationship" type="text" placeholder="e.g. wife, brother"></label>
+      <label class="field"><span>Number</span><input id="nextOfKinNumber" type="text" placeholder="e.g. +971 50 123 4567"></label>
+    </div>
+
+    <h2>Completed by</h2>
+    <div class="grid grid-2">
+      <label class="field"><span>Your name</span><input id="completedBy" type="text" placeholder="Your name"></label>
+      <label class="field"><span>Call sign</span><input id="callSign" type="text" placeholder="e.g. Medic 1"></label>
+    </div>
+
+    <h2>Message to copy</h2>
+    <p>The message updates as you fill the form. You can also edit the text below before you copy it.</p>
+    <textarea id="messagePreview" rows="16"></textarea>
+    <textarea id="copyFallback" class="hidden" readonly aria-hidden="true"></textarea>
+    <div class="actions">
+      <button type="button" class="primary" id="copyMessage">Copy message</button>
+      <button type="button" id="shareMessage">Share</button>
+      <button type="button" id="clearForm">Clear form</button>
+    </div>
+    <div id="shareNote" class="hint hidden" style="margin-top:8px"></div>
+  </div>
+  <script>
+(function () {
+  "use strict";
+  const NATIONALITY_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "USA", label: "USA" },
+    { value: "Canadian", label: "Canadian" },
+    { value: "Mexican", label: "Mexican" },
+    { value: "Brazilian", label: "Brazilian" },
+    { value: "Argentinian", label: "Argentinian" },
+    { value: "Colombian", label: "Colombian" },
+    { value: "UK", label: "UK" },
+    { value: "Scottish", label: "Scottish" },
+    { value: "Irish", label: "Irish" },
+    { value: "French", label: "French" },
+    { value: "German", label: "German" },
+    { value: "Spanish", label: "Spanish" },
+    { value: "Italian", label: "Italian" },
+    { value: "Dutch", label: "Dutch" },
+    { value: "Polish", label: "Polish" },
+    { value: "Russian", label: "Russian" },
+    { value: "Ukrainian", label: "Ukrainian" },
+    { value: "Chinese", label: "Chinese" },
+    { value: "Japanese", label: "Japanese" },
+    { value: "Indian", label: "Indian" },
+    { value: "Korean", label: "Korean" },
+    { value: "Thai", label: "Thai" },
+    { value: "Vietnamese", label: "Vietnamese" },
+    { value: "Turkish", label: "Turkish" },
+    { value: "Pakistani", label: "Pakistani" },
+    { value: "Emirati (UAE)", label: "Emirati (UAE)" },
+    { value: "Nepali", label: "Nepali" },
+    { value: "Zimbabwean", label: "Zimbabwean" },
+    { value: "South African", label: "South African" },
+    { value: "Iranian", label: "Iranian" },
+    { value: "Saudi Arabian", label: "Saudi Arabian" },
+    { value: "Other", label: "Other" },
+  ];
+  const GENDER_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "Male", label: "Male" },
+    { value: "Female", label: "Female" },
+  ];
+  const PARTICIPANT_TYPE_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "Visitor/Guest", label: "Visitor/Guest" },
+    { value: "Exhibitor/Staff", label: "Exhibitor/Staff" },
+    { value: "Other", label: "Other" },
+  ];
+  const CONDITION_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "Stable", label: "Stable" },
+    { value: "Serious", label: "Serious" },
+    { value: "Critical", label: "Critical" },
+  ];
+  const OUTCOME_OPTIONS = [
+    { value: "", label: "Select..." },
+    { value: "Treated and released on scene", label: "Treated and released on scene" },
+    { value: "Transported", label: "Transported" },
+    { value: "Refused treatment/transport", label: "Refused treatment/transport" },
+    { value: "Other", label: "Other" },
+  ];
+
+  function filled(value) { return value.trim(); }
+  function addLine(lines, label, value) {
+    const text = filled(value);
+    if (text) lines.push(label + ": " + text);
+  }
+  function formatDateDigits(raw) {
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return digits.slice(0, 2) + "/" + digits.slice(2);
+    return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+  }
+  function parseDateDDMMYYYY(value) {
+    const match = filled(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) return false;
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const d = new Date(year, month - 1, day);
+    return d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day;
+  }
+  function formatTodayDate() {
+    const d = new Date();
+    return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
+  }
+  function isDateFieldInvalid(value, blurred) {
+    const text = filled(value);
+    if (!text) return false;
+    if (parseDateDDMMYYYY(text)) return false;
+    return blurred || text.replace(/\D/g, "").length >= 8;
+  }
+  function dobDateFromDDMMYYYY(value) {
+    if (!parseDateDDMMYYYY(value)) return null;
+    const match = filled(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) return null;
+    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+  }
+  function isDobValid(value, now) {
+    now = now || new Date();
+    const dob = dobDateFromDDMMYYYY(value);
+    if (!dob) return false;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return dob.getTime() <= today.getTime();
+  }
+  function isDobFieldInvalid(value, blurred, now) {
+    const text = filled(value);
+    if (!text) return false;
+    if (isDobValid(text, now)) return false;
+    return blurred || text.replace(/\D/g, "").length >= 8;
+  }
+  function ageFromDobSelection(value, now) {
+    now = now || new Date();
+    const empty = { mode: "", months: "" };
+    const dob = dobDateFromDDMMYYYY(value);
+    if (!dob) return empty;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (dob.getTime() > today.getTime()) return empty;
+    let years = now.getFullYear() - dob.getFullYear();
+    if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) years -= 1;
+    if (years > 120) return empty;
+    if (years >= 1) return { mode: String(Math.min(years, 110)), months: "" };
+    let months = (now.getFullYear() - dob.getFullYear()) * 12 + (now.getMonth() - dob.getMonth());
+    if (now.getDate() < dob.getDate()) months -= 1;
+    if (months < 0) return empty;
+    return { mode: "infant", months: String(Math.max(0, Math.min(11, months))) };
+  }
+  function formatAgeMessage(mode, months) {
+    if (mode === "infant") {
+      if (months === "") return "";
+      const n = Number(months);
+      if (!isFinite(n) || n < 0) return "";
+      return n === 1 ? "1 month" : n + " months";
+    }
+    if (mode === "") return "";
+    const n = Number(mode);
+    if (!isFinite(n)) return "";
+    return n === 1 ? "1 year" : n + " years";
+  }
+
+  function isMostlyArabic(s) {
+    const letters = s.replace(/[^A-Za-z\u0600-\u06FF]/g, "");
+    if (!letters) return false;
+    const arabic = (s.match(/[\u0600-\u06FF]/g) || []).length;
+    return arabic / letters.length > 0.5;
+  }
+  const EID_FIELD_START = /^(id(\s*number)?|name|full name|nationality|sex|gender|date of birth|d\.?o\.?b\.?|dob|expiry|date of expiry|date of issue|issuing place|place of issue|occupation|employer|sponsor)\b/i;
+  const EID_LABEL_ONLY = /^(id(\s*number)?|name|full name|nationality|sex|gender|date of birth|d\.?o\.?b\.?|dob|expiry|date of expiry|date of issue|issuing place|place of issue|occupation|employer|sponsor|signature|card number|identity card|united arab emirates)$/i;
+  function isEidLabelOnly(s) {
+    return EID_LABEL_ONLY.test(s.replace(/[:：\-\u2013\u2014]\s*$/, "").trim());
+  }
+  function startsWithEidFieldLabel(s) {
+    return EID_FIELD_START.test(s.trim());
+  }
+  function prettyEidName(s) {
+    const x = s.replace(/\s+/g, " ").trim().replace(/^[:\-\u2013\u2014]\s*/, "");
+    if (!x) return "";
+    if (x === x.toUpperCase() && /[A-Za-z]/.test(x)) {
+      return x.split(/(\s+|-)/).map(function (w) {
+        if (!w || w === " " || w === "-") return w;
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      }).join("");
+    }
+    return x;
+  }
+  function isEidNameValue(s) {
+    const x = s.trim();
+    if (!x || isMostlyArabic(x) || isEidLabelOnly(x)) return false;
+    if (/^784\b/.test(x) || /\d{8,}/.test(x)) return false;
+    if (/^\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{2,4}$/.test(x)) return false;
+    return /[A-Za-z]{2,}/.test(x);
+  }
+  function isEidNationalityValue(s) {
+    const x = s.trim();
+    if (!x || isMostlyArabic(x)) return false;
+    if (startsWithEidFieldLabel(x) && !/^nationality\b/i.test(x)) return false;
+    if (/^784\b/.test(x) || /^\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{2,4}$/.test(x)) return false;
+    return /[A-Za-z]{2,}/.test(x);
+  }
+  function parseEidGender(raw) {
+    const n = raw.trim().toLowerCase().replace(/[.:]/g, "");
+    const first = n.split(/[\s/]+/)[0];
+    if (first === "m" || first === "male" || first === "man") return "Male";
+    if (first === "f" || first === "female" || first === "woman") return "Female";
+    return "";
+  }
+  function isEidGenderValue(s) { return parseEidGender(s) !== ""; }
+  function isEidDobValue(s) {
+    return /(\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{4}|\d{4}[/.+\-]\d{1,2}[/.+\-]\d{1,2})/.test(s);
+  }
+  function isEidWorkValue(s) {
+    const x = s.trim();
+    if (!x || isMostlyArabic(x) || isEidLabelOnly(x)) return false;
+    if (/^784\b/.test(x) || /^\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{2,4}$/.test(x)) return false;
+    const digits = x.replace(/\D/g, "");
+    if (digits.length >= 12 && /^784/.test(digits)) return false;
+    return /[A-Za-z]{2,}/.test(x);
+  }
+  function valueAfterEidLabel(lines, labelRe, isValue) {
+    const start = new RegExp("^(?:" + labelRe.source + ")\\s*[:：\\-\\u2013\\u2014]?\\s*(.*)$", "i");
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(start);
+      if (!m) continue;
+      const rest = m[1].trim();
+      if (rest && isValue(rest)) return rest;
+      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+        const v = lines[j];
+        if (isEidLabelOnly(v) || isMostlyArabic(v)) continue;
+        if (startsWithEidFieldLabel(v) && !isValue(v)) break;
+        if (isValue(v)) return v;
+        break;
+      }
+    }
+    return "";
+  }
+  function parseEidNumber(text) {
+    const digits = text.replace(/[^\d]/g, "");
+    const m = digits.match(/784\d{12}/);
+    if (!m) return "";
+    const d = m[0];
+    return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7, 14) + "-" + d.slice(14);
+  }
+  function birthYearFromEid(value) {
+    const formatted = parseEidNumber(value);
+    if (!formatted) return "";
+    const year = Number(formatted.slice(4, 8));
+    if (!isFinite(year) || year < 1920 || year > new Date().getFullYear()) return "";
+    return String(year);
+  }
+  function ageFromBirthYear(yearStr, now) {
+    now = now || new Date();
+    const year = Number(yearStr);
+    if (!isFinite(year)) return "";
+    const age = now.getFullYear() - year;
+    if (age < 0 || age > 120) return "";
+    return String(age);
+  }
+  function formatEidDob(raw, now) {
+    now = now || new Date();
+    const x = raw.trim();
+    let day = 0, month = 0, year = 0;
+    const yearFirst = x.match(/(\d{4})[/.+\-](\d{1,2})[/.+\-](\d{1,2})/);
+    const dayFirst = x.match(/(\d{1,2})[/.+\-](\d{1,2})[/.+\-](\d{4})/);
+    if (yearFirst && yearFirst.index === 0) { year = Number(yearFirst[1]); month = Number(yearFirst[2]); day = Number(yearFirst[3]); }
+    else if (dayFirst) { day = Number(dayFirst[1]); month = Number(dayFirst[2]); year = Number(dayFirst[3]); }
+    else return "";
+    const formatted = String(day).padStart(2, "0") + "/" + String(month).padStart(2, "0") + "/" + year;
+    return isDobValid(formatted, now) ? formatted : "";
+  }
+  function splitPersonName(full) {
+    const x = full.replace(/\s+/g, " ").trim();
+    if (!x) return { name: "", surname: "" };
+    const parts = x.split(" ");
+    if (parts.length === 1) return { name: parts[0], surname: "" };
+    return { name: parts.slice(0, -1).join(" "), surname: parts[parts.length - 1] };
+  }
+  function mapEidNationality(raw) {
+    const n = raw.trim().replace(/\./g, "").replace(/\s+/g, " ").toLowerCase();
+    const pairs = [
+      [/\b(united states of america|united states|american|usa|u s a)\b/, "USA"],
+      [/\b(canadian|canada)\b/, "Canadian"],
+      [/\b(mexican|mexico)\b/, "Mexican"],
+      [/\b(brazilian|brazil)\b/, "Brazilian"],
+      [/\b(argentinian|argentine|argentina)\b/, "Argentinian"],
+      [/\b(colombian|colombia)\b/, "Colombian"],
+      [/\b(united kingdom|great britain|british|england|uk)\b/, "UK"],
+      [/\b(scottish|scotland)\b/, "Scottish"],
+      [/\b(irish|ireland)\b/, "Irish"],
+      [/\b(french|france)\b/, "French"],
+      [/\b(german|germany)\b/, "German"],
+      [/\b(spanish|spain)\b/, "Spanish"],
+      [/\b(italian|italy)\b/, "Italian"],
+      [/\b(dutch|netherlands|holland)\b/, "Dutch"],
+      [/\b(polish|poland)\b/, "Polish"],
+      [/\b(russian|russia)\b/, "Russian"],
+      [/\b(ukrainian|ukraine)\b/, "Ukrainian"],
+      [/\b(chinese|china)\b/, "Chinese"],
+      [/\b(japanese|japan)\b/, "Japanese"],
+      [/\b(indian|india)\b/, "Indian"],
+      [/\b(south korean|south korea|korean|korea)\b/, "Korean"],
+      [/\b(thai|thailand)\b/, "Thai"],
+      [/\b(vietnamese|vietnam)\b/, "Vietnamese"],
+      [/\b(turkish|turkey)\b/, "Turkish"],
+      [/\b(pakistani|pakistan)\b/, "Pakistani"],
+      [/\b(emirati|united arab emirates|u a e|uae|emirates)\b/, "Emirati (UAE)"],
+      [/\b(nepali|nepalese|nepal)\b/, "Nepali"],
+      [/\b(zimbabwean|zimbabwe)\b/, "Zimbabwean"],
+      [/\b(south african|south africa)\b/, "South African"],
+      [/\b(iranian|iran)\b/, "Iranian"],
+      [/\b(saudi arabian|saudi arabia|saudi)\b/, "Saudi Arabian"],
+    ];
+    for (let i = 0; i < pairs.length; i++) {
+      if (pairs[i][0].test(n)) return { nationality: pairs[i][1], nationalityOther: "" };
+    }
+    return { nationality: "Other", nationalityOther: prettyEidName(raw.trim()) };
+  }
+  function parseEidText(text, now) {
+    now = now || new Date();
+    const empty = { name: "", surname: "", eid: "", nationality: "", nationalityOther: "", gender: "", dob: "", age: "", occupation: "", employer: "", issuingPlace: "" };
+    const raw = text.trim();
+    if (!raw) return empty;
+    const lines = raw.split(/\r?\n/).map(function (l) { return l.replace(/\s+/g, " ").trim(); }).filter(Boolean);
+    const nameRaw = valueAfterEidLabel(lines, /name|full name/, isEidNameValue);
+    const natRaw = valueAfterEidLabel(lines, /nationality/, isEidNationalityValue);
+    const genderRaw = valueAfterEidLabel(lines, /sex|gender/, isEidGenderValue);
+    const dobRaw = valueAfterEidLabel(lines, /date of birth|d\.?o\.?b\.?|dob/, isEidDobValue);
+    const occRaw = valueAfterEidLabel(lines, /occupation/, isEidWorkValue);
+    const empRaw = valueAfterEidLabel(lines, /employer|sponsor/, isEidWorkValue);
+    const issueRaw = valueAfterEidLabel(lines, /issuing place|place of issue/, isEidWorkValue);
+    const nat = natRaw ? mapEidNationality(natRaw) : { nationality: "", nationalityOther: "" };
+    const split = nameRaw ? splitPersonName(prettyEidName(nameRaw)) : { name: "", surname: "" };
+    const dob = dobRaw ? formatEidDob(dobRaw, now) : "";
+    let age = "";
+    if (dob) {
+      const sel = ageFromDobSelection(dob, now);
+      age = sel.mode === "infant" ? (sel.months === "1" ? "1 month" : sel.months + " months") : (sel.mode ? String(sel.mode) : "");
+    } else {
+      age = ageFromBirthYear(birthYearFromEid(parseEidNumber(raw)), now);
+    }
+    return {
+      name: split.name,
+      surname: split.surname,
+      eid: parseEidNumber(raw),
+      nationality: nat.nationality,
+      nationalityOther: nat.nationalityOther,
+      gender: genderRaw ? parseEidGender(genderRaw) : "",
+      dob: dob,
+      age: age,
+      occupation: occRaw ? prettyEidName(occRaw) : "",
+      employer: empRaw ? prettyEidName(empRaw) : "",
+      issuingPlace: issueRaw ? prettyEidName(issueRaw) : "",
+    };
+  }
+
+  function formatNowTime() {
+    const d = new Date();
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  function parseHHMM(value) {
+    const match = filled(value).match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) return null;
+    return hours * 60 + minutes;
+  }
+  function formatTimeDigits(raw) {
+    const digits = raw.replace(/\D/g, "").slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return digits.slice(0, 2) + ":" + digits.slice(2);
+  }
+  function finalizeTimeDigits(raw) {
+    const digits = raw.replace(/\D/g, "").slice(0, 4);
+    if (digits.length === 3) return formatTimeDigits(digits.padStart(4, "0"));
+    return formatTimeDigits(raw);
+  }
+  function isTimeFieldInvalid(value, blurred) {
+    const text = filled(value);
+    if (!text) return false;
+    if (parseHHMM(text) != null) return false;
+    return blurred || text.replace(/\D/g, "").length >= 4;
+  }
+  function addSection(lines, heading, body) {
+    if (!body.length) return;
+    if (lines.length) lines.push("");
+    lines.push(heading);
+    lines.push.apply(lines, body);
+  }
+  function buildMessage(opts) {
+    const lines = [];
+    const event = [];
+    addLine(event, "Event name", opts.eventName);
+    if (parseDateDDMMYYYY(opts.eventDate)) addLine(event, "Date", opts.eventDate);
+    if (parseHHMM(opts.eventTime) != null) addLine(event, "Time in", opts.eventTime);
+    if (parseHHMM(opts.eventTimeOut) != null) addLine(event, "Time out", opts.eventTimeOut);
+    addLine(event, "Location", opts.location);
+    addSection(lines, "EVENT", event);
+    const patient = [];
+    addLine(patient, "Participant type", opts.participantType);
+    addLine(patient, "Name", opts.patientName);
+    addLine(patient, "Surname", opts.patientSurname);
+    addLine(patient, "EID / ID / Passport", opts.eid);
+    addLine(patient, "Occupation", opts.occupation);
+    addLine(patient, "Employer", opts.employer);
+    addLine(patient, "Issuing place", opts.issuingPlace);
+    addLine(patient, "Gender", opts.gender);
+    addLine(patient, "Nationality", opts.nationality);
+    if (isDobValid(opts.dateOfBirth)) addLine(patient, "DOB", opts.dateOfBirth);
+    addLine(patient, "Age", formatAgeMessage(opts.ageMode, opts.ageMonths));
+    addLine(patient, "Cellphone", opts.cellphone);
+    addSection(lines, "PATIENT DETAILS", patient);
+    const happened = [];
+    addLine(happened, "Chief complaint", opts.complaint);
+    addLine(happened, "Short description", opts.description);
+    addSection(lines, "WHAT HAPPENED", happened);
+    const history = [];
+    addLine(history, "Allergies", opts.allergies);
+    addLine(history, "Medications", opts.medications);
+    addLine(history, "Medical history", opts.medicalHistory);
+    addSection(lines, "HISTORY", history);
+    const condition = [];
+    addLine(condition, "Condition", opts.condition);
+    addLine(condition, "Vitals", opts.vitals);
+    addSection(lines, "CONDITION", condition);
+    const treatment = [];
+    addLine(treatment, "Treatment given", opts.treatment);
+    addSection(lines, "TREATMENT", treatment);
+    const outcome = [];
+    addLine(outcome, "Outcome", opts.outcome);
+    addLine(outcome, "Hospital", opts.hospital);
+    addSection(lines, "OUTCOME", outcome);
+    const nok = [];
+    addLine(nok, "Name", opts.nextOfKinName);
+    addLine(nok, "Relationship", opts.relationship);
+    addLine(nok, "Number", opts.nextOfKinNumber);
+    addSection(lines, "NEXT OF KIN", nok);
+    const completed = [];
+    addLine(completed, "Name", opts.completedBy);
+    addLine(completed, "Call sign", opts.callSign);
+    addSection(lines, "COMPLETED BY", completed);
+    if (!lines.length) return "";
+    return ["PATIENT DETAILS", "", ...lines].join("\n").trim();
+  }
+
+  function el(id) { return document.getElementById(id); }
+  function show(node, on) { if (node) node.classList.toggle("hidden", !on); }
+  function fillSelect(select, options) {
+    select.innerHTML = "";
+    options.forEach(function (opt) {
+      const o = document.createElement("option");
+      o.value = opt.value;
+      o.textContent = opt.label;
+      select.appendChild(o);
+    });
+  }
+
+  const state = {
+    eventName: "", eventDate: "", dateBlurred: false, eventTime: "", timeBlurred: false, eventTimeOut: "", timeOutBlurred: false, location: "",
+    participantType: "", participantTypeOther: "", patientName: "", patientSurname: "", dateOfBirth: "", dobBlurred: false, ageMode: "", ageMonths: "", gender: "",
+    nationality: "", nationalityOther: "", eid: "", occupation: "", employer: "", issuingPlace: "", attachments: [], cellphone: "",
+    complaint: "", description: "", allergies: "", medications: "", medicalHistory: "",
+    condition: "", vitals: "", treatment: "", outcome: "", outcomeOther: "", hospital: "",
+    nextOfKinName: "", relationship: "", nextOfKinNumber: "", completedBy: "", callSign: "",
+    messageEdit: "", messageDirty: false
+  };
+  let copiedTimer = null;
+
+  function generatedMessage() {
+    return buildMessage({
+      eventName: state.eventName,
+      eventDate: state.eventDate,
+      eventTime: state.eventTime,
+      eventTimeOut: state.eventTimeOut,
+      location: state.location,
+      participantType: state.participantType === "Other" ? state.participantTypeOther : state.participantType,
+      patientName: state.patientName,
+      patientSurname: state.patientSurname,
+      dateOfBirth: state.dateOfBirth,
+      ageMode: state.ageMode,
+      ageMonths: state.ageMonths,
+      gender: state.gender,
+      nationality: state.nationality === "Other" ? state.nationalityOther : state.nationality,
+      eid: state.eid,
+      occupation: state.occupation,
+      employer: state.employer,
+      issuingPlace: state.issuingPlace,
+      cellphone: state.cellphone,
+      complaint: state.complaint,
+      description: state.description,
+      allergies: state.allergies,
+      medications: state.medications,
+      medicalHistory: state.medicalHistory,
+      condition: state.condition,
+      vitals: state.vitals,
+      treatment: state.treatment,
+      outcome: state.outcome === "Other" ? state.outcomeOther.trim() : state.outcome,
+      hospital: state.outcome === "Transported" ? state.hospital : "",
+      nextOfKinName: state.nextOfKinName,
+      relationship: state.relationship,
+      nextOfKinNumber: state.nextOfKinNumber,
+      completedBy: state.completedBy,
+      callSign: state.callSign,
+    });
+  }
+  function currentMessage() {
+    return state.messageDirty ? state.messageEdit : generatedMessage();
+  }
+  function touchForm() { state.messageDirty = false; }
+  function refresh() {
+    show(el("ageMonthsWrap"), state.ageMode === "infant");
+    show(el("participantTypeOtherWrap"), state.participantType === "Other");
+    show(el("nationalityOtherWrap"), state.nationality === "Other");
+    show(el("hospitalWrap"), state.outcome === "Transported");
+    show(el("outcomeOtherWrap"), state.outcome === "Other");
+    const dateInvalid = isDateFieldInvalid(state.eventDate, state.dateBlurred);
+    el("eventDate").classList.toggle("invalid", dateInvalid);
+    show(el("dateHint"), dateInvalid);
+    const timeInvalid = isTimeFieldInvalid(state.eventTime, state.timeBlurred);
+    el("eventTime").classList.toggle("invalid", timeInvalid);
+    show(el("timeHint"), timeInvalid);
+    const timeOutInvalid = isTimeFieldInvalid(state.eventTimeOut, state.timeOutBlurred);
+    el("eventTimeOut").classList.toggle("invalid", timeOutInvalid);
+    show(el("timeOutHint"), timeOutInvalid);
+    const dobInvalid = isDobFieldInvalid(state.dateOfBirth, state.dobBlurred);
+    el("dateOfBirth").classList.toggle("invalid", dobInvalid);
+    show(el("dobHint"), dobInvalid);
+    const msg = currentMessage();
+    if (el("messagePreview") !== document.activeElement) el("messagePreview").value = msg;
+    else if (!state.messageDirty) el("messagePreview").value = msg;
+    if (!state.messageDirty) el("messagePreview").value = msg;
+    el("copyFallback").value = msg;
+  }
+  function bind(id, key) {
+    el(id).addEventListener("input", function () {
+      state[key] = el(id).value;
+      touchForm();
+      refresh();
+    });
+  }
+  async function copyMessage() {
+    const text = currentMessage();
+    el("copyFallback").value = text;
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch (e) { ok = false; }
+    if (!ok) {
+      const ta = el("copyFallback");
+      ta.classList.remove("hidden");
+      ta.style.position = "fixed";
+      ta.style.left = "0";
+      ta.style.top = "0";
+      ta.style.opacity = "0";
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      ta.classList.add("hidden");
+    }
+    const btn = el("copyMessage");
+    if (ok) {
+      btn.textContent = "Copied";
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(function () { btn.textContent = "Copy message"; }, 2000);
+    } else {
+      btn.textContent = "Select and copy the message";
+    }
+    return ok;
+  }
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+  function showShareNote(text) {
+    const note = el("shareNote");
+    if (!text) {
+      note.textContent = "";
+      note.classList.add("hidden");
+      return;
+    }
+    note.textContent = text;
+    note.classList.remove("hidden");
+  }
+  function canShareFiles(files) {
+    if (!files.length) return false;
+    try {
+      return typeof navigator.canShare === "function" && navigator.canShare({ files: files });
+    } catch (e) {
+      return false;
+    }
+  }
+  function resetFileInputs() {
+    el("eidFile").value = "";
+    el("eidCamera").value = "";
+  }
+  function renderAttachments() {
+    const list = el("attachmentList");
+    list.innerHTML = "";
+    state.attachments.forEach(function (item) {
+      const row = document.createElement("div");
+      row.className = "attachment-item";
+      if (item.file.type.indexOf("image/") === 0) {
+        const img = document.createElement("img");
+        img.src = item.url;
+        img.alt = item.file.name;
+        row.appendChild(img);
+      }
+      const name = document.createElement("div");
+      name.className = "attachment-name";
+      name.textContent = item.file.name + " (" + formatFileSize(item.file.size) + ")";
+      row.appendChild(name);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Remove";
+      btn.addEventListener("click", function () { removeAttachment(item.id); });
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }
+  function clearAttachments() {
+    state.attachments.forEach(function (item) { URL.revokeObjectURL(item.url); });
+    state.attachments = [];
+    resetFileInputs();
+    renderAttachments();
+  }
+  function removeAttachment(id) {
+    const item = state.attachments.find(function (a) { return a.id === id; });
+    if (item) URL.revokeObjectURL(item.url);
+    state.attachments = state.attachments.filter(function (a) { return a.id !== id; });
+    renderAttachments();
+  }
+  function addFiles(list) {
+    const incoming = Array.prototype.slice.call(list).filter(Boolean);
+    if (!incoming.length) return;
+    incoming.forEach(function (file) {
+      state.attachments.push({
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+        file: file,
+        url: URL.createObjectURL(file)
+      });
+    });
+    resetFileInputs();
+    renderAttachments();
+  }
+  async function shareMessage() {
+    showShareNote("");
+    const text = currentMessage();
+    const files = state.attachments.map(function (item) { return item.file; });
+    const images = files.filter(function (file) { return file.type.indexOf("image/") === 0; });
+    const hasShare = typeof navigator.share === "function";
+    try {
+      if (hasShare) {
+        if (files.length && canShareFiles(files)) {
+          await navigator.share({ text: text, files: files });
+          return;
+        }
+        if (images.length && canShareFiles(images)) {
+          await navigator.share({ text: text, files: images });
+          showShareNote("Some files couldn't be included; attach the rest in WhatsApp yourself.");
+          return;
+        }
+        await navigator.share({ text: text });
+        if (files.length) showShareNote("Message shared; this browser couldn't include the files, so attach them in WhatsApp yourself.");
+        return;
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+    }
+    await copyMessage();
+    showShareNote("Sharing not supported here, message copied; attach the files in WhatsApp yourself.");
+  }
+    function clearForm() {
+    const keys = ["eventName","eventDate","eventTime","eventTimeOut","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","eid","occupation","employer","issuingPlace","eidPaste","cellphone","complaint","description","allergies","medications","medicalHistory","vitals","treatment","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign","nationalityOther"];
+    keys.forEach(function (k) { state[k] = ""; const n = el(k); if (n) n.value = ""; });
+    state.dateBlurred = false;
+    state.timeBlurred = false;
+    state.timeOutBlurred = false;
+    state.dobBlurred = false;
+    state.ageMode = "";
+    state.ageMonths = "";
+    state.gender = "";
+    state.nationality = "";
+    state.condition = "";
+    state.outcome = "";
+    state.messageEdit = "";
+    state.messageDirty = false;
+    el("participantType").value = "";
+    el("ageMode").value = "";
+    el("ageMonths").value = "";
+    el("gender").value = "";
+    el("nationality").value = "";
+    el("condition").value = "";
+    el("outcome").value = "";
+    el("copyMessage").textContent = "Copy message";
+    clearAttachments();
+    showShareNote("");
+    refresh();
+  }
+
+
+  function fieldIsEmpty(value, emptyValues) {
+    const x = String(value || "").trim();
+    if (!x) return true;
+    if (emptyValues && emptyValues.indexOf(x) !== -1) return true;
+    return false;
+  }
+  function applyParsedToEmptyFields(parsed) {
+    const filledNames = [];
+    const skipped = [];
+    function take(label, key, elId, val) {
+      if (!val) return;
+      if (!fieldIsEmpty(state[key])) { skipped.push(label); return; }
+      state[key] = val;
+      if (elId && el(elId)) el(elId).value = val;
+      filledNames.push(label);
+    }
+    take("Name", "patientName", "patientName", parsed.name);
+    take("Surname", "patientSurname", "patientSurname", parsed.surname);
+    take("EID / ID / Passport", "eid", "eid", parsed.eid);
+    take("Occupation", "occupation", "occupation", parsed.occupation);
+    take("Employer", "employer", "employer", parsed.employer);
+    take("Issuing place", "issuingPlace", "issuingPlace", parsed.issuingPlace);
+    if (parsed.nationality) {
+      if (fieldIsEmpty(state.nationality)) {
+        state.nationality = parsed.nationality;
+        el("nationality").value = parsed.nationality;
+        state.nationalityOther = parsed.nationality === "Other" ? parsed.nationalityOther : "";
+        el("nationalityOther").value = state.nationalityOther;
+        filledNames.push("Nationality");
+      } else skipped.push("Nationality");
+    }
+    take("Gender", "gender", "gender", parsed.gender);
+    if (parsed.dob) {
+      if (fieldIsEmpty(state.dateOfBirth) || !isDobValid(state.dateOfBirth)) {
+        state.dateOfBirth = parsed.dob;
+        state.dobBlurred = true;
+        el("dateOfBirth").value = parsed.dob;
+        filledNames.push("Date of birth");
+        if (fieldIsEmpty(state.ageMode)) {
+          const sel = ageFromDobSelection(parsed.dob);
+          state.ageMode = sel.mode;
+          state.ageMonths = sel.months;
+          el("ageMode").value = sel.mode;
+          el("ageMonths").value = sel.months;
+          if (sel.mode) filledNames.push("Age");
+        }
+      } else skipped.push("Date of birth");
+    }
+    if ((parsed.age || parsed.eid) && fieldIsEmpty(state.ageMode)) {
+      if (parsed.dob && isDobValid(parsed.dob)) {
+        /* already handled */
+      } else {
+        const year = birthYearFromEid(parsed.eid || state.eid);
+        const a = year ? ageFromBirthYear(year) : "";
+        const n = Number(a);
+        if (a && isFinite(n) && n >= 1) {
+          state.ageMode = String(Math.min(n, 110));
+          state.ageMonths = "";
+          el("ageMode").value = state.ageMode;
+          el("ageMonths").value = "";
+          filledNames.push("Age");
+        }
+      }
+    } else if (parsed.age && !fieldIsEmpty(state.ageMode) && filledNames.indexOf("Age") === -1) {
+      skipped.push("Age");
+    }
+    return { filledNames: filledNames, skipped: skipped };
+  }
+  var TESS_JS_VERSION = "5.1.1";
+  var TESS_CORE_VERSION = "5.1.0";
+  var TESS_SCRIPT_URLS = [
+    "https://cdn.jsdelivr.net/npm/tesseract.js@" + TESS_JS_VERSION + "/dist/tesseract.min.js",
+    "https://unpkg.com/tesseract.js@" + TESS_JS_VERSION + "/dist/tesseract.min.js"
+  ];
+  var TESS_WORKER_PATH = "https://cdn.jsdelivr.net/npm/tesseract.js@" + TESS_JS_VERSION + "/dist/worker.min.js";
+  var TESS_CORE_PATH = "https://cdn.jsdelivr.net/npm/tesseract.js-core@" + TESS_CORE_VERSION + "/tesseract-core.wasm.js";
+  var TESS_LANG_PATH = "https://tessdata.projectnaptha.com/4.0.0_fast";
+  var EID_OCR_MAX_SIDE = 1800;
+  var EID_OCR_WORKER_MS = 60000;
+  var EID_OCR_RECOGNIZE_MS = 60000;
+
+  function isProbablyImage(file) {
+    if (!file) return false;
+    var type = String(file.type || "").toLowerCase();
+    if (type.indexOf("image/") === 0) return true;
+    var name = String(file.name || "").toLowerCase();
+    if (/\.(jpe?g|png|webp|gif|bmp|heic|heif|tif{1,2})$/.test(name)) return true;
+    if (type && type !== "application/octet-stream" && type !== "application/download") return false;
+    if (file.size >= 8) return true;
+    return false;
+  }
+
+  function eidOcrStatusTargets() {
+    var nodes = [];
+    var main = el("eidFillNote");
+    if (main) nodes.push(main);
+    var extra = el("eidFillNotePaste");
+    if (extra && extra !== main) nodes.push(extra);
+    return nodes;
+  }
+
+  function showEidOcrStatus(msg) {
+    var nodes = eidOcrStatusTargets();
+    for (var i = 0; i < nodes.length; i++) {
+      var note = nodes[i];
+      note.textContent = msg;
+      note.classList.remove("hidden");
+      note.classList.add("is-on");
+    }
+    if (nodes[0] && nodes[0].scrollIntoView) {
+      try { nodes[0].scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {
+        try { nodes[0].scrollIntoView(); } catch (e2) {}
+      }
+    }
+  }
+
+  function withTimeout(promise, ms, message) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var timer = setTimeout(function () {
+        if (done) return;
+        done = true;
+        reject(new Error(message));
+      }, ms);
+      promise.then(function (value) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(value);
+      }, function (err) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
+
+  function loadScriptSrc(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.async = true;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error("script failed: " + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadTesseractLibrary(onStatus) {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    if (onStatus) onStatus("Loading reader...");
+    var chain = Promise.reject(new Error("start"));
+    for (var i = 0; i < TESS_SCRIPT_URLS.length; i++) {
+      (function (src) {
+        chain = chain.catch(function () { return loadScriptSrc(src); });
+      })(TESS_SCRIPT_URLS[i]);
+    }
+    return chain.then(function () {
+      if (window.Tesseract) return window.Tesseract;
+      throw new Error("The on-device reader did not start.");
+    }).catch(function (err) {
+      var orig = err && err.message ? err.message : "";
+      throw new Error("Could not load the on-device reader. Open this file in Chrome with an internet connection the first time (the pictures stay on this device). If you opened it from a chat app, use Open in Chrome. " + (orig && orig.indexOf("script failed") === -1 ? orig : ""));
+    });
+  }
+
+  function createEidOcrWorker(Tesseract, onStatus) {
+    var optsBlob = {
+      workerPath: TESS_WORKER_PATH,
+      corePath: TESS_CORE_PATH,
+      langPath: TESS_LANG_PATH,
+      workerBlobURL: true,
+      cacheMethod: "none",
+      logger: function (m) {
+        if (!onStatus || !m || !m.status) return;
+        var status = String(m.status);
+        if (status.indexOf("loading") !== -1 || status.indexOf("initializing") !== -1 || status.indexOf("loaded") !== -1) {
+          onStatus("Loading reader...");
+        }
+      }
+    };
+    function tryCreate(opts) {
+      return Tesseract.createWorker("eng", 1, opts);
+    }
+    return withTimeout(tryCreate(optsBlob), EID_OCR_WORKER_MS, "Loading the reader timed out. Open this file in Chrome with an internet connection, then try again.")
+      .catch(function (err) {
+        var optsDirect = {
+          workerPath: TESS_WORKER_PATH,
+          corePath: TESS_CORE_PATH,
+          langPath: TESS_LANG_PATH,
+          workerBlobURL: false,
+          cacheMethod: "none"
+        };
+        return withTimeout(tryCreate(optsDirect), EID_OCR_WORKER_MS, "Loading the reader timed out. Open this file in Chrome with an internet connection, then try again.")
+          .catch(function () {
+            var msg = err && err.message ? err.message : "Could not start the on-device reader.";
+            throw new Error("Could not start the on-device reader. Open this file in Chrome with an internet connection the first time (the pictures stay on this device). If you opened it from a chat app, use Open in Chrome. " + msg);
+          });
+      });
+  }
+
+  function jpegSizeAndOrientation(bytes) {
+    if (!bytes || bytes.length < 4 || bytes[0] !== 0xFF || bytes[1] !== 0xD8) return null;
+    var offset = 2;
+    var orientation = 1;
+    var width = 0;
+    var height = 0;
+    function u16(i, le) {
+      return le ? (bytes[i] | (bytes[i + 1] << 8)) : ((bytes[i] << 8) | bytes[i + 1]);
+    }
+    function u32(i, le) {
+      return le ? (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0
+        : ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0;
+    }
+    while (offset + 4 <= bytes.length) {
+      if (bytes[offset] !== 0xFF) break;
+      var marker = bytes[offset + 1];
+      if (marker === 0xDA) break;
+      var size = u16(offset + 2, false);
+      if (size < 2 || offset + 2 + size > bytes.length) break;
+      if (marker === 0xE1 && !orientation) orientation = 1;
+      if (marker === 0xE1 && size >= 10) {
+        var start = offset + 4;
+        if (bytes[start] === 0x45 && bytes[start + 1] === 0x78 && bytes[start + 2] === 0x69 && bytes[start + 3] === 0x66 && bytes[start + 4] === 0 && bytes[start + 5] === 0) {
+          var tiff = start + 6;
+          var le = bytes[tiff] === 0x49 && bytes[tiff + 1] === 0x49;
+          if ((le || (bytes[tiff] === 0x4D && bytes[tiff + 1] === 0x4D)) && tiff + 8 <= bytes.length) {
+            var ifd = tiff + u32(tiff + 4, le);
+            if (ifd + 2 <= bytes.length) {
+              var n = u16(ifd, le);
+              for (var i = 0; i < n && ifd + 2 + i * 12 + 12 <= bytes.length; i++) {
+                var entry = ifd + 2 + i * 12;
+                if (u16(entry, le) === 0x0112) {
+                  orientation = u16(entry + 8, le) || 1;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      if ((marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC5 && marker <= 0xC7) || (marker >= 0xC9 && marker <= 0xCB) || (marker >= 0xCD && marker <= 0xCF)) {
+        if (offset + 9 <= bytes.length) {
+          height = u16(offset + 5, false);
+          width = u16(offset + 7, false);
+        }
+        break;
+      }
+      offset += 2 + size;
+    }
+    if (!width || !height) return null;
+    return { width: width, height: height, orientation: orientation || 1 };
+  }
+
+  function pngSize(bytes) {
+    if (!bytes || bytes.length < 24) return null;
+    if (!(bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47)) return null;
+    var width = ((bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19]) >>> 0;
+    var height = ((bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23]) >>> 0;
+    if (!width || !height) return null;
+    return { width: width, height: height, orientation: 1 };
+  }
+
+  async function readFileBytes(file) {
+    var buf = await file.arrayBuffer();
+    return new Uint8Array(buf);
+  }
+
+  function resizeOptionsFor(size) {
+    if (!size) return null;
+    var w = size.width;
+    var h = size.height;
+    if (size.orientation >= 5 && size.orientation <= 8) {
+      w = size.height;
+      h = size.width;
+    }
+    var longSide = Math.max(w, h);
+    if (longSide <= EID_OCR_MAX_SIDE) return { width: w, height: h };
+    var scale = EID_OCR_MAX_SIDE / longSide;
+    return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
+  }
+
+  async function bitmapFromFile(file) {
+    var bytes = null;
+    try { bytes = await readFileBytes(file); } catch (e) { bytes = null; }
+    var size = bytes ? (jpegSizeAndOrientation(bytes) || pngSize(bytes)) : null;
+    var resized = resizeOptionsFor(size);
+    var optsBase = { imageOrientation: "from-image" };
+    if (typeof createImageBitmap === "function") {
+      try {
+        var opts = { imageOrientation: "from-image" };
+        if (resized) {
+          opts.resizeWidth = resized.width;
+          opts.resizeHeight = resized.height;
+          opts.resizeQuality = "high";
+        }
+        return await createImageBitmap(file, opts);
+      } catch (e1) {
+        try { return await createImageBitmap(file, optsBase); } catch (e2) {
+          try { return await createImageBitmap(file); } catch (e3) {}
+        }
+      }
+    }
+    return await new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error("This photo couldn't be opened. Try taking it again, or attach a JPEG or PNG."));
+      };
+      img.src = url;
+    });
+  }
+
+  function boostContrastGrayscale(ctx, w, h) {
+    var imageData = ctx.getImageData(0, 0, w, h);
+    var d = imageData.data;
+    for (var i = 0; i < d.length; i += 4) {
+      var y = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      y = (y - 128) * 1.45 + 128;
+      if (y < 0) y = 0;
+      if (y > 255) y = 255;
+      d[i] = d[i + 1] = d[i + 2] = y;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  async function prepareEidImage(file, rotation) {
+    var src = await bitmapFromFile(file);
+    var sw = src.width;
+    var sh = src.height;
+    if (!sw || !sh) throw new Error("This photo couldn't be opened. Try taking it again, or attach a JPEG or PNG.");
+    var longSide = Math.max(sw, sh);
+    var scale = longSide > EID_OCR_MAX_SIDE ? (EID_OCR_MAX_SIDE / longSide) : 1;
+    var dw = Math.max(1, Math.round(sw * scale));
+    var dh = Math.max(1, Math.round(sh * scale));
+    var angle = ((rotation || 0) % 360 + 360) % 360;
+    var canvas = document.createElement("canvas");
+    if (angle === 90 || angle === 270) {
+      canvas.width = dh;
+      canvas.height = dw;
+    } else {
+      canvas.width = dw;
+      canvas.height = dh;
+    }
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("This photo couldn't be prepared for reading.");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    if (angle === 90) {
+      ctx.translate(canvas.width, 0);
+      ctx.rotate(Math.PI / 2);
+    } else if (angle === 180) {
+      ctx.translate(canvas.width, canvas.height);
+      ctx.rotate(Math.PI);
+    } else if (angle === 270) {
+      ctx.translate(0, canvas.height);
+      ctx.rotate(-Math.PI / 2);
+    }
+    ctx.drawImage(src, 0, 0, dw, dh);
+    ctx.restore();
+    if (src.close) try { src.close(); } catch (e) {}
+    boostContrastGrayscale(ctx, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  function countParsedFields(parsed) {
+    if (!parsed) return 0;
+    var keys = ["name", "surname", "eid", "nationality", "gender", "dob", "age", "occupation", "employer", "issuingPlace"];
+    var n = 0;
+    for (var i = 0; i < keys.length; i++) {
+      if (parsed[keys[i]]) n += 1;
+    }
+    return n;
+  }
+
+  function parsedIsStrong(parsed, confidence) {
+    if (!parsed) return false;
+    if (parsed.eid && countParsedFields(parsed) >= 3 && confidence >= 30) return true;
+    if (parsed.eid && (parsed.name || parsed.dob) && confidence >= 40) return true;
+    return false;
+  }
+
+  async function recognizePhotoBest(worker, file, onStatus, index, total) {
+    var angles = [0, 90, 180, 270];
+    var best = { text: "", confidence: -1, angle: 0, parsed: null, score: -1 };
+    for (var i = 0; i < angles.length; i++) {
+      if (onStatus) {
+        onStatus(i === 0
+          ? ("Reading photo " + (index + 1) + " of " + total + "...")
+          : ("Trying another angle on photo " + (index + 1) + "..."));
+      }
+      var canvas = await prepareEidImage(file, angles[i]);
+      var result = await withTimeout(
+        worker.recognize(canvas),
+        EID_OCR_RECOGNIZE_MS,
+        "Reading is taking too long. Try a clearer, closer photo of the card, then tap Read card again."
+      );
+      var text = result && result.data ? (result.data.text || "") : "";
+      var confidence = result && result.data ? Number(result.data.confidence) || 0 : 0;
+      var parsed = parseEidText(text);
+      var score = countParsedFields(parsed) * 100 + confidence;
+      if (score > best.score) best = { text: text, confidence: confidence, angle: angles[i], parsed: parsed, score: score };
+      if (i === 0 && parsedIsStrong(parsed, confidence)) break;
+      if (parsed.eid && countParsedFields(parsed) >= 5) break;
+    }
+    return best;
+  }
+
+  function formatReadCardDone(applied, parsed) {
+    var filled = applied && applied.filledNames ? applied.filledNames : [];
+    var missing = [];
+    if (!parsed.name) missing.push("Name");
+    if (!parsed.surname) missing.push("Surname");
+    if (!parsed.eid) missing.push("EID / ID / Passport");
+    if (!parsed.occupation) missing.push("Occupation");
+    if (!parsed.employer) missing.push("Employer");
+    if (!parsed.issuingPlace) missing.push("Issuing place");
+    if (!parsed.nationality) missing.push("Nationality");
+    if (!parsed.gender) missing.push("Gender");
+    if (!parsed.dob) missing.push("Date of birth");
+    if (!parsed.age) missing.push("Age");
+    var foundAny = !!(parsed.eid || parsed.name || parsed.dob || parsed.gender || parsed.nationality || parsed.occupation || parsed.employer || parsed.issuingPlace);
+    if (!filled.length && !foundAny) {
+      return "Done: couldn't read the card. Try a sharper picture of the front and back, and check every field by hand.";
+    }
+    var msg = "Done: " + (filled.length ? ("filled " + filled.join(", ")) : "no empty fields were filled");
+    if (applied && applied.skipped && applied.skipped.length) {
+      msg += ". Already had " + applied.skipped.join(", ") + " (left as they were)";
+    }
+    if (missing.length) msg += ", couldn't read " + missing.join(", ");
+    msg += ". Check every field by hand.";
+    return msg;
+  }
+
+  function collectImageItems(items) {
+    var out = [];
+    (items || []).forEach(function (item) {
+      var file = item && item.file ? item.file : item;
+      if (isProbablyImage(file)) out.push(item && item.file ? item : { file: file });
+    });
+    return out;
+  }
+
+
+  var READER_PASTE_FALLBACK = "The reader can't run on this page. Use Google Lens to copy the card text, paste it in the box below and tap Fill from card text.";
+  function isCspOrReaderLoadError(err) {
+    var m = err && err.message ? String(err.message) : String(err || "");
+    return /Content Security Policy|unsafe-eval|Evaluating a string as JavaScript|wasm-unsafe-eval|Could not load the on-device reader|Could not start the on-device reader|on-device reader did not start|timed out|internet connection/i.test(m);
+  }
+  function textDetectorAvailable() {
+    return typeof window.TextDetector === "function";
+  }
+  async function recognizeWithTextDetector(files, onStatus) {
+    if (!textDetectorAvailable()) return null;
+    try {
+      var detector = new window.TextDetector();
+      var parts = [];
+      for (var i = 0; i < files.length; i++) {
+        if (onStatus) onStatus("Reading photo " + (i + 1) + " of " + files.length + "...");
+        var file = files[i].file || files[i];
+        var src = null;
+        try {
+          src = await createImageBitmap(file, { imageOrientation: "from-image" });
+        } catch (e1) {
+          try { src = await bitmapFromFile(file); } catch (e2) { src = null; }
+        }
+        if (!src) continue;
+        var boxes = await detector.detect(src);
+        if (src.close) try { src.close(); } catch (e3) {}
+        var text = (boxes || []).map(function (b) { return b && (b.rawValue || ""); }).filter(Boolean).join("\n");
+        parts.push(text);
+      }
+      return parts.join("\n\n").trim() || null;
+    } catch (err) {
+      return null;
+    }
+  }
+  function parsedLooksUseful(parsed) {
+    if (!parsed) return false;
+    return !!(parsed.eid || parsed.name || parsed.occupation || parsed.employer || parsed.issuingPlace || (countParsedFields(parsed) >= 2));
+  }
+  function applyCardText(raw, applyParsed) {
+    var text = String(raw || "").trim();
+    if (!text) {
+      showEidOcrStatus("Paste the card text first, then tap Fill from card text.");
+      return null;
+    }
+    var parsed = parseEidText(text);
+    var applied = applyParsed(parsed);
+    showEidOcrStatus(formatReadCardDone(applied, parsed));
+    return parsed;
+  }
+
+  async function runReadCard(getItems, applyParsed) {
+    showEidOcrStatus("Loading reader...");
+    var images = collectImageItems(typeof getItems === "function" ? getItems() : getItems);
+    if (!images.length) {
+      showEidOcrStatus("Take or attach a photo of the card first");
+      return;
+    }
+    var btn = el("readCard");
+    var prev = btn ? btn.textContent : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Reading…";
+    }
+    var worker = null;
+    try {
+      var detectorText = await recognizeWithTextDetector(images, showEidOcrStatus);
+      if (detectorText) {
+        var detected = parseEidText(detectorText);
+        if (parsedLooksUseful(detected)) {
+          var appliedDetector = applyParsed(detected);
+          showEidOcrStatus(formatReadCardDone(appliedDetector, detected));
+          return detected;
+        }
+      }
+      showEidOcrStatus("Loading reader...");
+      var Tesseract = await loadTesseractLibrary(showEidOcrStatus);
+      worker = await createEidOcrWorker(Tesseract, showEidOcrStatus);
+      var parts = [];
+      var bestParsed = null;
+      var bestScore = -1;
+      for (var i = 0; i < images.length; i++) {
+        var file = images[i].file || images[i];
+        var best = await recognizePhotoBest(worker, file, showEidOcrStatus, i, images.length);
+        parts.push(best.text || "");
+        if (best.score > bestScore && best.parsed) {
+          bestParsed = best.parsed;
+          bestScore = best.score;
+        }
+      }
+      if (worker && worker.terminate) await worker.terminate();
+      worker = null;
+      var combined = parseEidText(parts.join("\n\n"));
+      var parsed = countParsedFields(combined) >= countParsedFields(bestParsed) ? combined : (bestParsed || combined);
+      var applied = applyParsed(parsed);
+      showEidOcrStatus(formatReadCardDone(applied, parsed));
+      return parsed;
+    } catch (err) {
+      if (worker && worker.terminate) try { await worker.terminate(); } catch (e) {}
+      if (isCspOrReaderLoadError(err)) showEidOcrStatus(READER_PASTE_FALLBACK);
+      else showEidOcrStatus(err && err.message ? err.message : "Could not read the card.");
+      return null;
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = prev || "Read card";
+      }
+    }
+  }
+
+
+  async function readCard() {
+    try {
+      await runReadCard(function () { return state.attachments || []; }, function (parsed) {
+        var applied = applyParsedToEmptyFields(parsed);
+        touchForm();
+        refresh();
+        return applied;
+      });
+    } catch (err) {
+      /* Status is already shown on the page. */
+    }
+  }
+
+  const AGE_YEAR_OPTIONS = [{ value: "", label: "Select..." }];
+  for (let i = 0; i <= 110; i++) AGE_YEAR_OPTIONS.push({ value: String(i), label: String(i) });
+  AGE_YEAR_OPTIONS.push({ value: "infant", label: "Infant (months)" });
+  const AGE_MONTH_OPTIONS = [{ value: "", label: "Select..." }];
+  for (let i = 0; i <= 11; i++) AGE_MONTH_OPTIONS.push({ value: String(i), label: i === 1 ? "1 month" : i + " months" });
+  fillSelect(el("ageMode"), AGE_YEAR_OPTIONS);
+  fillSelect(el("ageMonths"), AGE_MONTH_OPTIONS);
+  fillSelect(el("participantType"), PARTICIPANT_TYPE_OPTIONS);
+  fillSelect(el("gender"), GENDER_OPTIONS);
+  fillSelect(el("nationality"), NATIONALITY_OPTIONS);
+  el("nationality").value = "";
+  fillSelect(el("condition"), CONDITION_OPTIONS);
+  fillSelect(el("outcome"), OUTCOME_OPTIONS);
+
+  bind("eventName", "eventName");
+  el("eventDate").addEventListener("input", function () {
+    state.eventDate = formatDateDigits(el("eventDate").value);
+    el("eventDate").value = state.eventDate;
+    touchForm();
+    refresh();
+  });
+  el("eventDate").addEventListener("blur", function () { state.dateBlurred = true; refresh(); });
+  el("dateToday").addEventListener("click", function () {
+    state.eventDate = formatTodayDate();
+    state.dateBlurred = true;
+    el("eventDate").value = state.eventDate;
+    touchForm();
+    refresh();
+  });
+  el("eventTime").addEventListener("input", function () {
+    state.eventTime = formatTimeDigits(el("eventTime").value);
+    el("eventTime").value = state.eventTime;
+    touchForm();
+    refresh();
+  });
+  el("eventTime").addEventListener("blur", function () {
+    state.eventTime = finalizeTimeDigits(state.eventTime);
+    state.timeBlurred = true;
+    el("eventTime").value = state.eventTime;
+    touchForm();
+    refresh();
+  });
+  el("timeNow").addEventListener("click", function () {
+    state.eventTime = formatNowTime();
+    state.timeBlurred = true;
+    el("eventTime").value = state.eventTime;
+    touchForm();
+    refresh();
+  });
+  el("eventTimeOut").addEventListener("input", function () {
+    state.eventTimeOut = formatTimeDigits(el("eventTimeOut").value);
+    el("eventTimeOut").value = state.eventTimeOut;
+    touchForm();
+    refresh();
+  });
+  el("eventTimeOut").addEventListener("blur", function () {
+    state.eventTimeOut = finalizeTimeDigits(state.eventTimeOut);
+    state.timeOutBlurred = true;
+    el("eventTimeOut").value = state.eventTimeOut;
+    touchForm();
+    refresh();
+  });
+  el("timeOutNow").addEventListener("click", function () {
+    state.eventTimeOut = formatNowTime();
+    state.timeOutBlurred = true;
+    el("eventTimeOut").value = state.eventTimeOut;
+    touchForm();
+    refresh();
+  });
+  bind("location", "location");
+  el("participantType").addEventListener("change", function () { state.participantType = el("participantType").value; touchForm(); refresh(); });
+  bind("participantTypeOther", "participantTypeOther");
+  bind("patientName", "patientName");
+  bind("patientSurname", "patientSurname");
+  el("dateOfBirth").addEventListener("input", function () {
+    state.dateOfBirth = formatDateDigits(el("dateOfBirth").value);
+    el("dateOfBirth").value = state.dateOfBirth;
+    if (isDobValid(state.dateOfBirth)) {
+      const sel = ageFromDobSelection(state.dateOfBirth);
+      state.ageMode = sel.mode;
+      state.ageMonths = sel.months;
+      el("ageMode").value = sel.mode;
+      el("ageMonths").value = sel.months;
+    }
+    touchForm();
+    refresh();
+  });
+  el("dateOfBirth").addEventListener("blur", function () { state.dobBlurred = true; refresh(); });
+  el("ageMode").addEventListener("change", function () {
+    state.ageMode = el("ageMode").value;
+    if (state.ageMode !== "infant") {
+      state.ageMonths = "";
+      el("ageMonths").value = "";
+    }
+    touchForm();
+    refresh();
+  });
+  el("ageMonths").addEventListener("change", function () {
+    state.ageMonths = el("ageMonths").value;
+    touchForm();
+    refresh();
+  });
+  el("gender").addEventListener("change", function () { state.gender = el("gender").value; touchForm(); refresh(); });
+  el("nationality").addEventListener("change", function () { state.nationality = el("nationality").value; touchForm(); refresh(); });
+  bind("nationalityOther", "nationalityOther");
+  el("eid").addEventListener("input", function () {
+    state.eid = el("eid").value;
+    const formatted = parseEidNumber(state.eid);
+    if (formatted) {
+      state.eid = formatted;
+      el("eid").value = formatted;
+      if (!state.ageMode) {
+        const year = birthYearFromEid(formatted);
+        const a = year ? ageFromBirthYear(year) : "";
+        if (a) {
+          const n = Number(a);
+          if (isFinite(n) && n >= 1) {
+            state.ageMode = String(Math.min(n, 110));
+            state.ageMonths = "";
+            el("ageMode").value = state.ageMode;
+            el("ageMonths").value = "";
+          }
+        }
+      }
+    }
+    touchForm();
+    refresh();
+  });
+  bind("occupation", "occupation");
+  bind("employer", "employer");
+  bind("issuingPlace", "issuingPlace");
+  el("readCard").addEventListener("click", function () { readCard(); });
+  el("fillFromCardText").addEventListener("click", function () {
+    applyCardText(el("eidPaste").value, function (parsed) {
+      var applied = applyParsedToEmptyFields(parsed);
+      touchForm();
+      refresh();
+      return applied;
+    });
+  });
+  el("eidFile").addEventListener("change", function () {
+    if (el("eidFile").files && el("eidFile").files.length) addFiles(el("eidFile").files);
+    else resetFileInputs();
+  });
+  el("eidCamera").addEventListener("change", function () {
+    if (el("eidCamera").files && el("eidCamera").files.length) addFiles(el("eidCamera").files);
+    else resetFileInputs();
+  });
+  bind("cellphone", "cellphone");
+  bind("complaint", "complaint");
+  bind("description", "description");
+  bind("allergies", "allergies");
+  bind("medications", "medications");
+  bind("medicalHistory", "medicalHistory");
+  el("condition").addEventListener("change", function () { state.condition = el("condition").value; touchForm(); refresh(); });
+  bind("vitals", "vitals");
+  bind("treatment", "treatment");
+  el("outcome").addEventListener("change", function () { state.outcome = el("outcome").value; touchForm(); refresh(); });
+  bind("hospital", "hospital");
+  bind("outcomeOther", "outcomeOther");
+  bind("nextOfKinName", "nextOfKinName");
+  bind("relationship", "relationship");
+  bind("nextOfKinNumber", "nextOfKinNumber");
+  bind("completedBy", "completedBy");
+  bind("callSign", "callSign");
+  el("messagePreview").addEventListener("input", function () {
+    state.messageEdit = el("messagePreview").value;
+    state.messageDirty = true;
+  });
+  el("copyMessage").addEventListener("click", copyMessage);
+  el("shareMessage").addEventListener("click", shareMessage);
+  el("clearForm").addEventListener("click", clearForm);
+
+  window.__quickinfo = {
+    state: state,
+    buildMessage: buildMessage,
+    generatedMessage: generatedMessage,
+    currentMessage: currentMessage,
+    ageFromDobSelection: ageFromDobSelection,
+    formatAgeMessage: formatAgeMessage,
+    isDobValid: isDobValid,
+    formatDateDigits: formatDateDigits,
+    formatTimeDigits: formatTimeDigits,
+    finalizeTimeDigits: finalizeTimeDigits,
+    parseHHMM: parseHHMM,
+    clearForm: clearForm,
+    refresh: refresh,
+  };
+  refresh();
+})();
+  </script>
+</body>
+</html>

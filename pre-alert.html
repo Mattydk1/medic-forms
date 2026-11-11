@@ -1,0 +1,3042 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0b5fff">
+  <title>EMT hospital pre-alert</title>
+  <style>
+:root {
+  --bg: #f4f5f7;
+  --bg-card: #ffffff;
+  --bg-subtle: #eef0f3;
+  --fg: #15181d;
+  --muted: #4b5563;
+  --border: #cfd4dc;
+  --border-strong: #9aa3b0;
+  --accent: #0b5fff;
+  --accent-fg: #ffffff;
+  --accent-subtle: #e8f0ff;
+  --danger: #c43c3c;
+  --warning: #9a6b00;
+  --warning-bg: #fff6e0;
+  --success: #0f7b4a;
+  --success-bg: #e6f6ee;
+  --military: #c27800;
+  --hospital: #c43c3c;
+  --base: #0b5fff;
+  --pin: #0f7b4a;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(16,24,40,.06);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --tap: 44px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101215;
+    --bg-card: #1a1d22;
+    --bg-subtle: #15181d;
+    --fg: #f2f4f7;
+    --muted: #b0b7c3;
+    --border: #3a404a;
+    --border-strong: #5b6370;
+    --accent: #6ea0ff;
+    --accent-fg: #0b1220;
+    --accent-subtle: #1a2740;
+    --danger: #f07171;
+    --warning: #f0c36b;
+    --warning-bg: #3a2d12;
+    --success: #5dcc8d;
+    --success-bg: #163324;
+    --military: #f0a94a;
+    --hospital: #f07171;
+    --base: #6ea0ff;
+    --pin: #5dcc8d;
+    --shadow: 0 1px 2px rgba(0,0,0,.35);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 16px;
+  line-height: 1.5;
+}
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.wrap { max-width: 920px; margin: 0 auto; padding: 16px 16px 80px; }
+header h1 { font-size: 1.7rem; line-height: 1.25; margin: 0 0 8px; }
+.lede, .muted, .hint { color: var(--muted); }
+.lede { margin: 0 0 16px; }
+nav.toc {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin: 16px 0;
+}
+nav.toc strong { display: block; margin-bottom: 6px; }
+nav.toc ol { margin: 0; padding-left: 1.2rem; }
+nav.toc a { text-decoration: none; }
+nav.toc a:hover { text-decoration: underline; }
+section { margin: 28px 0; }
+section > h2 { font-size: 1.25rem; margin: 0 0 10px; }
+.caption { color: var(--muted); font-size: .95rem; margin: -4px 0 12px; }
+.callout {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.callout.warn { background: var(--warning-bg); border-color: var(--warning); }
+.callout.ok { background: var(--success-bg); border-color: var(--success); }
+.callout .lead { font-weight: 700; margin-bottom: 4px; }
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.grow { flex: 1 1 220px; }
+label.field, .field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  width: 100%;
+}
+label.field > span, .field-label > span { color: var(--muted); }
+input[type="text"], input[type="number"], input[type="email"], select, textarea {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--fg);
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.45;
+}
+textarea { min-height: 120px; resize: vertical; }
+input:disabled { opacity: .65; }
+.invalid { border-color: var(--warning) !important; }
+.hint { font-size: 12px; line-height: 1.4; margin-top: 4px; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 700px) {
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+}
+button, .btn {
+  min-height: var(--tap);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--fg);
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+  user-select: none;
+}
+button.primary, .btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+  font-weight: 600;
+}
+button.quiet:hover, button:hover, .btn:hover { filter: brightness(0.97); }
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg);
+  font-size: 15px;
+  cursor: pointer;
+  min-height: var(--tap);
+}
+.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; }
+#map {
+  width: 100%;
+  height: 360px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  margin-top: 8px;
+}
+.map-offline {
+  display: none;
+  width: 100%;
+  min-height: 160px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  color: var(--muted);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  margin-top: 8px;
+}
+.map-offline.show { display: flex; }
+#map.hidden { display: none; }
+
+  #eidFillNote, #eidFillNotePaste, .eid-fill-note {
+    white-space: pre-wrap;
+  }
+  #eidFillNote.is-on, #eidFillNotePaste.is-on, .eid-fill-note.is-on {
+    display: block !important;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+.hospital-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.hospital-list .card header, .split {
+  display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline;
+}
+.badge {
+  font-size: 13px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.badge.accent { background: var(--accent-subtle); color: var(--fg); border-color: var(--accent); }
+.badge.warn { background: var(--warning-bg); color: var(--fg); border-color: var(--warning); }
+.readonly {
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+}
+.gcs-total {
+  margin-top: 2px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.4;
+}
+#messagePreview {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--fg);
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-x: auto;
+}
+.actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-size: 14px;
+}
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--bg-subtle); font-weight: 600; }
+ul { padding-left: 1.2rem; }
+li { margin: 6px 0; }
+.legend { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+.photo-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.photo-btn { position: relative; }
+.photo-btn input[type="file"] {
+  position: absolute;
+  width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+#eidPhotoList { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+#eidPhotoList .eid-photo-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#eidPhotoList img {
+  width: 96px; height: 96px; object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.hidden { display: none !important; }
+.leaflet-square-icon {
+  border-radius: 4px;
+  border: 2px solid var(--bg-card);
+  background: var(--base);
+}
+hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
+.back-top { margin-top: 8px; }
+
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>EMT hospital pre-alert</h1>
+      <p class="lede">A quick map of NGC work bases in the UAE, the nearest public emergency hospitals, and a form that writes a hospital pre-notification message. Locations are approximate. There is no official public catchment map. Compiled 11 Nov 2026.</p>
+      <p class="hint">This file runs in your browser only. Patient details are not saved or sent anywhere. The map needs internet; the form and hospital list work offline.</p>
+    </header>
+
+    <nav class="toc" aria-label="Contents">
+      <strong>On this page</strong>
+      <ol>
+        <li><a href="#read-first">Please read this first</a></li>
+        <li><a href="#map-hospitals">Map and nearest hospitals</a></li>
+        <li><a href="#pre-alert">Pre-notification message</a></li>
+        <li><a href="#work-bases">Work bases</a></li>
+        <li><a href="#hospitals">Hospitals</a></li>
+        <li><a href="#double-check">What to double-check</a></li>
+      </ol>
+    </nav>
+
+    <section id="read-first">
+      <h2>Please read this first</h2>
+      <div class="callout warn">
+        <div class="lead">This is only a quick-reference aid</div>
+        Follow your company’s own medical and referral protocols, and always confirm with the receiving hospital. Do not use this page as the official destination list.
+      </div>
+      <p>The UAE does not publish a public hospital catchment map like the Gauteng EMS tool. Hospitals here are ranked by straight-line distance (as the crow flies), not by road time, and not by any official catchment. In the desert, driving can take much longer than the straight-line figure suggests.</p>
+      <p>Pins for work bases are approximate public locations (a town, field, plant or camp area). They are not the exact clinic gate. For a life-threatening emergency in the UAE, call ambulance 998 or emergency 999.</p>
+      <div class="card" style="margin-top:12px">
+        <label class="check">
+          <input type="checkbox" id="military">
+          <span>Military patients: usually Zayed Military Hospital, depending on severity (nearest ED for critical cases, per your protocol)</span>
+        </label>
+        <p id="militaryNote" class="hidden muted" style="margin:10px 0 0">With this turned on, Zayed Military Hospital is highlighted in the list, with the straight-line distance from your chosen point. For a critical patient, the nearest emergency department may still be the safer first stop — follow your protocol.</p>
+      </div>
+    </section>
+
+    <section id="map-hospitals">
+      <h2>Map and nearest hospitals</h2>
+      <p>Pick a work base, tap “Use my location” (only works when you are in the UAE), or tap the map to drop a pin. The list below then shows the nearest hospitals with a public emergency department.</p>
+      <div class="row" style="margin:12px 0">
+        <label class="field grow">
+          <span>Work base</span>
+          <select id="workBase"></select>
+        </label>
+        <button type="button" id="useLocation">Use my location</button>
+      </div>
+      <div id="gpsCallout" class="callout hidden"></div>
+      <div id="noPinCallout" class="callout warn hidden">
+        <div class="lead">No map pin for this base</div>
+        <div id="noPinNote"></div>
+      </div>
+      <div id="map" role="application" aria-label="Map of work bases and hospitals"></div>
+      <div id="mapOffline" class="map-offline">Map needs internet</div>
+      <p class="legend" id="mapLegend"></p>
+      <div id="originNote"></div>
+      <div id="hospitalList" class="hospital-list"></div>
+      <div id="noOrigin" class="callout hidden">
+        <div class="lead">Choose a starting point</div>
+        This base has no public map pin. Pick another base, drop a pin on the map, or use your location if you are in the UAE.
+      </div>
+    </section>
+
+    <section id="pre-alert">
+      <h2>Pre-notification message</h2>
+      <p>Fill in what you know. Leave blank what you do not know — blank fields are left out of the message, except Hospital transported to and EID / ID / Passport, which show a dash if empty. Headings follow the Response Plus Medical (RPM) Patient Care Record. This is a short pre-alert, not a full PCR. Then copy the message and send it the way your protocol says (radio, phone or written pre-alert).</p>
+
+      <div class="stack" style="margin-top:12px">
+        <label class="field"><span>Base name</span><select id="alertBaseId"></select></label>
+        <label class="field hidden" id="alertBaseOtherWrap"><span>Base name (other)</span><input id="alertBaseOther" type="text" placeholder="Type the base name"></label>
+        <label class="field"><span>Call sign</span><input id="callSign" type="text" placeholder="e.g. Medic 1"></label>
+      </div>
+
+      <div class="grid grid-2" style="margin-top:12px">
+        <div>
+          <div class="field-label"><span>Date</span>
+            <div class="row">
+              <div class="grow">
+                <input id="incidentDate" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="e.g. 11/11/2026">
+                <div id="dateHint" class="hint hidden">Use a real date, dd/mm/yyyy</div>
+              </div>
+              <button type="button" class="quiet" id="dateToday">Today</button>
+            </div>
+          </div>
+        </div>
+        <label class="field"><span>Project name</span><input id="projectName" type="text" placeholder="Project name"></label>
+        <label class="field"><span>Case number</span><input id="caseNumber" type="text" placeholder="Case number"></label>
+        <label class="field"><span>EPCR number</span><input id="epcrNumber" type="text" placeholder="EPCR number"></label>
+        <label class="field"><span>Call class</span><select id="callClass"></select></label>
+        <div>
+          <label class="field"><span>Sub class</span><select id="subClass"></select></label>
+          <label class="field hidden" id="subClassOtherWrap" style="margin-top:12px"><span>Sub class (other)</span><input id="subClassOther" type="text" placeholder="Type the sub class"></label>
+        </div>
+      </div>
+
+      <div class="grid grid-2" style="margin-top:12px">
+        <label class="field"><span>Hospital transported to</span><select id="hospitalId"></select></label>
+        <div>
+          <label class="field"><span>Incident type</span><select id="incidentType"></select></label>
+          <label class="field hidden" id="incidentTypeOtherWrap" style="margin-top:12px"><span>Incident type (other)</span><input id="incidentTypeOther" type="text" placeholder="Type the incident type"></label>
+          <label class="field" style="margin-top:12px"><span>Incident location</span><input id="incidentLocation" type="text" placeholder="Type an address or paste a Google Maps link (blank = map pin)"></label>
+        </div>
+      </div>
+      <label class="field hidden" id="hospitalOtherWrap" style="margin-top:12px"><span>Hospital transported to (other)</span><input id="hospitalOther" type="text" placeholder="Type the hospital name"></label>
+
+      <p style="margin:12px 0 8px;font-weight:600">Times</p>
+      <div id="timesGrid" class="grid grid-2"></div>
+
+      <div style="margin-top:12px">
+        <label class="check">
+          <input type="checkbox" id="noCamera">
+          <span>No camera available</span>
+        </label>
+        <div id="noCameraHint" class="hint hidden">Enter EID details by hand or paste text</div>
+        <div id="eidPhotoArea">
+          <div class="field-label"><span>Add EID photos (front and back)</span></div>
+          <div class="photo-btns">
+            <label class="btn photo-btn">
+              <input id="eidFile" type="file" accept="image/*" multiple>
+              Choose files
+            </label>
+            <label class="btn photo-btn">
+              <input id="eidCamera" type="file" accept="image/*" capture="environment">
+              Use camera
+            </label>
+          </div>
+          <div class="hint" style="margin-top:6px">On a computer, Use camera may just open the file picker.</div>
+          <div id="eidPhotoList"></div>
+          <div style="margin-top:10px"><button type="button" id="readCard">Read card</button></div>
+          <div id="eidFillNote" class="hint hidden" style="margin-top:8px"></div>
+          <div class="hint" style="margin-top:8px">Read card can read more than one photo (front and back) on this device — the pictures are not sent anywhere. Check every field by hand. If reading fails, copy the text with Google Lens and paste below.</div>
+        </div>
+        <label class="field" style="margin-top:10px">
+          <span>Paste card text</span>
+          <span class="hint">If Read card can't run, copy the card with Google Lens (front and back), paste it here, then tap Fill from card text. Check every field by hand.</span>
+          <textarea id="eidPaste" rows="6" placeholder="Paste the copied Emirates ID text (front and back)"></textarea>
+        </label>
+        <div style="margin-top:10px"><button type="button" id="fillFromCardText">Fill from card text</button></div>
+        <div id="eidFillNotePaste" class="hint hidden eid-fill-note" style="margin-top:8px"></div>
+      </div>
+
+      <label class="field" style="margin-top:12px"><span>Name</span><input id="patientName" type="text" placeholder="e.g. Ahmed"></label>
+      <label class="field" style="margin-top:12px"><span>Surname</span><input id="patientSurname" type="text" placeholder="e.g. Ali"></label>
+      <div class="grid grid-2" style="margin-top:12px">
+        <label class="field"><span>Nationality</span><select id="nationality"></select></label>
+        <label class="field"><span>Gender</span><select id="gender"></select></label>
+        <div>
+          <div class="field-label"><span>Date of birth</span>
+            <input id="dateOfBirth" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="e.g. 11/11/1990">
+            <div id="dobHint" class="hint hidden">Use a real date, dd/mm/yyyy, not in the future</div>
+          </div>
+        </div>
+        <label class="field"><span>Age</span><input id="age" type="text" placeholder="e.g. 34, or 8 months"></label>
+        <label class="field"><span>EID / ID / Passport no</span><input id="eid" type="text" placeholder="784-XXXX-XXXXXXX-X"></label>
+        <label class="field"><span>Occupation</span><input id="occupation" type="text" placeholder="e.g. Engineer"></label>
+        <label class="field"><span>Employer</span><input id="employer" type="text" placeholder="e.g. ADNOC"></label>
+        <label class="field"><span>Issuing place</span><input id="issuingPlace" type="text" placeholder="e.g. Abu Dhabi"></label>
+        <label class="field"><span>Hospital number (if applicable)</span><input id="hospitalNumber" type="text" placeholder="Hospital number"></label>
+        <label class="field"><span>Cellphone number</span><input id="cellphone" type="text" placeholder="e.g. +971 50 123 4567"></label>
+        <label class="field"><span>Email address</span><input id="email" type="text" placeholder="e.g. name@example.com"></label>
+      </div>
+      <label class="field hidden" id="nationalityOtherWrap" style="margin-top:12px"><span>Nationality (other)</span><input id="nationalityOther" type="text" placeholder="Type the nationality"></label>
+
+      <label class="field" style="margin-top:12px"><span>Chief complaint / diagnosis</span><input id="complaint" type="text" placeholder="e.g. chest pain, suspected STEMI"></label>
+      <label class="field" style="margin-top:12px"><span>Event / mechanism history</span><input id="eventHistory" type="text" placeholder="e.g. sudden onset at work, no trauma"></label>
+      <label class="field" style="margin-top:12px"><span>Signs and symptoms</span><input id="signs" type="text" placeholder="e.g. pale, diaphoretic, radiating pain"></label>
+      <div class="grid grid-2" style="margin-top:12px">
+        <label class="field"><span>Allergies</span><input id="allergies" type="text" placeholder="e.g. NKDA, or penicillin"></label>
+        <label class="field"><span>Medications</span><input id="medications" type="text" placeholder="Current medicines"></label>
+        <label class="field"><span>Past med</span><input id="pastMed" type="text" placeholder="Past medical history"></label>
+        <label class="field"><span>Last meal</span><input id="lastMeal" type="text" placeholder="e.g. 12:00"></label>
+      </div>
+
+      <p style="margin:12px 0 8px;font-weight:600">Primary survey A / B / C / D / E</p>
+      <label class="field"><span>A (Airway)</span><select id="primaryA"></select></label>
+      <label class="field hidden" id="primaryAOtherWrap" style="margin-top:12px"><span>A (other)</span><input id="primaryAOther" type="text" placeholder="Type the airway finding"></label>
+      <label class="field" id="primaryADetailsWrap" style="margin-top:12px"><span>A details</span><input id="primaryADetails" type="text" placeholder="Optional, e.g. blood in airway"></label>
+      <label class="field" style="margin-top:8px"><span>B (Breathing)</span><select id="primaryB"></select></label>
+      <label class="field hidden" id="primaryBOtherWrap" style="margin-top:12px"><span>B (other)</span><input id="primaryBOther" type="text" placeholder="Type the breathing finding"></label>
+      <label class="field" id="primaryBDetailsWrap" style="margin-top:12px"><span>B details</span><input id="primaryBDetails" type="text" placeholder="Optional detail"></label>
+      <label class="field" style="margin-top:8px"><span>C (Circulation)</span><select id="primaryC"></select></label>
+      <label class="field hidden" id="primaryCOtherWrap" style="margin-top:12px"><span>C (other)</span><input id="primaryCOther" type="text" placeholder="Type the circulation finding"></label>
+      <label class="field" id="primaryCDetailsWrap" style="margin-top:12px"><span>C details</span><input id="primaryCDetails" type="text" placeholder="Optional detail"></label>
+      <label class="field" style="margin-top:8px"><span>D (Disability)</span><select id="primaryD"></select></label>
+      <label class="field" style="margin-top:12px"><span>Neurological fallout</span><select id="primaryDFallout"></select></label>
+      <label class="field" style="margin-top:12px"><span>D details</span><input id="primaryDDetails" type="text" placeholder="Optional detail"></label>
+      <label class="field" style="margin-top:8px"><span>E (Exposure): Head-to-toe exam done</span><select id="primaryEExam"></select></label>
+      <label class="field" style="margin-top:12px"><span>Injuries, rashes or deformities found</span><select id="primaryEFindings"></select></label>
+      <label class="field" style="margin-top:12px"><span>E details</span><input id="primaryEDetails" type="text" placeholder="Optional, e.g. laceration L forearm"></label>
+
+      <p style="margin:12px 0 8px;font-weight:600">Vitals</p>
+      <div class="grid grid-3">
+        <label class="field"><span>Resp rate</span><input id="respRate" type="text" placeholder="e.g. 18"></label>
+        <label class="field"><span>SpO2 %</span><input id="spo2" type="number" placeholder="e.g. 98"></label>
+        <label class="field"><span>Heart rate</span><input id="heartRate" type="text" placeholder="e.g. 88"></label>
+        <label class="field"><span>NIBP</span><input id="nibp" type="text" placeholder="e.g. 120/80"></label>
+        <label class="field"><span>Cap refill</span><input id="capRefill" type="text" placeholder="e.g. under 2 sec"></label>
+        <label class="field"><span>ECG rhythm</span><input id="ecg" type="text" placeholder="e.g. sinus tach"></label>
+        <label class="field"><span>Pupils</span><input id="pupils" type="text" placeholder="e.g. PEARL 3 mm"></label>
+        <label class="field"><span>HGT</span><input id="hgt" type="text" placeholder="e.g. 6.2"></label>
+        <label class="field"><span>Temp</span><input id="temp" type="text" placeholder="e.g. 37.2"></label>
+        <label class="field"><span>Pain</span><input id="pain" type="text" placeholder="e.g. 6/10"></label>
+        <label class="field"><span>ETCO2</span><input id="etco2" type="text" placeholder="if recorded"></label>
+      </div>
+
+      <p style="margin:12px 0 8px;font-weight:600">GCS</p>
+      <div class="stack">
+        <label class="field"><span>Eye Opening (E), Max 4</span><select id="gcsE"></select></label>
+        <label class="field"><span>Verbal Response (V), Max 5</span><select id="gcsV"></select></label>
+        <label class="field"><span>Best Motor Response (M), Max 6</span><select id="gcsM"></select></label>
+        <div id="gcsTotal" class="gcs-total">GCS total: incomplete</div>
+      </div>
+
+      <p style="margin:12px 0 8px;font-weight:600">Treatment given</p>
+      <div class="grid grid-2">
+        <label class="field"><span>Medicines</span><input id="medicines" type="text" placeholder="e.g. aspirin 300 mg PO"></label>
+        <label class="field"><span>IV</span><input id="iv" type="text" placeholder="e.g. 18G left AC, NaCl running"></label>
+        <label class="field"><span>Airway</span><input id="airway" type="text" placeholder="e.g. NRB 15 L/min"></label>
+        <label class="field"><span>Circulation</span><input id="circulation" type="text" placeholder="e.g. haemorrhage control"></label>
+      </div>
+      <label class="field" style="margin-top:12px"><span>Procedures (splints, KED, C-spine, other)</span><input id="procedures" type="text" placeholder="e.g. C-spine collar, pelvic binder"></label>
+      <div class="grid grid-2" style="margin-top:12px">
+        <label class="field"><span>Patient condition</span><select id="condition"></select></label>
+      </div>
+      <label class="field" style="margin-top:12px"><span>Clinical notes</span><input id="clinicalNotes" type="text" placeholder="Anything else the hospital should know"></label>
+
+      <div style="margin-top:16px">
+        <p style="margin:0;font-weight:600">Message to copy</p>
+        <pre id="messagePreview"></pre>
+        <textarea id="copyFallback" class="hidden" readonly aria-hidden="true"></textarea>
+        <div class="actions">
+          <button type="button" class="primary" id="copyMessage">Copy message</button>
+          <button type="button" id="clearForm">Clear form</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="work-bases">
+      <h2>Work bases</h2>
+      <p class="caption">Names are taken from the NGC Yearly Planner 2027 (updated). Coast Ghumais is on the planner even though it was not in the first request list.</p>
+      <div style="overflow-x:auto"><table id="basesTable"></table></div>
+      <p>Short notes on each pin:</p>
+      <ul id="baseNotes"></ul>
+    </section>
+
+    <section id="hospitals">
+      <h2>Hospitals</h2>
+      <p class="caption">Only hospitals with a public emergency department are listed. Phone numbers are official switchboards or national emergency numbers, not unconfirmed direct ED lines.</p>
+      <div style="overflow-x:auto"><table id="hospitalsTable"></table></div>
+      <p>Sheikh Shakhbout Medical City is the published trauma centre for the Abu Dhabi region. Cleveland Clinic Abu Dhabi is the official chest pain and stroke centre for Abu Dhabi. Al Dhafra Hospitals (SEHA / PureHealth) run Madinat Zayed, Ghayathi, Mirfa, Al Sila, Liwa and Delma. Ruwais Hospital is in the ADNOC Ruwais area and is not on that current SEHA list. Delma Hospital is on Delma Island, so it is not used for the onshore nearest-hospital list.</p>
+    </section>
+
+    <section id="double-check">
+      <h2>What to double-check</h2>
+      <ul>
+        <li>Coast Ghumais: on the planner, but no separate public location was found. Confirm whether it is a distinct site next to Ras Ghumais.</li>
+        <li>Al Hairah: this is still a probable name match in Sharjah (Al Heera). Confirm it is the compound you actually work at. Al Burair now uses the official Google Maps pin you provided, in southern Al Dhafra — not the Sharjah village of the same name, and not Al Burairat in Ras Al Khaimah.</li>
+        <li>Fujairah: the exact NGC clinic was not found. The pin is the port oil terminal, which may be wrong if your base is in the city.</li>
+        <li>Oil-field camps: Shah, ASAB, Sahil and Buhasa now use the official Google Maps pins you provided. Al Dabiya is still an approximate field or accommodation pin — the clinic gate may be a few kilometres away.</li>
+        <li>Phone numbers: use 998 or 999 in an emergency. Hospital numbers on this page are switchboards from official sites. Confirm the current ED number with your control room before you rely on it.</li>
+        <li>Military referrals: military patients usually go to Zayed Military Hospital, depending on how serious the illness or injury is. Critical cases may need the nearest emergency department first, following your protocol.</li>
+        <li>Driving time: always check a live route. Straight-line kilometres are only a first look.</li>
+      </ul>
+    </section>
+
+    <hr>
+    <p>Compiled on 11 Nov 2026 (Africa/Johannesburg time) from public maps and official hospital pages. Update this page if your company issues a formal referral list or if a pin is wrong.</p>
+    <p>Map data © OpenStreetMap contributors (openstreetmap.org/copyright).</p>
+    <p class="back-top"><a href="#top" id="backToTop">Back to top</a></p>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+const BASES = [
+  {
+    id: "sas-al-nakhil",
+    name: "SAS Al Nakhil",
+    region: "Abu Dhabi city area",
+    lat: 24.423079,
+    lon: 54.504095,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for SAS Al Nakhil (ساس النخل), near ADNOC refining. This replaces the earlier approximate district pin.",
+    mapsUrl: "https://maps.app.goo.gl/1XwExSKVwzdw6gtQ9",
+  },
+  {
+    id: "tarif",
+    name: "Tarif",
+    region: "Al Dhafra (Western Region)",
+    lat: 24.0233,
+    lon: 53.7829,
+    confidence: "high",
+    note: "Approximate pin for the town of Tarif (طريف) in Al Dhafra. Not the exact clinic gate.",
+  },
+  {
+    id: "ras-ghumais",
+    name: "Ras Ghumais",
+    region: "Al Dhafra, far west coast",
+    lat: 24.384635,
+    lon: 51.579787,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for Ras Ghumais (رأس غميس), on the far west coast near the Saudi border. This replaces the earlier approximate area pin.",
+    mapsUrl: "https://maps.app.goo.gl/hWT1nCnsyTtyxHt7A",
+  },
+  {
+    id: "coast-ghumais",
+    name: "Coast Ghumais",
+    region: "Al Dhafra, far west coast",
+    lat: null,
+    lon: null,
+    confidence: "not-found",
+    note: "This name is on your 2027 planner, but no separate public place with this name was found. It is likely near Ras Ghumais. Confirm the exact site with your company list — no pin is shown, so a location is not invented.",
+  },
+  {
+    id: "buhasa",
+    name: "Buhasa",
+    region: "Al Dhafra, ADNOC onshore",
+    lat: 23.590485,
+    lon: 53.372724,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for Buhasa (بو حصا). This replaces the earlier approximate settlement pin.",
+    mapsUrl: "https://maps.app.goo.gl/4HdhNJji5FA5CWCF9",
+  },
+  {
+    id: "sahil",
+    name: "Sahil",
+    region: "Al Dhafra, ADNOC onshore",
+    lat: 23.670434,
+    lon: 54.397001,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for Sahil. This replaces the earlier approximate field-centre pin.",
+    mapsUrl: "https://maps.app.goo.gl/1TP7yMA18ouS1fVVA",
+  },
+  {
+    id: "asab",
+    name: "ASAB",
+    region: "Al Dhafra, ADNOC onshore",
+    lat: 23.270647,
+    lon: 54.296168,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for ASAB (عصب). This replaces the earlier approximate town pin.",
+    mapsUrl: "https://maps.app.goo.gl/z71oqpCBZjuKkPvN9",
+  },
+  {
+    id: "barakah",
+    name: "Barakah",
+    region: "Al Dhafra, coast west of Ruwais",
+    lat: 23.977602,
+    lon: 52.275752,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for Barakah, on the coast west of Ruwais. This replaces the earlier pin for the nuclear power plant itself.",
+    mapsUrl: "https://maps.app.goo.gl/uraVFWSR7xNb4Xm57",
+  },
+  {
+    id: "shah",
+    name: "Shah",
+    region: "Al Dhafra, southern desert",
+    lat: 22.944522,
+    lon: 54.071719,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for Shah. This replaces the earlier approximate plant-area pin.",
+    mapsUrl: "https://maps.app.goo.gl/pTwqSFYYvBfRA67V7",
+  },
+  {
+    id: "fujairah",
+    name: "Fujairah",
+    region: "East coast",
+    lat: 25.191,
+    lon: 56.3625,
+    confidence: "low",
+    note: "Approximate pin for Fujairah Port oil terminal, a likely industrial work area. The exact NGC clinic was not found in public sources. It may instead be in Fujairah city — confirm with your site list.",
+  },
+  {
+    id: "baynouna",
+    name: "Baynouna",
+    region: "Al Dhafra",
+    lat: 24.103801,
+    lon: 52.649423,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for Baynouna (بينونة). This replaces the earlier approximate locality pin.",
+    mapsUrl: "https://maps.app.goo.gl/9iTTMWffuTpFxH1f9",
+  },
+  {
+    id: "al-madam",
+    name: "Al Madam",
+    region: "Sharjah, inland",
+    lat: 24.912,
+    lon: 55.7763,
+    confidence: "high",
+    note: "Approximate pin for the town of Al Madam, Sharjah. Not the exact clinic gate.",
+  },
+  {
+    id: "al-dabiya",
+    name: "Al Dabiya",
+    region: "Coast west of Abu Dhabi, ADNOC",
+    lat: 24.3062,
+    lon: 54.1134,
+    confidence: "medium",
+    note: "Approximate pin for the mapped ADCO Dabbiya accommodation. The wider Al Dabbiya field stretches along the coast, so confirm the clinic location on site.",
+  },
+  {
+    id: "al-mirfa",
+    name: "Al Mirfa",
+    region: "Al Dhafra, coast",
+    lat: 24.092788,
+    lon: 53.465543,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for Al Mirfa (المرفأ). This replaces the earlier approximate town pin. Mirfa Hospital is in the same town.",
+    mapsUrl: "https://maps.app.goo.gl/J4KGpfm8JN8S4rpq9",
+  },
+  {
+    id: "al-hairah",
+    name: "Al Hairah",
+    region: "Sharjah coast (probable)",
+    lat: 25.3826,
+    lon: 55.4173,
+    confidence: "medium",
+    note: "Probable match for Al Heera / الحيرة in Sharjah, between Sharjah and Ajman (a pharmacy there is even spelled Al Hairah). This is not confirmed as your exact work compound — please double-check.",
+  },
+  {
+    id: "al-burair",
+    name: "Al Burair",
+    region: "Al Dhafra, southern desert",
+    lat: 22.850779,
+    lon: 53.373172,
+    confidence: "high",
+    note: "Official pin from the Google Maps link you provided for Al Burair. This replaces the earlier probable match for the village of Al Burair / البرير in Al Bataeh, Sharjah, which was a different place.",
+    mapsUrl: "https://maps.app.goo.gl/9JeRkhDtFzXCmTS99",
+  },
+];
+
+const HOSPITALS = [
+  { id: "madinat-zayed", name: "Madinat Zayed Hospital", lat: 23.6582, lon: 53.7276, network: "SEHA / PureHealth — Al Dhafra Hospitals", role: "Main regional hospital in Al Dhafra, 24/7 emergency department", phone: "800 50", phoneNote: "SEHA / Al Dhafra Hospitals switchboard, not a confirmed direct ED line" },
+  { id: "ruwais", name: "Ruwais Hospital", lat: 24.0857, lon: 52.6652, network: "NMC (ADNOC Ruwais area). Not on the current SEHA Al Dhafra hospital list", role: "24/7 emergency department" },
+  { id: "ghayathi", name: "Ghayathi Hospital", lat: 23.8993, lon: 52.8018, network: "SEHA / PureHealth — Al Dhafra Hospitals", role: "Regional hospital, 24/7 emergency department", phone: "800 50", phoneNote: "SEHA / Al Dhafra Hospitals switchboard, not a confirmed direct ED line" },
+  { id: "mirfa", name: "Mirfa Hospital (Al Marfa Hospital)", lat: 24.0854, lon: 53.4982, network: "SEHA / PureHealth — Al Dhafra Hospitals", role: "Regional hospital, 24/7 emergency department", phone: "800 50", phoneNote: "SEHA / Al Dhafra Hospitals switchboard, not a confirmed direct ED line" },
+  { id: "sila", name: "Al Sila Hospital", lat: 24.0437, lon: 51.7586, network: "SEHA / PureHealth — Al Dhafra Hospitals", role: "Regional hospital, 24/7 emergency department", phone: "800 50", phoneNote: "SEHA / Al Dhafra Hospitals switchboard, not a confirmed direct ED line" },
+  { id: "liwa", name: "Liwa Hospital", lat: 23.1474, lon: 53.807, network: "SEHA / PureHealth — Al Dhafra Hospitals", role: "Regional hospital, 24/7 emergency department", phone: "800 50", phoneNote: "SEHA / Al Dhafra Hospitals switchboard, not a confirmed direct ED line" },
+  { id: "delma", name: "Delma Hospital", lat: null, lon: null, network: "SEHA / PureHealth — Al Dhafra Hospitals", role: "Island hospital on Delma (Dalma) Island", phone: "800 50", phoneNote: "SEHA / Al Dhafra Hospitals switchboard, not a confirmed direct ED line", island: true },
+  { id: "ssmc", name: "Sheikh Shakhbout Medical City (SSMC)", lat: 24.3241, lon: 54.6136, network: "SEHA / PureHealth, Abu Dhabi (Bani Yas / Al Mafraq)", role: "Designated trauma centre for the Abu Dhabi region. 24/7 emergency department", phone: "800 7762", phoneNote: "Official SSMC switchboard" },
+  { id: "skmc", name: "Sheikh Khalifa Medical City (SKMC)", lat: 24.4691, lon: 54.3636, network: "SEHA / PureHealth, Abu Dhabi (Al Manhal / Al Karamah Street)", role: "Major hospital, 24/7 emergency department", phone: "800 50", phoneNote: "SKMC lists 800 50 for 24/7 patient support, and 998 for emergency" },
+  { id: "ccad", name: "Cleveland Clinic Abu Dhabi", lat: 24.4971, lon: 54.3879, network: "Al Maryah Island, Abu Dhabi", role: "24/7 emergency department. Official chest pain and stroke centre for Abu Dhabi", phone: "800 8 2223", phoneNote: "Official hospital number. For a medical emergency they say to call 999 in the UAE" },
+  { id: "zmh", name: "Zayed Military Hospital", lat: 24.4204, lon: 54.4313, network: "Abu Dhabi (Al Rawdah / Al Safarat area)", role: "Military hospital with a 24-hour emergency department", military: true },
+  { id: "tawam", name: "Tawam Hospital", lat: 24.1956, lon: 55.6485, network: "SEHA / PureHealth, Al Ain", role: "Major hospital in Al Ain, 24/7 emergency department", phone: "800 50", phoneNote: "SEHA switchboard, not a confirmed direct ED line" },
+  { id: "fujairah-hospital", name: "Fujairah Hospital", lat: 25.1263, lon: 56.3149, network: "Emirates Health Services (EHS)", role: "Main hospital for Fujairah, 24/7 accident and emergency department", phone: "800 8877", phoneNote: "EHS general number, not a confirmed direct ED line" },
+  { id: "kalba", name: "Kalba Hospital", lat: 25.036, lon: 56.3448, network: "Emirates Health Services (EHS), Sharjah east coast", role: "Regional hospital, emergency department", phone: "800 8877", phoneNote: "EHS general number, not a confirmed direct ED line" },
+  { id: "al-dhaid", name: "Al Dhaid Hospital", lat: 25.2799, lon: 55.892, network: "Emirates Health Services (EHS), Sharjah", role: "Regional hospital, 24/7 emergency services", phone: "800 8877", phoneNote: "EHS general number, not a confirmed direct ED line. Map pin is approximate" },
+  { id: "al-qassimi", name: "Al Qassimi Hospital", lat: 25.3417, lon: 55.4325, network: "Emirates Health Services (EHS), Sharjah", role: "Major hospital in Sharjah, emergency department", phone: "800 8877", phoneNote: "EHS general number, not a confirmed direct ED line" },
+  { id: "masafi", name: "Masafi Hospital", lat: 25.2985, lon: 56.1648, network: "Emirates Health Services (EHS), on the Dhaid–east coast road", role: "Regional hospital, emergency department", phone: "800 8877", phoneNote: "EHS general number, not a confirmed direct ED line" },
+];
+
+const MAPPED_HOSPITALS = HOSPITALS.filter((h) => h.lat != null && h.lon != null);
+const MAPPED_BASES = BASES.filter((b) => b.lat != null && b.lon != null);
+const UAE_BBOX = { minLat: 22.4, maxLat: 26.2, minLon: 51.3, maxLon: 56.6 };
+const UAE_OUTLINE = [[51.58, 24.3], [51.63, 24.0], [51.85, 23.95], [52.2, 23.92], [52.55, 24.1], [52.73, 24.2], [53.2, 24.16], [53.5, 24.12], [54.05, 24.22], [54.35, 24.3], [54.42, 24.53], [54.7, 24.55], [54.95, 24.9], [55.2, 25.22], [55.28, 25.36], [55.3, 25.55], [55.55, 25.65], [55.8, 25.85], [56.08, 26.05], [56.25, 25.7], [56.4, 25.62], [56.38, 25.35], [56.37, 25.12], [56.36, 24.95], [56.15, 24.85], [55.9, 24.7], [55.8, 24.45], [55.78, 24.2], [55.7, 23.7], [55.55, 23.1], [55.2, 22.7], [54.5, 22.63], [53.7, 22.72], [52.9, 22.95], [52.2, 23.35], [51.75, 23.85], [51.58, 24.3]];
+
+function haversineKm(aLat, aLon, bLat, bLon) {
+  const R = 6371;
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLon = ((bLon - aLon) * Math.PI) / 180;
+  const s1 = Math.sin(dLat / 2);
+  const s2 = Math.sin(dLon / 2);
+  const h = s1 * s1 + Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * s2 * s2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+function formatKm(km) {
+  if (km < 10) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
+}
+function inUae(lat, lon) {
+  return lat >= UAE_BBOX.minLat && lat <= UAE_BBOX.maxLat && lon >= UAE_BBOX.minLon && lon <= UAE_BBOX.maxLon;
+}
+function lonLatToWorld(lon, lat, z) {
+  const n = Math.pow(2, z);
+  const x = ((lon + 180) / 360) * n;
+  const latRad = (lat * Math.PI) / 180;
+  const y = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n;
+  return { x, y };
+}
+function worldToLonLat(x, y, z) {
+  const n = Math.pow(2, z);
+  const lon = (x / n) * 360 - 180;
+  const latRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n)));
+  return { lon, lat: (latRad * 180) / Math.PI };
+}
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+function confidenceLabel(c) {
+  if (c === "high") return "Good match for the town or site";
+  if (c === "medium") return "Approximate — please confirm on site";
+  if (c === "low") return "Uncertain — please confirm";
+  return "Not found — no pin";
+}
+function nearestHospitals(lat, lon, limit = 5) {
+  return MAPPED_HOSPITALS.map((h) => ({ hospital: h, km: haversineKm(lat, lon, h.lat, h.lon) })).sort((a, b) => a.km - b.km).slice(0, limit);
+}
+function filled(value) {
+  return value.trim();
+}
+function addLine(lines, label, value, always = false) {
+  const text = filled(value);
+  if (text) lines.push(`${label}: ${text}`);
+  else if (always) lines.push(`${label}: —`);
+}
+function isGoogleMapsLink(value) {
+  const text = filled(value);
+  if (!text) return false;
+  const url = /^(https?:\/\/)/i.test(text) ? text : `https://${text}`;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+    const path = parsed.pathname.toLowerCase();
+    if (host === "maps.app.goo.gl" || host.endsWith(".maps.app.goo.gl")) return true;
+    if (host === "goo.gl" && (path === "/maps" || path.startsWith("/maps/"))) return true;
+    if (host === "maps.google.com" || host.startsWith("maps.google.")) return true;
+    if ((host === "google.com" || /^google\.[a-z.]+$/.test(host)) && (path === "/maps" || path.startsWith("/maps/"))) return true;
+    return false;
+  } catch {
+    return /maps\.google\.|google\.[^\s/]+\/maps|goo\.gl\/maps|maps\.app\.goo\.gl/i.test(text);
+  }
+}
+function formatIncidentLocation(input, origin) {
+  const text = filled(input);
+  if (text) {
+    if (isGoogleMapsLink(text)) return text;
+    return text;
+  }
+  if (!origin) return "";
+  const link = `https://www.google.com/maps?q=${origin.lat.toFixed(6)},${origin.lon.toFixed(6)}`;
+  const place = origin.kind === "base" ? origin.label : origin.kind === "gps" ? "current location" : "dropped pin";
+  return `near ${place}, ${link}`;
+}
+const INCIDENT_TYPE_OPTIONS = [
+  { value: "", label: "Select..." },
+  { value: "Walk-in", label: "Walk-in" },
+  { value: "Call-out", label: "Call-out" },
+  { value: "IFT", label: "IFT" },
+  { value: "Event", label: "Event" },
+  { value: "Other", label: "Other" },
+];
+const CALL_CLASS_OPTIONS = [
+  { value: "", label: "Select..." },
+  { value: "Trauma", label: "Trauma" },
+  { value: "Medical", label: "Medical" },
+  { value: "Trauma and medical", label: "Trauma and medical" },
+];
+const SUB_CLASS_OPTIONS = [
+  { value: "", label: "Select..." },
+  { value: "Cardiovascular emergency", label: "Cardiovascular emergency" },
+  { value: "Respiratory/breathing emergency", label: "Respiratory/breathing emergency" },
+  { value: "Neurological emergency", label: "Neurological emergency" },
+  { value: "Trauma and haemorrhage", label: "Trauma and haemorrhage" },
+  { value: "Gastrointestinal and abdominal emergency", label: "Gastrointestinal and abdominal emergency" },
+  { value: "Anaphylaxis and acute allergic reaction", label: "Anaphylaxis and acute allergic reaction" },
+  { value: "Environmental (temperature reactions)", label: "Environmental (temperature reactions)" },
+  { value: "Specialised emergencies (behavioural or psychiatric crises)", label: "Specialised emergencies (behavioural or psychiatric crises)" },
+  { value: "Other", label: "Other" },
+];
+const TIME_FIELD_DEFS = [
+  { key: "callRecorded", label: "Call recorded" },
+  { key: "callDispatched", label: "Call dispatched" },
+  { key: "mobileToCall", label: "Mobile to call" },
+  { key: "onScene", label: "On scene" },
+  { key: "atClinic", label: "At clinic", allowNA: true },
+  { key: "leftClinic", label: "Left clinic", allowNA: true },
+  { key: "toDestination", label: "To destination" },
+  { key: "atDestination", label: "At destination" },
+  { key: "handover", label: "Handover" },
+  { key: "available", label: "Available" },
+  { key: "backAtSite", label: "Back at site" },
+];
+const EMPTY_TIMES = {
+  callRecorded: "",
+  callDispatched: "",
+  mobileToCall: "",
+  onScene: "",
+  atClinic: "",
+  leftClinic: "",
+  toDestination: "",
+  atDestination: "",
+  handover: "",
+  available: "",
+  backAtSite: "",
+};
+const EMPTY_TIME_BLURRED = {
+  callRecorded: false,
+  callDispatched: false,
+  mobileToCall: false,
+  onScene: false,
+  atClinic: false,
+  leftClinic: false,
+  toDestination: false,
+  atDestination: false,
+  handover: false,
+  available: false,
+  backAtSite: false,
+};
+function formatNowTime() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function parseHHMM(value) {
+  const text = filled(value);
+  const match = text.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+function formatTimeDigits(raw) {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+function finalizeTimeDigits(raw) {
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (digits.length === 3) return formatTimeDigits(digits.padStart(4, "0"));
+  return formatTimeDigits(raw);
+}
+function isTimeFieldInvalid(value, blurred) {
+  const text = filled(value);
+  if (!text) return false;
+  if (parseHHMM(text) != null) return false;
+  const digits = text.replace(/\D/g, "");
+  return blurred || digits.length >= 4;
+}
+function formatDateDigits(raw) {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+function parseDateDDMMYYYY(value) {
+  const match = filled(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return false;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const d = new Date(year, month - 1, day);
+  return d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day;
+}
+function formatTodayDate() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+function isDateFieldInvalid(value, blurred) {
+  const text = filled(value);
+  if (!text) return false;
+  if (parseDateDDMMYYYY(text)) return false;
+  const digits = text.replace(/\D/g, "");
+  return blurred || digits.length >= 8;
+}
+function dobDateFromDDMMYYYY(value) {
+  if (!parseDateDDMMYYYY(value)) return null;
+  const match = filled(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return null;
+  return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+}
+function isDobValid(value, now = new Date()) {
+  const dob = dobDateFromDDMMYYYY(value);
+  if (!dob) return false;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return dob.getTime() <= today.getTime();
+}
+function isDobFieldInvalid(value, blurred, now = new Date()) {
+  const text = filled(value);
+  if (!text) return false;
+  if (isDobValid(text, now)) return false;
+  const digits = text.replace(/\D/g, "");
+  return blurred || digits.length >= 8;
+}
+function ageFromDob(value, now = new Date()) {
+  const dob = dobDateFromDDMMYYYY(value);
+  if (!dob) return "";
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (dob.getTime() > today.getTime()) return "";
+  let years = now.getFullYear() - dob.getFullYear();
+  if (now.getMonth() < dob.getMonth() || (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate())) years -= 1;
+  if (years > 120) return "";
+  if (years >= 1) return String(years);
+  let months = (now.getFullYear() - dob.getFullYear()) * 12 + (now.getMonth() - dob.getMonth());
+  if (now.getDate() < dob.getDate()) months -= 1;
+  if (months < 0) return "";
+  return months === 1 ? "1 month" : `${months} months`;
+}
+function splitPersonName(full) {
+  const t = full.replace(/\s+/g, " ").trim();
+  if (!t) return { name: "", surname: "" };
+  const parts = t.split(" ");
+  if (parts.length === 1) return { name: parts[0], surname: "" };
+  return { name: parts.slice(0, -1).join(" "), surname: parts[parts.length - 1] };
+}
+function formatEidDob(raw, now = new Date()) {
+  const t = raw.trim();
+  let day = 0;
+  let month = 0;
+  let year = 0;
+  const yearFirst = t.match(/(\d{4})[/.+\-](\d{1,2})[/.+\-](\d{1,2})/);
+  const dayFirst = t.match(/(\d{1,2})[/.+\-](\d{1,2})[/.+\-](\d{4})/);
+  if (yearFirst && yearFirst.index === 0) {
+    year = Number(yearFirst[1]);
+    month = Number(yearFirst[2]);
+    day = Number(yearFirst[3]);
+  } else if (dayFirst) {
+    day = Number(dayFirst[1]);
+    month = Number(dayFirst[2]);
+    year = Number(dayFirst[3]);
+  } else {
+    return "";
+  }
+  const formatted = `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+  return isDobValid(formatted, now) ? formatted : "";
+}
+function minutesBetween(start, end) {
+  return end < start ? end + 24 * 60 - start : end - start;
+}
+function formatDuration(mins) {
+  const hours = Math.floor(mins / 60);
+  const minutes = mins % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+}
+function totalCallTime(times, na) {
+  const start = parseHHMM(times.callRecorded);
+  if (start == null) return { display: "Needs Call recorded and Back at site", message: null };
+  const back = parseHHMM(times.backAtSite);
+  if (back != null) {
+    const text = formatDuration(minutesBetween(start, back));
+    return { display: text, message: `Total call time: ${text}` };
+  }
+  let latest = null;
+  for (const field of TIME_FIELD_DEFS) {
+    if (field.key === "callRecorded") continue;
+    if (field.key === "atClinic" && na.atClinic) continue;
+    if (field.key === "leftClinic" && na.leftClinic) continue;
+    const mins = parseHHMM(times[field.key]);
+    if (mins == null) continue;
+    const elapsed = minutesBetween(start, mins);
+    if (latest == null || elapsed > latest) latest = elapsed;
+  }
+  if (latest == null) return { display: "Needs Call recorded and Back at site", message: null };
+  const text = formatDuration(latest);
+  return { display: `${text} so far`, message: `Total call time: ${text} so far` };
+}
+function formatTimesMessage(times, na) {
+  const lines = [];
+  for (const field of TIME_FIELD_DEFS) {
+    if (field.key === "atClinic" && na.atClinic) {
+      lines.push("At clinic: N/A");
+      continue;
+    }
+    if (field.key === "leftClinic" && na.leftClinic) {
+      lines.push("Left clinic: N/A");
+      continue;
+    }
+    const value = filled(times[field.key]);
+    if (value && parseHHMM(value) != null) lines.push(`${field.label}: ${value}`);
+  }
+  const total = totalCallTime(times, na);
+  if (total.message) lines.push(total.message);
+  return lines;
+}
+function isMostlyArabic(s) {
+  const letters = s.replace(/[^A-Za-z\u0600-\u06FF]/g, "");
+  if (!letters) return false;
+  const arabic = (s.match(/[\u0600-\u06FF]/g) || []).length;
+  return arabic / letters.length > 0.5;
+}
+const EID_FIELD_START = /^(id(\s*number)?|name|full name|nationality|sex|gender|date of birth|d\.?o\.?b\.?|dob|expiry|date of expiry|date of issue|issuing place|place of issue|occupation|employer|sponsor)\b/i;
+const EID_LABEL_ONLY = /^(id(\s*number)?|name|full name|nationality|sex|gender|date of birth|d\.?o\.?b\.?|dob|expiry|date of expiry|date of issue|issuing place|place of issue|occupation|employer|sponsor|signature|card number|identity card|united arab emirates)$/i;
+function isEidLabelOnly(s) {
+  return EID_LABEL_ONLY.test(s.replace(/[:：\-\u2013\u2014]\s*$/, "").trim());
+}
+function startsWithEidFieldLabel(s) {
+  return EID_FIELD_START.test(s.trim());
+}
+function prettyEidName(s) {
+  const t = s.replace(/\s+/g, " ").trim().replace(/^[:\-\u2013\u2014]\s*/, "");
+  if (!t) return "";
+  if (t === t.toUpperCase() && /[A-Za-z]/.test(t)) {
+    return t.split(/(\s+|-)/).map((w) => {
+      if (!w || w === " " || w === "-") return w;
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join("");
+  }
+  return t;
+}
+function isEidNameValue(s) {
+  const t = s.trim();
+  if (!t || isMostlyArabic(t) || isEidLabelOnly(t)) return false;
+  if (/^784\b/.test(t) || /\d{8,}/.test(t)) return false;
+  if (/^\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{2,4}$/.test(t)) return false;
+  return /[A-Za-z]{2,}/.test(t);
+}
+function isEidNationalityValue(s) {
+  const t = s.trim();
+  if (!t || isMostlyArabic(t)) return false;
+  if (startsWithEidFieldLabel(t) && !/^nationality\b/i.test(t)) return false;
+  if (/^784\b/.test(t) || /^\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{2,4}$/.test(t)) return false;
+  return /[A-Za-z]{2,}/.test(t);
+}
+function parseEidGender(raw) {
+  const n = raw.trim().toLowerCase().replace(/[.:]/g, "");
+  const first = n.split(/[\s/]+/)[0];
+  if (first === "m" || first === "male" || first === "man") return "M";
+  if (first === "f" || first === "female" || first === "woman") return "F";
+  return "";
+}
+function isEidGenderValue(s) {
+  return parseEidGender(s) !== "";
+}
+function ageFromEidDob(raw, now) {
+  const t = raw.trim();
+  let day = 0;
+  let month = 0;
+  let year = 0;
+  const yearFirst = t.match(/(\d{4})[/.+\-](\d{1,2})[/.+\-](\d{1,2})/);
+  const dayFirst = t.match(/(\d{1,2})[/.+\-](\d{1,2})[/.+\-](\d{4})/);
+  if (yearFirst && yearFirst.index === 0) {
+    year = Number(yearFirst[1]);
+    month = Number(yearFirst[2]);
+    day = Number(yearFirst[3]);
+  } else if (dayFirst) {
+    day = Number(dayFirst[1]);
+    month = Number(dayFirst[2]);
+    year = Number(dayFirst[3]);
+  } else {
+    return "";
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return "";
+  if (year < 1920 || year > now.getFullYear()) return "";
+  const dob = new Date(year, month - 1, day);
+  if (dob.getFullYear() !== year || dob.getMonth() !== month - 1 || dob.getDate() !== day) return "";
+  if (dob > now) return "";
+  let age = now.getFullYear() - year;
+  if (now.getMonth() < month - 1 || (now.getMonth() === month - 1 && now.getDate() < day)) age -= 1;
+  if (age < 0 || age > 120) return "";
+  return String(age);
+}
+function isEidDobValue(s) {
+  return /(\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{4}|\d{4}[/.+\-]\d{1,2}[/.+\-]\d{1,2})/.test(s);
+}
+function isEidWorkValue(s) {
+  const t = s.trim();
+  if (!t || isMostlyArabic(t) || isEidLabelOnly(t)) return false;
+  if (/^784\b/.test(t) || /^\d{1,2}[/.+\-]\d{1,2}[/.+\-]\d{2,4}$/.test(t)) return false;
+  const digits = t.replace(/\D/g, "");
+  if (digits.length >= 12 && /^784/.test(digits)) return false;
+  return /[A-Za-z]{2,}/.test(t);
+}
+function valueAfterEidLabel(lines, labelRe, isValue) {
+  const start = new RegExp(`^(?:${labelRe.source})\\s*[:：\\-\\u2013\\u2014]?\\s*(.*)$`, "i");
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(start);
+    if (!m) continue;
+    const rest = m[1].trim();
+    if (rest && isValue(rest)) return rest;
+    for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+      const v = lines[j];
+      if (isEidLabelOnly(v) || isMostlyArabic(v)) continue;
+      if (startsWithEidFieldLabel(v) && !isValue(v)) break;
+      if (isValue(v)) return v;
+      break;
+    }
+  }
+  return "";
+}
+function parseEidNumber(text) {
+  const digits = text.replace(/[^\d]/g, "");
+  const m = digits.match(/784\d{12}/);
+  if (!m) return "";
+  const d = m[0];
+  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 14)}-${d.slice(14)}`;
+}
+function birthYearFromEid(value) {
+  const formatted = parseEidNumber(value);
+  if (!formatted) return "";
+  const year = Number(formatted.slice(4, 8));
+  if (!isFinite(year) || year < 1920 || year > new Date().getFullYear()) return "";
+  return String(year);
+}
+function ageFromBirthYear(yearStr, now) {
+  now = now || new Date();
+  const year = Number(yearStr);
+  if (!isFinite(year)) return "";
+  const age = now.getFullYear() - year;
+  if (age < 0 || age > 120) return "";
+  return String(age);
+}
+function mapEidNationality(raw) {
+  const n = raw.trim().replace(/\./g, "").replace(/\s+/g, " ").toLowerCase();
+  if (/\b(emirati|uae|u a e|united arab emirates)\b/.test(n) || n === "emirates") return { nationality: "Emirati", nationalityOther: "" };
+  if (/\b(indian|india)\b/.test(n)) return { nationality: "Indian", nationalityOther: "" };
+  if (/\b(nepali|nepalese|nepal)\b/.test(n)) return { nationality: "Nepali", nationalityOther: "" };
+  if (/\b(south african|south africa)\b/.test(n)) return { nationality: "South African", nationalityOther: "" };
+  if (/\b(pakistani|pakistan)\b/.test(n)) return { nationality: "Pakistani", nationalityOther: "" };
+  if (/\b(lebanese|lebanon)\b/.test(n)) return { nationality: "Lebanese", nationalityOther: "" };
+  return { nationality: "Other", nationalityOther: prettyEidName(raw.trim()) };
+}
+function parseEidText(text, now = new Date()) {
+  const empty = { name: "", surname: "", eid: "", nationality: "", nationalityOther: "", gender: "", dob: "", age: "", occupation: "", employer: "", issuingPlace: "" };
+  const raw = text.trim();
+  if (!raw) return empty;
+  const lines = raw.split(/\r?\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const nameRaw = valueAfterEidLabel(lines, /name|full name/, isEidNameValue);
+  const natRaw = valueAfterEidLabel(lines, /nationality/, isEidNationalityValue);
+  const genderRaw = valueAfterEidLabel(lines, /sex|gender/, isEidGenderValue);
+  const dobRaw = valueAfterEidLabel(lines, /date of birth|d\.?o\.?b\.?|dob/, isEidDobValue);
+  const occRaw = valueAfterEidLabel(lines, /occupation/, isEidWorkValue);
+  const empRaw = valueAfterEidLabel(lines, /employer|sponsor/, isEidWorkValue);
+  const issueRaw = valueAfterEidLabel(lines, /issuing place|place of issue/, isEidWorkValue);
+  const nat = natRaw ? mapEidNationality(natRaw) : { nationality: "", nationalityOther: "" };
+  const split = nameRaw ? splitPersonName(prettyEidName(nameRaw)) : { name: "", surname: "" };
+  const dob = dobRaw ? formatEidDob(dobRaw, now) : "";
+  return {
+    name: split.name,
+    surname: split.surname,
+    eid: parseEidNumber(raw),
+    nationality: nat.nationality,
+    nationalityOther: nat.nationalityOther,
+    gender: genderRaw ? parseEidGender(genderRaw) : "",
+    dob,
+    age: dob ? ageFromDob(dob, now) : ageFromBirthYear(birthYearFromEid(parseEidNumber(raw)), now),
+    occupation: occRaw ? prettyEidName(occRaw) : "",
+    employer: empRaw ? prettyEidName(empRaw) : "",
+    issuingPlace: issueRaw ? prettyEidName(issueRaw) : "",
+  };
+}
+function formatEidFillNote(parsed, hadText) {
+  if (!hadText) return "Paste the EID text first.";
+  const fields = [
+    ["Name", !!parsed.name],
+    ["Surname", !!parsed.surname],
+    ["EID / ID / Passport", !!parsed.eid],
+    ["Nationality", !!parsed.nationality],
+    ["Gender", !!parsed.gender],
+    ["Date of birth", !!parsed.dob],
+    ["Age", !!parsed.age],
+    ["Occupation", !!parsed.occupation],
+    ["Employer", !!parsed.employer],
+    ["Issuing place", !!parsed.issuingPlace],
+  ];
+  const yes = fields.filter((f) => f[1]).map((f) => f[0]);
+  const no = fields.filter((f) => !f[1]).map((f) => f[0]);
+  if (!yes.length) return "Could not read any fields from the pasted text. Check the text and try again. Check every field by hand.";
+  let msg = `Filled: ${yes.join(", ")}.`;
+  if (no.length) msg += ` Not found: ${no.join(", ")}.`;
+  msg += " Check every field by hand.";
+  return msg;
+}
+const NATIONALITY_OPTIONS = [
+  { value: "Not stated", label: "Not stated" },
+  { value: "Emirati", label: "Emirati" },
+  { value: "Indian", label: "Indian" },
+  { value: "Nepali", label: "Nepali" },
+  { value: "South African", label: "South African" },
+  { value: "Pakistani", label: "Pakistani" },
+  { value: "Lebanese", label: "Lebanese" },
+  { value: "Other", label: "Other" },
+];
+const GCS_EYE_OPTIONS = [
+  { value: "", label: "Not assessed" },
+  { value: "4", label: "4 Spontaneous (opens eyes on own)" },
+  { value: "3", label: "3 To speech (opens eyes when spoken to)" },
+  { value: "2", label: "2 To pressure / pain (opens eyes to physical stimulation)" },
+  { value: "1", label: "1 None" },
+];
+const GCS_VERBAL_OPTIONS = [
+  { value: "", label: "Not assessed" },
+  { value: "5", label: "5 Oriented (knows person, place, time)" },
+  { value: "4", label: "4 Confused conversation" },
+  { value: "3", label: "3 Inappropriate words" },
+  { value: "2", label: "2 Incomprehensible sounds" },
+  { value: "1", label: "1 None" },
+  { value: "T", label: "T Intubated or unable to speak" },
+];
+const GCS_MOTOR_OPTIONS = [
+  { value: "", label: "Not assessed" },
+  { value: "6", label: "6 Obeys commands" },
+  { value: "5", label: "5 Localizes pain" },
+  { value: "4", label: "4 Normal flexion / withdrawal from pain" },
+  { value: "3", label: "3 Abnormal flexion (decorticate posture)" },
+  { value: "2", label: "2 Extension (decerebrate posture)" },
+  { value: "1", label: "1 None" },
+];
+const PRIMARY_A_OPTIONS = [
+  { value: "Not assessed", label: "Not assessed" },
+  { value: "Open and self-maintained", label: "Open and self-maintained" },
+  { value: "Physical obstruction or trauma", label: "Physical obstruction or trauma" },
+  { value: "Other", label: "Other (type in)" },
+];
+const PRIMARY_B_OPTIONS = [
+  { value: "Not assessed", label: "Not assessed" },
+  { value: "Equal and clear bilaterally", label: "Equal and clear bilaterally" },
+  { value: "Other", label: "Other (type in)" },
+];
+const PRIMARY_C_OPTIONS = [
+  { value: "Not assessed", label: "Not assessed" },
+  { value: "Strong palpable radial pulses", label: "Strong palpable radial pulses" },
+  { value: "Other", label: "Other (type in)" },
+];
+const PRIMARY_D_AVPU_OPTIONS = [
+  { value: "Not assessed", label: "Not assessed" },
+  { value: "Alert", label: "Alert" },
+  { value: "Verbal", label: "Verbal" },
+  { value: "Pain", label: "Pain" },
+  { value: "Unconscious", label: "Unconscious" },
+];
+const PRIMARY_D_FALLOUT_OPTIONS = [
+  { value: "Not assessed", label: "Not assessed" },
+  { value: "Yes", label: "Yes" },
+  { value: "No", label: "No" },
+];
+const PRIMARY_E_YESNO_OPTIONS = [
+  { value: "Not assessed", label: "Not assessed" },
+  { value: "Yes", label: "Yes" },
+  { value: "No", label: "No" },
+];
+function formatPrimaryD(avpu, fallout, details) {
+  const parts = [];
+  if (avpu && avpu !== "Not assessed") parts.push(avpu);
+  if (fallout && fallout !== "Not assessed") parts.push(`neuro fallout: ${fallout}`);
+  const detail = filled(details);
+  if (detail) parts.push(detail);
+  return parts.join(", ");
+}
+function formatPrimaryE(exam, findings, details) {
+  const parts = [];
+  if (exam && exam !== "Not assessed") parts.push(`Head-to-toe done: ${exam}`);
+  if (findings && findings !== "Not assessed") parts.push(`injuries/rashes/deformities: ${findings}`);
+  const detail = filled(details);
+  if (detail) parts.push(detail);
+  return parts.join(", ");
+}
+function formatSurveyChoice(choice, other, details) {
+  const detail = filled(details);
+  if (choice === "Other") return filled(other);
+  if (choice === "Not assessed" || !choice) return detail;
+  if (detail) return `${choice}, ${detail}`;
+  return choice;
+}
+function formatGcs(e, v, m) {
+  const eye = filled(e);
+  const verbal = filled(v);
+  const motor = filled(m);
+  const parts = [eye && `E${eye}`, verbal && `V${verbal}`, motor && `M${motor}`].filter(Boolean);
+  if (!parts.length) return "";
+  if (eye && verbal && motor) {
+    if (verbal === "T") {
+      const total = Number(eye) + Number(motor);
+      return `${total}T (${parts.join(" ")})`;
+    }
+    const total = Number(eye) + Number(verbal) + Number(motor);
+    return `${total}/15 (${parts.join(" ")})`;
+  }
+  return parts.join(" ");
+}
+function formatGcsTotalLabel(e, v, m) {
+  const eye = filled(e);
+  const verbal = filled(v);
+  const motor = filled(m);
+  const parts = [`E${eye || "?"}`, `V${verbal || "?"}`, `M${motor || "?"}`];
+  if (eye && verbal && motor) {
+    if (verbal === "T") {
+      const total = Number(eye) + Number(motor);
+      return `GCS total: ${total}T (${parts.join(" ")})`;
+    }
+    const total = Number(eye) + Number(verbal) + Number(motor);
+    return `GCS total: ${total}/15 (${parts.join(" ")})`;
+  }
+  if (!eye && !verbal && !motor) return "GCS total: incomplete";
+  return `GCS total: incomplete (${parts.join(" ")})`;
+}
+function buildMessage(opts) {
+  const lines = ["HOSPITAL PRE-NOTIFICATION", ""];
+  const incident = [];
+  addLine(incident, "Base", opts.baseName);
+  addLine(incident, "Call sign", opts.callSign);
+  if (parseDateDDMMYYYY(opts.incidentDate)) addLine(incident, "Date", opts.incidentDate);
+  addLine(incident, "Project", opts.projectName);
+  addLine(incident, "Case no", opts.caseNumber);
+  addLine(incident, "EPCR no", opts.epcrNumber);
+  addLine(incident, "Call class", opts.callClass);
+  addLine(incident, "Sub class", opts.subClass);
+  addLine(incident, "Hospital transported to", opts.destination, true);
+  addLine(incident, "Incident type", opts.incidentType);
+  addLine(incident, "Location", opts.incidentLocation);
+  if (incident.length) {
+    lines.push("INCIDENT");
+    lines.push(...incident);
+    lines.push("");
+  }
+  if (opts.timeLines.length) {
+    lines.push("TIMES");
+    lines.push(...opts.timeLines);
+    lines.push("");
+  }
+  const patient = [];
+  addLine(patient, "Name", opts.patientName);
+  addLine(patient, "Surname", opts.patientSurname);
+  addLine(patient, "Nationality", opts.nationality);
+  if (opts.gender !== "Not stated") addLine(patient, "Gender", opts.gender);
+  if (isDobValid(opts.dateOfBirth)) addLine(patient, "DOB", opts.dateOfBirth);
+  addLine(patient, "Age", opts.age);
+  addLine(patient, "Cellphone", opts.cellphone);
+  addLine(patient, "Email", opts.email);
+  addLine(patient, "EID / ID / Passport", opts.eid, true);
+  addLine(patient, "Occupation", opts.occupation);
+  addLine(patient, "Employer", opts.employer);
+  addLine(patient, "Issuing place", opts.issuingPlace);
+  addLine(patient, "Hospital no", opts.hospitalNumber);
+  if (opts.noCamera) patient.push("EID photo: not taken (no camera available)");
+  lines.push("PATIENT");
+  lines.push(...patient);
+  lines.push("");
+  addLine(lines, "Chief complaint / diagnosis", opts.complaint);
+  addLine(lines, "Event / mechanism history", opts.eventHistory);
+  addLine(lines, "Signs and symptoms", opts.signs);
+  addLine(lines, "Allergies", opts.allergies);
+  addLine(lines, "Medications", opts.medications);
+  addLine(lines, "Past med", opts.pastMed);
+  addLine(lines, "Last meal", opts.lastMeal);
+  const survey = [];
+  addLine(survey, "A", opts.primaryA);
+  addLine(survey, "B", opts.primaryB);
+  addLine(survey, "C", opts.primaryC);
+  addLine(survey, "D", opts.primaryD);
+  addLine(survey, "E", opts.primaryE);
+  if (survey.length) {
+    lines.push("");
+    lines.push("Primary survey:");
+    lines.push(...survey);
+  }
+  const gcs = formatGcs(opts.gcsE, opts.gcsV, opts.gcsM);
+  const vitals = [
+    filled(opts.respRate) && `Resp rate ${filled(opts.respRate)}`,
+    filled(opts.spo2) && `SpO2 ${filled(opts.spo2)}%`,
+    filled(opts.heartRate) && `Heart rate ${filled(opts.heartRate)}`,
+    filled(opts.nibp) && `NIBP ${filled(opts.nibp)}`,
+    filled(opts.capRefill) && `Cap refill ${filled(opts.capRefill)}`,
+    filled(opts.ecg) && `ECG rhythm ${filled(opts.ecg)}`,
+    gcs && `GCS: ${gcs}`,
+    filled(opts.pupils) && `Pupils ${filled(opts.pupils)}`,
+    filled(opts.hgt) && `HGT ${filled(opts.hgt)}`,
+    filled(opts.temp) && `Temp ${filled(opts.temp)}`,
+    filled(opts.pain) && `Pain ${filled(opts.pain)}`,
+    filled(opts.etco2) && `ETCO2 ${filled(opts.etco2)}`,
+  ].filter(Boolean);
+  if (vitals.length) {
+    lines.push("");
+    lines.push(`Vitals: ${vitals.join("; ")}`);
+  }
+  const treatment = [];
+  addLine(treatment, "Medicines", opts.medicines);
+  addLine(treatment, "IV", opts.iv);
+  addLine(treatment, "Airway", opts.airway);
+  addLine(treatment, "Circulation", opts.circulation);
+  addLine(treatment, "Procedures", opts.procedures);
+  if (treatment.length) {
+    lines.push("");
+    lines.push("TREATMENT GIVEN");
+    lines.push(...treatment);
+  }
+  if (opts.condition !== "Not stated" && filled(opts.condition)) {
+    lines.push("");
+    addLine(lines, "Patient condition", opts.condition);
+  }
+  if (filled(opts.clinicalNotes)) {
+    lines.push("");
+    addLine(lines, "Clinical notes", opts.clinicalNotes);
+  }
+  lines.push("");
+  lines.push("This is a pre-alert only. Please confirm with the receiving facility.");
+  return lines.filter((line, i, arr) => !(line === "" && (i === 0 || arr[i - 1] === ""))).join("\n").trim();
+}
+
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    BASES, HOSPITALS, MAPPED_HOSPITALS, MAPPED_BASES, haversineKm, formatKm, inUae,
+    confidenceLabel, nearestHospitals, filled, addLine, isGoogleMapsLink, formatIncidentLocation,
+    formatNowTime, parseHHMM, formatTimeDigits, finalizeTimeDigits, isTimeFieldInvalid,
+    formatDateDigits, parseDateDDMMYYYY, formatTodayDate, isDateFieldInvalid, minutesBetween,
+    formatDuration, totalCallTime, formatTimesMessage, parseEidText, formatEidFillNote, parseEidNumber, birthYearFromEid, ageFromBirthYear,
+    formatPrimaryD, formatPrimaryE, formatSurveyChoice, formatGcs, formatGcsTotalLabel, buildMessage,
+    TIME_FIELD_DEFS, EMPTY_TIMES, EMPTY_TIME_BLURRED
+  };
+}
+
+  </script>
+  <script>
+(function () {
+  "use strict";
+
+  function el(id) { return document.getElementById(id); }
+  function show(node, on) { if (node) node.classList.toggle("hidden", !on); }
+  function fillSelect(select, options) {
+    select.innerHTML = "";
+    options.forEach(function (opt) {
+      const o = document.createElement("option");
+      o.value = opt.value;
+      o.textContent = opt.label;
+      select.appendChild(o);
+    });
+  }
+
+  const locatedBases = BASES.filter(function (b) { return b.lat != null; });
+  const defaultBaseId = locatedBases[0] ? locatedBases[0].id : "sas-al-nakhil";
+
+  const state = {
+    baseId: defaultBaseId,
+    pin: null,
+    gps: null,
+    gpsMessage: "",
+    originMode: "base",
+    military: false,
+    hospitalId: "",
+    hospitalOther: "",
+    alertBaseId: defaultBaseId,
+    alertBaseOther: "",
+    callSign: "",
+    incidentDate: "",
+    dateBlurred: false,
+    projectName: "",
+    caseNumber: "",
+    epcrNumber: "",
+    callClass: "",
+    subClass: "",
+    subClassOther: "",
+    patientName: "",
+    patientSurname: "",
+    dateOfBirth: "",
+    dobBlurred: false,
+    hospitalNumber: "",
+    occupation: "",
+    employer: "",
+    issuingPlace: "",
+    eidPaste: "",
+    eidFillNote: "",
+    eidPhotos: [],
+    noCamera: false,
+    incidentLocation: "",
+    incidentType: "",
+    incidentTypeOther: "",
+    times: Object.assign({}, EMPTY_TIMES),
+    timeBlurred: Object.assign({}, EMPTY_TIME_BLURRED),
+    timeAtClinicNA: false,
+    timeLeftClinicNA: false,
+    nationality: "Not stated",
+    nationalityOther: "",
+    gender: "Not stated",
+    age: "",
+    cellphone: "",
+    email: "",
+    eid: "",
+    complaint: "",
+    eventHistory: "",
+    signs: "",
+    allergies: "",
+    medications: "",
+    pastMed: "",
+    lastMeal: "",
+    primaryA: "Not assessed",
+    primaryAOther: "",
+    primaryADetails: "",
+    primaryB: "Not assessed",
+    primaryBOther: "",
+    primaryBDetails: "",
+    primaryC: "Not assessed",
+    primaryCOther: "",
+    primaryCDetails: "",
+    primaryD: "Not assessed",
+    primaryDFallout: "Not assessed",
+    primaryDDetails: "",
+    primaryEExam: "Not assessed",
+    primaryEFindings: "Not assessed",
+    primaryEDetails: "",
+    respRate: "",
+    spo2: "",
+    heartRate: "",
+    nibp: "",
+    capRefill: "",
+    ecg: "",
+    gcsE: "",
+    gcsV: "",
+    gcsM: "",
+    pupils: "",
+    hgt: "",
+    temp: "",
+    pain: "",
+    etco2: "",
+    medicines: "",
+    iv: "",
+    airway: "",
+    circulation: "",
+    procedures: "",
+    condition: "Not stated",
+    clinicalNotes: "",
+    copied: false,
+  };
+
+  let map = null;
+  let mapLayers = { bases: [], hospitals: [], origin: null, tilesOk: true };
+  let copiedTimer = null;
+
+  function selectedBase() {
+    return BASES.find(function (b) { return b.id === state.baseId; }) || BASES[0];
+  }
+
+  function origin() {
+    if (state.originMode === "gps" && state.gps) return { lat: state.gps.lat, lon: state.gps.lon, label: "My location", kind: "gps" };
+    if (state.originMode === "pin" && state.pin) {
+      return { lat: state.pin.lat, lon: state.pin.lon, label: "Dropped pin (" + state.pin.lat.toFixed(4) + ", " + state.pin.lon.toFixed(4) + ")", kind: "pin" };
+    }
+    const b = selectedBase();
+    if (b.lat != null && b.lon != null) return { lat: b.lat, lon: b.lon, label: b.name, kind: "base" };
+    return null;
+  }
+
+  function rankedHospitals() {
+    const o = origin();
+    return o ? nearestHospitals(o.lat, o.lon, 6) : [];
+  }
+
+  function destinationHospital() {
+    const ranked = rankedHospitals();
+    if (state.hospitalId === "other") return undefined;
+    return HOSPITALS.find(function (h) { return h.id === state.hospitalId; }) || (ranked[0] ? ranked[0].hospital : undefined);
+  }
+
+  function currentMessage() {
+    const o = origin();
+    return buildMessage({
+      destination: state.hospitalId === "other" ? state.hospitalOther.trim() : (destinationHospital() ? destinationHospital().name : ""),
+      incidentLocation: formatIncidentLocation(state.incidentLocation, o),
+      incidentType: state.incidentType === "Other" ? state.incidentTypeOther.trim() : state.incidentType,
+      timeLines: formatTimesMessage(state.times, { atClinic: state.timeAtClinicNA, leftClinic: state.timeLeftClinicNA }),
+      baseName: state.alertBaseId === "other" ? state.alertBaseOther : ((BASES.find(function (b) { return b.id === state.alertBaseId; }) || {}).name || ""),
+      callSign: state.callSign,
+      incidentDate: state.incidentDate,
+      projectName: state.projectName,
+      caseNumber: state.caseNumber,
+      epcrNumber: state.epcrNumber,
+      callClass: state.callClass,
+      subClass: state.subClass === "Other" ? state.subClassOther.trim() : state.subClass,
+      patientName: state.patientName,
+      patientSurname: state.patientSurname,
+      nationality: state.nationality === "Other" ? state.nationalityOther : state.nationality === "Not stated" ? "" : state.nationality,
+      gender: state.gender,
+      dateOfBirth: state.dateOfBirth,
+      age: state.age,
+      cellphone: state.cellphone,
+      email: state.email,
+      eid: state.eid,
+      occupation: state.occupation,
+      employer: state.employer,
+      issuingPlace: state.issuingPlace,
+      hospitalNumber: state.hospitalNumber,
+      noCamera: state.noCamera,
+      complaint: state.complaint,
+      eventHistory: state.eventHistory,
+      signs: state.signs,
+      allergies: state.allergies,
+      medications: state.medications,
+      pastMed: state.pastMed,
+      lastMeal: state.lastMeal,
+      primaryA: formatSurveyChoice(state.primaryA, state.primaryAOther, state.primaryADetails),
+      primaryB: formatSurveyChoice(state.primaryB, state.primaryBOther, state.primaryBDetails),
+      primaryC: formatSurveyChoice(state.primaryC, state.primaryCOther, state.primaryCDetails),
+      primaryD: formatPrimaryD(state.primaryD, state.primaryDFallout, state.primaryDDetails),
+      primaryE: formatPrimaryE(state.primaryEExam, state.primaryEFindings, state.primaryEDetails),
+      respRate: state.respRate,
+      spo2: state.spo2,
+      heartRate: state.heartRate,
+      nibp: state.nibp,
+      capRefill: state.capRefill,
+      ecg: state.ecg,
+      gcsE: state.gcsE,
+      gcsV: state.gcsV,
+      gcsM: state.gcsM,
+      pupils: state.pupils,
+      hgt: state.hgt,
+      temp: state.temp,
+      pain: state.pain,
+      etco2: state.etco2,
+      medicines: state.medicines,
+      iv: state.iv,
+      airway: state.airway,
+      circulation: state.circulation,
+      procedures: state.procedures,
+      condition: state.condition,
+      clinicalNotes: state.clinicalNotes,
+    });
+  }
+
+  function pickBase(id) {
+    state.baseId = id;
+    state.originMode = "base";
+    state.hospitalId = "";
+    state.alertBaseId = id;
+    el("workBase").value = id;
+    el("alertBaseId").value = id;
+    refresh();
+    if (map) {
+      const b = selectedBase();
+      if (b.lat != null) map.setView([b.lat, b.lon], Math.max(map.getZoom(), 9));
+    }
+  }
+
+  function dropPin(lat, lon) {
+    state.pin = { lat: Number(lat.toFixed(5)), lon: Number(lon.toFixed(5)) };
+    state.originMode = "pin";
+    state.hospitalId = "";
+    refresh();
+  }
+
+  function useMyLocation() {
+    state.gpsMessage = "Asking for your location…";
+    refreshGps();
+    if (!navigator.geolocation) {
+      state.gpsMessage = "This browser cannot share your location. Pick a base or drop a pin on the map instead.";
+      refresh();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        if (!inUae(lat, lon)) {
+          state.gps = null;
+          state.gpsMessage = "Your phone’s location is not in the UAE, so it will not show the right hospitals. Pick a work base, or drop a pin on the map in the UAE.";
+          refresh();
+          return;
+        }
+        state.gps = { lat: lat, lon: lon };
+        state.originMode = "gps";
+        state.hospitalId = "";
+        state.gpsMessage = "Using your current location in the UAE. Distances are still in a straight line, not driving time.";
+        refresh();
+        if (map) map.setView([lat, lon], Math.max(map.getZoom(), 9));
+      },
+      function () {
+        state.gpsMessage = "Could not get your location. Allow location access, or pick a base or drop a pin instead.";
+        refresh();
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+    );
+  }
+
+  function refreshGps() {
+    const box = el("gpsCallout");
+    if (!state.gpsMessage) {
+      show(box, false);
+      return;
+    }
+    box.className = "callout " + (state.gps && state.originMode === "gps" ? "ok" : "warn");
+    box.innerHTML = "<div class=\"lead\">" + (state.gps && state.originMode === "gps" ? "Location found" : "Location note") + "</div>" + escapeHtml(state.gpsMessage);
+    show(box, true);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+    });
+  }
+
+  function updateHospitalOptions() {
+    const ranked = rankedHospitals();
+    const first = ranked[0] ? { value: "", label: "Nearest: " + ranked[0].hospital.name } : { value: "", label: "Choose a hospital" };
+    const opts = [first].concat(
+      HOSPITALS.filter(function (h) { return h.lat != null; }).map(function (h) { return { value: h.id, label: h.name }; }),
+      [{ value: "other", label: "Other (type in)" }]
+    );
+    const prev = state.hospitalId;
+    fillSelect(el("hospitalId"), opts);
+    el("hospitalId").value = prev;
+  }
+
+  function renderHospitalList() {
+    const list = el("hospitalList");
+    const o = origin();
+    const noOrigin = el("noOrigin");
+    if (!o) {
+      list.innerHTML = "";
+      show(noOrigin, true);
+      return;
+    }
+    show(noOrigin, false);
+    const ranked = rankedHospitals();
+    const dest = destinationHospital();
+    const zmh = HOSPITALS.find(function (h) { return h.id === "zmh"; });
+    const zmhKm = o && zmh && zmh.lat != null ? haversineKm(o.lat, o.lon, zmh.lat, zmh.lon) : null;
+    let html = "";
+    if (state.military && zmh && zmhKm != null) {
+      html += '<div class="card" data-hid="zmh"><div class="split"><strong>Zayed Military Hospital</strong><span class="badge warn">' + formatKm(zmhKm) + ' straight line</span></div>';
+      html += '<div class="muted" style="margin-top:6px">Usual destination for military patients, depending on severity. ' + escapeHtml(zmh.network) + '.</div>';
+      html += '<div style="margin-top:8px"><button type="button" class="use-hospital' + (state.hospitalId === "zmh" ? " primary" : "") + '" data-hid="zmh">Use in pre-alert</button></div></div>';
+    }
+    ranked.forEach(function (row, index) {
+      const h = row.hospital;
+      const active = (state.hospitalId || (ranked[0] && ranked[0].hospital.id)) === h.id;
+      const phone = h.phone ? " " + (h.phoneNote || "Switchboard") + ": " + h.phone + "." : " No official public ED phone was found.";
+      html += '<div class="card"><div class="split"><strong>' + (index + 1) + ". " + escapeHtml(h.name) + '</strong><span class="badge' + (index === 0 ? " accent" : "") + '">' + formatKm(row.km) + ' straight line</span></div>';
+      html += '<div class="muted" style="margin-top:6px">' + escapeHtml(h.role) + ". " + escapeHtml(h.network) + "." + escapeHtml(phone) + "</div>";
+      html += '<div style="margin-top:8px"><button type="button" class="use-hospital' + (active ? " primary" : "") + '" data-hid="' + h.id + '">Use in pre-alert</button></div></div>';
+    });
+    list.innerHTML = html;
+  }
+
+  function renderOriginNote() {
+    const box = el("originNote");
+    const o = origin();
+    const b = selectedBase();
+    const noPin = el("noPinCallout");
+    if (b.lat == null && state.originMode === "base") {
+      el("noPinNote").textContent = b.note;
+      show(noPin, true);
+    } else {
+      show(noPin, false);
+    }
+    if (o && b.lat != null && state.originMode === "base") {
+      let html = "<p>Showing hospitals from " + escapeHtml(o.label) + ". " + escapeHtml(b.note) + " Confidence: " + escapeHtml(confidenceLabel(b.confidence)) + ".</p>";
+      if (b.mapsUrl) html += '<p style="margin-top:8px"><a href="' + escapeHtml(b.mapsUrl) + '" target="_blank" rel="noopener noreferrer">Open in Google Maps</a></p>';
+      box.innerHTML = html;
+    } else if (o && state.originMode === "pin") {
+      box.innerHTML = "<p>Showing hospitals from a dropped pin at " + o.lat.toFixed(4) + "°N, " + o.lon.toFixed(4) + "°E. This is still a straight-line rank, not driving time.</p>";
+    } else if (o && state.originMode === "gps") {
+      box.innerHTML = "<p>Showing hospitals from your current location. This is still a straight-line rank, not driving time.</p>";
+    } else {
+      box.innerHTML = "";
+    }
+  }
+
+  function updateConditional() {
+    show(el("alertBaseOtherWrap"), state.alertBaseId === "other");
+    show(el("subClassOtherWrap"), state.subClass === "Other");
+    show(el("incidentTypeOtherWrap"), state.incidentType === "Other");
+    show(el("hospitalOtherWrap"), state.hospitalId === "other");
+    show(el("nationalityOtherWrap"), state.nationality === "Other");
+    show(el("primaryAOtherWrap"), state.primaryA === "Other");
+    show(el("primaryADetailsWrap"), state.primaryA !== "Other");
+    show(el("primaryBOtherWrap"), state.primaryB === "Other");
+    show(el("primaryBDetailsWrap"), state.primaryB !== "Other");
+    show(el("primaryCOtherWrap"), state.primaryC === "Other");
+    show(el("primaryCDetailsWrap"), state.primaryC !== "Other");
+    show(el("militaryNote"), state.military);
+    show(el("eidPhotoArea"), !state.noCamera);
+    show(el("noCameraHint"), state.noCamera);
+    const dateInvalid = isDateFieldInvalid(state.incidentDate, state.dateBlurred);
+    el("incidentDate").classList.toggle("invalid", dateInvalid);
+    show(el("dateHint"), dateInvalid);
+    const dobInvalid = isDobFieldInvalid(state.dateOfBirth, state.dobBlurred);
+    el("dateOfBirth").classList.toggle("invalid", dobInvalid);
+    show(el("dobHint"), dobInvalid);
+    TIME_FIELD_DEFS.forEach(function (field) {
+      const isNA = (field.key === "atClinic" && state.timeAtClinicNA) || (field.key === "leftClinic" && state.timeLeftClinicNA);
+      const input = el("time-" + field.key);
+      const hint = el("timehint-" + field.key);
+      const nowBtn = el("timenow-" + field.key);
+      if (!input) return;
+      input.disabled = isNA;
+      input.value = isNA ? "N/A" : state.times[field.key];
+      const invalid = isTimeFieldInvalid(state.times[field.key], state.timeBlurred[field.key]) && !isNA;
+      input.classList.toggle("invalid", invalid);
+      if (hint) show(hint, invalid);
+    });
+    el("totalCallTime").textContent = totalCallTime(state.times, { atClinic: state.timeAtClinicNA, leftClinic: state.timeLeftClinicNA }).display;
+    el("gcsTotal").textContent = formatGcsTotalLabel(state.gcsE, state.gcsV, state.gcsM);
+  }
+
+  function refresh() {
+    updateHospitalOptions();
+    updateConditional();
+    renderHospitalList();
+    renderOriginNote();
+    refreshGps();
+    el("messagePreview").textContent = currentMessage();
+    el("copyFallback").value = currentMessage();
+    updateMapMarkers();
+  }
+
+  function bindValue(id, key, ev) {
+    const node = el(id);
+    node.addEventListener(ev || "input", function () {
+      if (node.type === "checkbox") state[key] = node.checked;
+      else state[key] = node.value;
+      refresh();
+    });
+  }
+
+  function renderEidPhotos() {
+    const wrap = el("eidPhotoList");
+    wrap.innerHTML = "";
+    state.eidPhotos.forEach(function (item) {
+      const row = document.createElement("div");
+      row.className = "eid-photo-row";
+      const img = document.createElement("img");
+      img.src = item.url;
+      img.alt = item.file.name || "EID photo";
+      const name = document.createElement("div");
+      name.textContent = item.file.name || "Photo";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "quiet";
+      btn.textContent = "Remove";
+      btn.addEventListener("click", function () {
+        removeEidPhoto(item.id);
+        refresh();
+      });
+      row.appendChild(img);
+      row.appendChild(name);
+      row.appendChild(btn);
+      wrap.appendChild(row);
+    });
+  }
+
+  function clearEidPhoto() {
+    el("eidFile").value = "";
+    el("eidCamera").value = "";
+    state.eidPhotos.forEach(function (item) { URL.revokeObjectURL(item.url); });
+    state.eidPhotos = [];
+    renderEidPhotos();
+  }
+
+  function removeEidPhoto(id) {
+    const keep = [];
+    state.eidPhotos.forEach(function (item) {
+      if (item.id === id) URL.revokeObjectURL(item.url);
+      else keep.push(item);
+    });
+    state.eidPhotos = keep;
+    renderEidPhotos();
+  }
+
+  function onEidPhotoChange(input) {
+    const incoming = input.files ? Array.prototype.slice.call(input.files).filter(function (f) { return isProbablyImage(f); }) : [];
+    el("eidFile").value = "";
+    el("eidCamera").value = "";
+    if (!incoming.length) return;
+    incoming.forEach(function (file) {
+      state.eidPhotos.push({
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+        file: file,
+        url: URL.createObjectURL(file),
+      });
+    });
+    renderEidPhotos();
+  }
+
+  function applyBirthYearFromEidField() {
+    const formatted = parseEidNumber(state.eid);
+    if (formatted && formatted !== state.eid) {
+      state.eid = formatted;
+      el("eid").value = formatted;
+    }
+    if (!formatted) return;
+    if (!String(state.age || "").trim()) {
+      const year = birthYearFromEid(formatted);
+      const a = year ? ageFromBirthYear(year) : "";
+      if (a) {
+        state.age = a;
+        el("age").value = a;
+      }
+    }
+  }
+
+  function fieldIsEmpty(value, emptyValues) {
+    const t = String(value || "").trim();
+    if (!t) return true;
+    if (emptyValues && emptyValues.indexOf(t) !== -1) return true;
+    return false;
+  }
+
+  function applyParsedToEmptyFields(parsed) {
+    const filledNames = [];
+    const skipped = [];
+    function take(label, key, elId, val, emptyValues) {
+      if (!val) return;
+      if (!fieldIsEmpty(state[key], emptyValues)) {
+        skipped.push(label);
+        return;
+      }
+      state[key] = val;
+      if (elId && el(elId)) el(elId).value = val;
+      filledNames.push(label);
+    }
+    take("Name", "patientName", "patientName", parsed.name);
+    take("Surname", "patientSurname", "patientSurname", parsed.surname);
+    take("EID / ID / Passport", "eid", "eid", parsed.eid);
+    take("Occupation", "occupation", "occupation", parsed.occupation);
+    take("Employer", "employer", "employer", parsed.employer);
+    take("Issuing place", "issuingPlace", "issuingPlace", parsed.issuingPlace);
+    if (parsed.nationality) {
+      if (fieldIsEmpty(state.nationality, ["Not stated"])) {
+        state.nationality = parsed.nationality;
+        el("nationality").value = parsed.nationality;
+        state.nationalityOther = parsed.nationality === "Other" ? parsed.nationalityOther : "";
+        el("nationalityOther").value = state.nationalityOther;
+        filledNames.push("Nationality");
+      } else skipped.push("Nationality");
+    }
+    take("Gender", "gender", "gender", parsed.gender, ["Not stated"]);
+    if (parsed.dob) {
+      if (fieldIsEmpty(state.dateOfBirth) || !isDobValid(state.dateOfBirth)) {
+        state.dateOfBirth = parsed.dob;
+        state.dobBlurred = true;
+        el("dateOfBirth").value = parsed.dob;
+        filledNames.push("Date of birth");
+      } else skipped.push("Date of birth");
+    }
+    take("Age", "age", "age", parsed.age);
+    return { filledNames: filledNames, skipped: skipped };
+  }
+
+  var TESS_JS_VERSION = "5.1.1";
+  var TESS_CORE_VERSION = "5.1.0";
+  var TESS_SCRIPT_URLS = [
+    "https://cdn.jsdelivr.net/npm/tesseract.js@" + TESS_JS_VERSION + "/dist/tesseract.min.js",
+    "https://unpkg.com/tesseract.js@" + TESS_JS_VERSION + "/dist/tesseract.min.js"
+  ];
+  var TESS_WORKER_PATH = "https://cdn.jsdelivr.net/npm/tesseract.js@" + TESS_JS_VERSION + "/dist/worker.min.js";
+  var TESS_CORE_PATH = "https://cdn.jsdelivr.net/npm/tesseract.js-core@" + TESS_CORE_VERSION + "/tesseract-core.wasm.js";
+  var TESS_LANG_PATH = "https://tessdata.projectnaptha.com/4.0.0_fast";
+  var EID_OCR_MAX_SIDE = 1800;
+  var EID_OCR_WORKER_MS = 60000;
+  var EID_OCR_RECOGNIZE_MS = 60000;
+
+  function isProbablyImage(file) {
+    if (!file) return false;
+    var type = String(file.type || "").toLowerCase();
+    if (type.indexOf("image/") === 0) return true;
+    var name = String(file.name || "").toLowerCase();
+    if (/\.(jpe?g|png|webp|gif|bmp|heic|heif|tif{1,2})$/.test(name)) return true;
+    if (type && type !== "application/octet-stream" && type !== "application/download") return false;
+    if (file.size >= 8) return true;
+    return false;
+  }
+
+  function eidOcrStatusTargets() {
+    var nodes = [];
+    var main = el("eidFillNote");
+    if (main) nodes.push(main);
+    var extra = el("eidFillNotePaste");
+    if (extra && extra !== main) nodes.push(extra);
+    return nodes;
+  }
+
+  function showEidOcrStatus(msg) {
+    var nodes = eidOcrStatusTargets();
+    for (var i = 0; i < nodes.length; i++) {
+      var note = nodes[i];
+      note.textContent = msg;
+      note.classList.remove("hidden");
+      note.classList.add("is-on");
+    }
+    if (nodes[0] && nodes[0].scrollIntoView) {
+      try { nodes[0].scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {
+        try { nodes[0].scrollIntoView(); } catch (e2) {}
+      }
+    }
+  }
+
+  function withTimeout(promise, ms, message) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var timer = setTimeout(function () {
+        if (done) return;
+        done = true;
+        reject(new Error(message));
+      }, ms);
+      promise.then(function (value) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(value);
+      }, function (err) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
+
+  function loadScriptSrc(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.async = true;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error("script failed: " + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadTesseractLibrary(onStatus) {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    if (onStatus) onStatus("Loading reader...");
+    var chain = Promise.reject(new Error("start"));
+    for (var i = 0; i < TESS_SCRIPT_URLS.length; i++) {
+      (function (src) {
+        chain = chain.catch(function () { return loadScriptSrc(src); });
+      })(TESS_SCRIPT_URLS[i]);
+    }
+    return chain.then(function () {
+      if (window.Tesseract) return window.Tesseract;
+      throw new Error("The on-device reader did not start.");
+    }).catch(function (err) {
+      var orig = err && err.message ? err.message : "";
+      throw new Error("Could not load the on-device reader. Open this file in Chrome with an internet connection the first time (the pictures stay on this device). If you opened it from a chat app, use Open in Chrome. " + (orig && orig.indexOf("script failed") === -1 ? orig : ""));
+    });
+  }
+
+  function createEidOcrWorker(Tesseract, onStatus) {
+    var optsBlob = {
+      workerPath: TESS_WORKER_PATH,
+      corePath: TESS_CORE_PATH,
+      langPath: TESS_LANG_PATH,
+      workerBlobURL: true,
+      cacheMethod: "none",
+      logger: function (m) {
+        if (!onStatus || !m || !m.status) return;
+        var status = String(m.status);
+        if (status.indexOf("loading") !== -1 || status.indexOf("initializing") !== -1 || status.indexOf("loaded") !== -1) {
+          onStatus("Loading reader...");
+        }
+      }
+    };
+    function tryCreate(opts) {
+      return Tesseract.createWorker("eng", 1, opts);
+    }
+    return withTimeout(tryCreate(optsBlob), EID_OCR_WORKER_MS, "Loading the reader timed out. Open this file in Chrome with an internet connection, then try again.")
+      .catch(function (err) {
+        var optsDirect = {
+          workerPath: TESS_WORKER_PATH,
+          corePath: TESS_CORE_PATH,
+          langPath: TESS_LANG_PATH,
+          workerBlobURL: false,
+          cacheMethod: "none"
+        };
+        return withTimeout(tryCreate(optsDirect), EID_OCR_WORKER_MS, "Loading the reader timed out. Open this file in Chrome with an internet connection, then try again.")
+          .catch(function () {
+            var msg = err && err.message ? err.message : "Could not start the on-device reader.";
+            throw new Error("Could not start the on-device reader. Open this file in Chrome with an internet connection the first time (the pictures stay on this device). If you opened it from a chat app, use Open in Chrome. " + msg);
+          });
+      });
+  }
+
+  function jpegSizeAndOrientation(bytes) {
+    if (!bytes || bytes.length < 4 || bytes[0] !== 0xFF || bytes[1] !== 0xD8) return null;
+    var offset = 2;
+    var orientation = 1;
+    var width = 0;
+    var height = 0;
+    function u16(i, le) {
+      return le ? (bytes[i] | (bytes[i + 1] << 8)) : ((bytes[i] << 8) | bytes[i + 1]);
+    }
+    function u32(i, le) {
+      return le ? (bytes[i] | (bytes[i + 1] << 8) | (bytes[i + 2] << 16) | (bytes[i + 3] << 24)) >>> 0
+        : ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0;
+    }
+    while (offset + 4 <= bytes.length) {
+      if (bytes[offset] !== 0xFF) break;
+      var marker = bytes[offset + 1];
+      if (marker === 0xDA) break;
+      var size = u16(offset + 2, false);
+      if (size < 2 || offset + 2 + size > bytes.length) break;
+      if (marker === 0xE1 && !orientation) orientation = 1;
+      if (marker === 0xE1 && size >= 10) {
+        var start = offset + 4;
+        if (bytes[start] === 0x45 && bytes[start + 1] === 0x78 && bytes[start + 2] === 0x69 && bytes[start + 3] === 0x66 && bytes[start + 4] === 0 && bytes[start + 5] === 0) {
+          var tiff = start + 6;
+          var le = bytes[tiff] === 0x49 && bytes[tiff + 1] === 0x49;
+          if ((le || (bytes[tiff] === 0x4D && bytes[tiff + 1] === 0x4D)) && tiff + 8 <= bytes.length) {
+            var ifd = tiff + u32(tiff + 4, le);
+            if (ifd + 2 <= bytes.length) {
+              var n = u16(ifd, le);
+              for (var i = 0; i < n && ifd + 2 + i * 12 + 12 <= bytes.length; i++) {
+                var entry = ifd + 2 + i * 12;
+                if (u16(entry, le) === 0x0112) {
+                  orientation = u16(entry + 8, le) || 1;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      if ((marker >= 0xC0 && marker <= 0xC3) || (marker >= 0xC5 && marker <= 0xC7) || (marker >= 0xC9 && marker <= 0xCB) || (marker >= 0xCD && marker <= 0xCF)) {
+        if (offset + 9 <= bytes.length) {
+          height = u16(offset + 5, false);
+          width = u16(offset + 7, false);
+        }
+        break;
+      }
+      offset += 2 + size;
+    }
+    if (!width || !height) return null;
+    return { width: width, height: height, orientation: orientation || 1 };
+  }
+
+  function pngSize(bytes) {
+    if (!bytes || bytes.length < 24) return null;
+    if (!(bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47)) return null;
+    var width = ((bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19]) >>> 0;
+    var height = ((bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23]) >>> 0;
+    if (!width || !height) return null;
+    return { width: width, height: height, orientation: 1 };
+  }
+
+  async function readFileBytes(file) {
+    var buf = await file.arrayBuffer();
+    return new Uint8Array(buf);
+  }
+
+  function resizeOptionsFor(size) {
+    if (!size) return null;
+    var w = size.width;
+    var h = size.height;
+    if (size.orientation >= 5 && size.orientation <= 8) {
+      w = size.height;
+      h = size.width;
+    }
+    var longSide = Math.max(w, h);
+    if (longSide <= EID_OCR_MAX_SIDE) return { width: w, height: h };
+    var scale = EID_OCR_MAX_SIDE / longSide;
+    return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
+  }
+
+  async function bitmapFromFile(file) {
+    var bytes = null;
+    try { bytes = await readFileBytes(file); } catch (e) { bytes = null; }
+    var size = bytes ? (jpegSizeAndOrientation(bytes) || pngSize(bytes)) : null;
+    var resized = resizeOptionsFor(size);
+    var optsBase = { imageOrientation: "from-image" };
+    if (typeof createImageBitmap === "function") {
+      try {
+        var opts = { imageOrientation: "from-image" };
+        if (resized) {
+          opts.resizeWidth = resized.width;
+          opts.resizeHeight = resized.height;
+          opts.resizeQuality = "high";
+        }
+        return await createImageBitmap(file, opts);
+      } catch (e1) {
+        try { return await createImageBitmap(file, optsBase); } catch (e2) {
+          try { return await createImageBitmap(file); } catch (e3) {}
+        }
+      }
+    }
+    return await new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error("This photo couldn't be opened. Try taking it again, or attach a JPEG or PNG."));
+      };
+      img.src = url;
+    });
+  }
+
+  function boostContrastGrayscale(ctx, w, h) {
+    var imageData = ctx.getImageData(0, 0, w, h);
+    var d = imageData.data;
+    for (var i = 0; i < d.length; i += 4) {
+      var y = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      y = (y - 128) * 1.45 + 128;
+      if (y < 0) y = 0;
+      if (y > 255) y = 255;
+      d[i] = d[i + 1] = d[i + 2] = y;
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  async function prepareEidImage(file, rotation) {
+    var src = await bitmapFromFile(file);
+    var sw = src.width;
+    var sh = src.height;
+    if (!sw || !sh) throw new Error("This photo couldn't be opened. Try taking it again, or attach a JPEG or PNG.");
+    var longSide = Math.max(sw, sh);
+    var scale = longSide > EID_OCR_MAX_SIDE ? (EID_OCR_MAX_SIDE / longSide) : 1;
+    var dw = Math.max(1, Math.round(sw * scale));
+    var dh = Math.max(1, Math.round(sh * scale));
+    var angle = ((rotation || 0) % 360 + 360) % 360;
+    var canvas = document.createElement("canvas");
+    if (angle === 90 || angle === 270) {
+      canvas.width = dh;
+      canvas.height = dw;
+    } else {
+      canvas.width = dw;
+      canvas.height = dh;
+    }
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("This photo couldn't be prepared for reading.");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    if (angle === 90) {
+      ctx.translate(canvas.width, 0);
+      ctx.rotate(Math.PI / 2);
+    } else if (angle === 180) {
+      ctx.translate(canvas.width, canvas.height);
+      ctx.rotate(Math.PI);
+    } else if (angle === 270) {
+      ctx.translate(0, canvas.height);
+      ctx.rotate(-Math.PI / 2);
+    }
+    ctx.drawImage(src, 0, 0, dw, dh);
+    ctx.restore();
+    if (src.close) try { src.close(); } catch (e) {}
+    boostContrastGrayscale(ctx, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  function countParsedFields(parsed) {
+    if (!parsed) return 0;
+    var keys = ["name", "surname", "eid", "nationality", "gender", "dob", "age", "occupation", "employer", "issuingPlace"];
+    var n = 0;
+    for (var i = 0; i < keys.length; i++) {
+      if (parsed[keys[i]]) n += 1;
+    }
+    return n;
+  }
+
+  function parsedIsStrong(parsed, confidence) {
+    if (!parsed) return false;
+    if (parsed.eid && countParsedFields(parsed) >= 3 && confidence >= 30) return true;
+    if (parsed.eid && (parsed.name || parsed.dob) && confidence >= 40) return true;
+    return false;
+  }
+
+  async function recognizePhotoBest(worker, file, onStatus, index, total) {
+    var angles = [0, 90, 180, 270];
+    var best = { text: "", confidence: -1, angle: 0, parsed: null, score: -1 };
+    for (var i = 0; i < angles.length; i++) {
+      if (onStatus) {
+        onStatus(i === 0
+          ? ("Reading photo " + (index + 1) + " of " + total + "...")
+          : ("Trying another angle on photo " + (index + 1) + "..."));
+      }
+      var canvas = await prepareEidImage(file, angles[i]);
+      var result = await withTimeout(
+        worker.recognize(canvas),
+        EID_OCR_RECOGNIZE_MS,
+        "Reading is taking too long. Try a clearer, closer photo of the card, then tap Read card again."
+      );
+      var text = result && result.data ? (result.data.text || "") : "";
+      var confidence = result && result.data ? Number(result.data.confidence) || 0 : 0;
+      var parsed = parseEidText(text);
+      var score = countParsedFields(parsed) * 100 + confidence;
+      if (score > best.score) best = { text: text, confidence: confidence, angle: angles[i], parsed: parsed, score: score };
+      if (i === 0 && parsedIsStrong(parsed, confidence)) break;
+      if (parsed.eid && countParsedFields(parsed) >= 5) break;
+    }
+    return best;
+  }
+
+  function formatReadCardDone(applied, parsed) {
+    var filled = applied && applied.filledNames ? applied.filledNames : [];
+    var missing = [];
+    if (!parsed.name) missing.push("Name");
+    if (!parsed.surname) missing.push("Surname");
+    if (!parsed.eid) missing.push("EID / ID / Passport");
+    if (!parsed.occupation) missing.push("Occupation");
+    if (!parsed.employer) missing.push("Employer");
+    if (!parsed.issuingPlace) missing.push("Issuing place");
+    if (!parsed.nationality) missing.push("Nationality");
+    if (!parsed.gender) missing.push("Gender");
+    if (!parsed.dob) missing.push("Date of birth");
+    if (!parsed.age) missing.push("Age");
+    var foundAny = !!(parsed.eid || parsed.name || parsed.dob || parsed.gender || parsed.nationality || parsed.occupation || parsed.employer || parsed.issuingPlace);
+    if (!filled.length && !foundAny) {
+      return "Done: couldn't read the card. Try a sharper picture of the front and back, and check every field by hand.";
+    }
+    var msg = "Done: " + (filled.length ? ("filled " + filled.join(", ")) : "no empty fields were filled");
+    if (applied && applied.skipped && applied.skipped.length) {
+      msg += ". Already had " + applied.skipped.join(", ") + " (left as they were)";
+    }
+    if (missing.length) msg += ", couldn't read " + missing.join(", ");
+    msg += ". Check every field by hand.";
+    return msg;
+  }
+
+  function collectImageItems(items) {
+    var out = [];
+    (items || []).forEach(function (item) {
+      var file = item && item.file ? item.file : item;
+      if (isProbablyImage(file)) out.push(item && item.file ? item : { file: file });
+    });
+    return out;
+  }
+
+
+  var READER_PASTE_FALLBACK = "The reader can't run on this page. Use Google Lens to copy the card text, paste it in the box below and tap Fill from card text.";
+  function isCspOrReaderLoadError(err) {
+    var m = err && err.message ? String(err.message) : String(err || "");
+    return /Content Security Policy|unsafe-eval|Evaluating a string as JavaScript|wasm-unsafe-eval|Could not load the on-device reader|Could not start the on-device reader|on-device reader did not start|timed out|internet connection/i.test(m);
+  }
+  function textDetectorAvailable() {
+    return typeof window.TextDetector === "function";
+  }
+  async function recognizeWithTextDetector(files, onStatus) {
+    if (!textDetectorAvailable()) return null;
+    try {
+      var detector = new window.TextDetector();
+      var parts = [];
+      for (var i = 0; i < files.length; i++) {
+        if (onStatus) onStatus("Reading photo " + (i + 1) + " of " + files.length + "...");
+        var file = files[i].file || files[i];
+        var src = null;
+        try {
+          src = await createImageBitmap(file, { imageOrientation: "from-image" });
+        } catch (e1) {
+          try { src = await bitmapFromFile(file); } catch (e2) { src = null; }
+        }
+        if (!src) continue;
+        var boxes = await detector.detect(src);
+        if (src.close) try { src.close(); } catch (e3) {}
+        var text = (boxes || []).map(function (b) { return b && (b.rawValue || ""); }).filter(Boolean).join("\n");
+        parts.push(text);
+      }
+      return parts.join("\n\n").trim() || null;
+    } catch (err) {
+      return null;
+    }
+  }
+  function parsedLooksUseful(parsed) {
+    if (!parsed) return false;
+    return !!(parsed.eid || parsed.name || parsed.occupation || parsed.employer || parsed.issuingPlace || (countParsedFields(parsed) >= 2));
+  }
+  function applyCardText(raw, applyParsed) {
+    var text = String(raw || "").trim();
+    if (!text) {
+      showEidOcrStatus("Paste the card text first, then tap Fill from card text.");
+      return null;
+    }
+    var parsed = parseEidText(text);
+    var applied = applyParsed(parsed);
+    showEidOcrStatus(formatReadCardDone(applied, parsed));
+    return parsed;
+  }
+
+  async function runReadCard(getItems, applyParsed) {
+    showEidOcrStatus("Loading reader...");
+    var images = collectImageItems(typeof getItems === "function" ? getItems() : getItems);
+    if (!images.length) {
+      showEidOcrStatus("Take or attach a photo of the card first");
+      return;
+    }
+    var btn = el("readCard");
+    var prev = btn ? btn.textContent : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Reading…";
+    }
+    var worker = null;
+    try {
+      var detectorText = await recognizeWithTextDetector(images, showEidOcrStatus);
+      if (detectorText) {
+        var detected = parseEidText(detectorText);
+        if (parsedLooksUseful(detected)) {
+          var appliedDetector = applyParsed(detected);
+          showEidOcrStatus(formatReadCardDone(appliedDetector, detected));
+          return detected;
+        }
+      }
+      showEidOcrStatus("Loading reader...");
+      var Tesseract = await loadTesseractLibrary(showEidOcrStatus);
+      worker = await createEidOcrWorker(Tesseract, showEidOcrStatus);
+      var parts = [];
+      var bestParsed = null;
+      var bestScore = -1;
+      for (var i = 0; i < images.length; i++) {
+        var file = images[i].file || images[i];
+        var best = await recognizePhotoBest(worker, file, showEidOcrStatus, i, images.length);
+        parts.push(best.text || "");
+        if (best.score > bestScore && best.parsed) {
+          bestParsed = best.parsed;
+          bestScore = best.score;
+        }
+      }
+      if (worker && worker.terminate) await worker.terminate();
+      worker = null;
+      var combined = parseEidText(parts.join("\n\n"));
+      var parsed = countParsedFields(combined) >= countParsedFields(bestParsed) ? combined : (bestParsed || combined);
+      var applied = applyParsed(parsed);
+      showEidOcrStatus(formatReadCardDone(applied, parsed));
+      return parsed;
+    } catch (err) {
+      if (worker && worker.terminate) try { await worker.terminate(); } catch (e) {}
+      if (isCspOrReaderLoadError(err)) showEidOcrStatus(READER_PASTE_FALLBACK);
+      else showEidOcrStatus(err && err.message ? err.message : "Could not read the card.");
+      return null;
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = prev || "Read card";
+      }
+    }
+  }
+
+
+  var _showEidOcrStatusInner = showEidOcrStatus;
+  showEidOcrStatus = function (msg) {
+    if (typeof state !== "undefined" && state) state.eidFillNote = msg;
+    _showEidOcrStatusInner(msg);
+  };
+
+  async function readCard() {
+    try {
+      await runReadCard(function () { return state.eidPhotos || []; }, function (parsed) {
+        var applied = applyParsedToEmptyFields(parsed);
+        if (parsed && parsed.eid && fieldIsEmpty(state.age)) applyBirthYearFromEidField();
+        refresh();
+        return applied;
+      });
+    } catch (err) {
+      /* Status is already shown on the page. */
+    }
+  }
+
+  function fillFromCardText() {
+    applyCardText(state.eidPaste, function (parsed) {
+      var applied = applyParsedToEmptyFields(parsed);
+      if (parsed && parsed.eid && fieldIsEmpty(state.age)) applyBirthYearFromEidField();
+      refresh();
+      return applied;
+    });
+  }
+  function fillFromEid() { fillFromCardText(); }
+
+  async function copyMessage() {
+    const text = currentMessage();
+    el("copyFallback").value = text;
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch (e) { ok = false; }
+    if (!ok) {
+      const ta = el("copyFallback");
+      ta.classList.remove("hidden");
+      ta.style.position = "fixed";
+      ta.style.left = "0";
+      ta.style.top = "0";
+      ta.style.opacity = "0";
+      ta.style.height = "1px";
+      ta.style.width = "1px";
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      ta.classList.add("hidden");
+      ta.style.position = "";
+      ta.style.left = "";
+      ta.style.top = "";
+      ta.style.opacity = "";
+      ta.style.height = "";
+      ta.style.width = "";
+    }
+    const btn = el("copyMessage");
+    if (ok) {
+      btn.textContent = "Copied";
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(function () { btn.textContent = "Copy message"; }, 2000);
+    } else {
+      btn.textContent = "Select and copy the message";
+    }
+  }
+
+  function clearForm() {
+    state.hospitalId = "";
+    state.hospitalOther = "";
+    state.alertBaseId = state.baseId;
+    state.alertBaseOther = "";
+    state.callSign = "";
+    state.incidentDate = "";
+    state.dateBlurred = false;
+    state.projectName = "";
+    state.caseNumber = "";
+    state.epcrNumber = "";
+    state.callClass = "";
+    state.subClass = "";
+    state.subClassOther = "";
+    state.patientName = "";
+    state.patientSurname = "";
+    state.dateOfBirth = "";
+    state.dobBlurred = false;
+    state.hospitalNumber = "";
+    state.eidPaste = "";
+    state.eidFillNote = "";
+    state.noCamera = false;
+    clearEidPhoto();
+    state.incidentLocation = "";
+    state.incidentType = "";
+    state.incidentTypeOther = "";
+    state.times = Object.assign({}, EMPTY_TIMES);
+    state.timeBlurred = Object.assign({}, EMPTY_TIME_BLURRED);
+    state.timeAtClinicNA = false;
+    state.timeLeftClinicNA = false;
+    state.nationality = "Not stated";
+    state.nationalityOther = "";
+    state.gender = "Not stated";
+    state.age = "";
+    state.cellphone = "";
+    state.email = "";
+    state.eid = "";
+    state.occupation = "";
+    state.employer = "";
+    state.issuingPlace = "";
+    state.complaint = "";
+    state.eventHistory = "";
+    state.signs = "";
+    state.allergies = "";
+    state.medications = "";
+    state.pastMed = "";
+    state.lastMeal = "";
+    state.primaryA = "Not assessed";
+    state.primaryAOther = "";
+    state.primaryADetails = "";
+    state.primaryB = "Not assessed";
+    state.primaryBOther = "";
+    state.primaryBDetails = "";
+    state.primaryC = "Not assessed";
+    state.primaryCOther = "";
+    state.primaryCDetails = "";
+    state.primaryD = "Not assessed";
+    state.primaryDFallout = "Not assessed";
+    state.primaryDDetails = "";
+    state.primaryEExam = "Not assessed";
+    state.primaryEFindings = "Not assessed";
+    state.primaryEDetails = "";
+    state.respRate = "";
+    state.spo2 = "";
+    state.heartRate = "";
+    state.nibp = "";
+    state.capRefill = "";
+    state.ecg = "";
+    state.gcsE = "";
+    state.gcsV = "";
+    state.gcsM = "";
+    state.pupils = "";
+    state.hgt = "";
+    state.temp = "";
+    state.pain = "";
+    state.etco2 = "";
+    state.medicines = "";
+    state.iv = "";
+    state.airway = "";
+    state.circulation = "";
+    state.procedures = "";
+    state.condition = "Not stated";
+    state.clinicalNotes = "";
+    const ids = [
+      "hospitalOther","alertBaseOther","callSign","incidentDate","projectName","caseNumber","epcrNumber",
+      "subClassOther","patientName","patientSurname","dateOfBirth","hospitalNumber","eidPaste","incidentLocation","incidentTypeOther","nationalityOther",
+      "age","cellphone","email","eid","occupation","employer","issuingPlace","complaint","eventHistory","signs","allergies","medications","pastMed",
+      "lastMeal","primaryAOther","primaryADetails","primaryBOther","primaryBDetails","primaryCOther","primaryCDetails",
+      "primaryDDetails","primaryEDetails","respRate","spo2","heartRate","nibp","capRefill","ecg","pupils","hgt",
+      "temp","pain","etco2","medicines","iv","airway","circulation","procedures","clinicalNotes"
+    ];
+    ids.forEach(function (id) { const n = el(id); if (n) n.value = ""; });
+    el("alertBaseId").value = state.baseId;
+    el("hospitalId").value = "";
+    el("callClass").value = "";
+    el("subClass").value = "";
+    el("incidentType").value = "";
+    el("nationality").value = "Not stated";
+    el("gender").value = "Not stated";
+    el("primaryA").value = "Not assessed";
+    el("primaryB").value = "Not assessed";
+    el("primaryC").value = "Not assessed";
+    el("primaryD").value = "Not assessed";
+    el("primaryDFallout").value = "Not assessed";
+    el("primaryEExam").value = "Not assessed";
+    el("primaryEFindings").value = "Not assessed";
+    el("gcsE").value = "";
+    el("gcsV").value = "";
+    el("gcsM").value = "";
+    el("condition").value = "Not stated";
+    el("noCamera").checked = false;
+    el("timeAtClinicNA").checked = false;
+    el("timeLeftClinicNA").checked = false;
+    el("eidFillNote").textContent = "";
+    show(el("eidFillNote"), false);
+    el("eidFillNote").classList.remove("is-on");
+    if (el("eidFillNotePaste")) {
+      el("eidFillNotePaste").textContent = "";
+      show(el("eidFillNotePaste"), false);
+      el("eidFillNotePaste").classList.remove("is-on");
+    }
+    el("copyMessage").textContent = "Copy message";
+    refresh();
+  }
+
+  function buildTimesGrid() {
+    const grid = el("timesGrid");
+    let html = "";
+    TIME_FIELD_DEFS.forEach(function (field) {
+      html += '<div><div class="row"><div class="grow"><div class="field-label"><span>' + escapeHtml(field.label) + '</span>';
+      html += '<input id="time-' + field.key + '" type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="e.g. 14:20">';
+      html += '<div id="timehint-' + field.key + '" class="hint hidden">Use 00:00–23:59</div></div></div>';
+      html += '<button type="button" class="quiet" id="timenow-' + field.key + '">Now</button></div>';
+      if (field.allowNA) {
+        html += '<label class="check"><input type="checkbox" id="' + (field.key === "atClinic" ? "timeAtClinicNA" : "timeLeftClinicNA") + '"><span>Not applicable</span></label>';
+      }
+      html += "</div>";
+    });
+    html += '<div><div class="field-label"><span>Total call time</span><div id="totalCallTime" class="readonly">Needs Call recorded and Back at site</div></div></div>';
+    grid.innerHTML = html;
+    TIME_FIELD_DEFS.forEach(function (field) {
+      const input = el("time-" + field.key);
+      input.addEventListener("input", function () {
+        const isNA = (field.key === "atClinic" && state.timeAtClinicNA) || (field.key === "leftClinic" && state.timeLeftClinicNA);
+        if (isNA) return;
+        state.times[field.key] = formatTimeDigits(input.value);
+        input.value = state.times[field.key];
+        refresh();
+      });
+      input.addEventListener("blur", function () {
+        const isNA = (field.key === "atClinic" && state.timeAtClinicNA) || (field.key === "leftClinic" && state.timeLeftClinicNA);
+        if (isNA) return;
+        state.times[field.key] = finalizeTimeDigits(state.times[field.key]);
+        state.timeBlurred[field.key] = true;
+        input.value = state.times[field.key];
+        refresh();
+      });
+      el("timenow-" + field.key).addEventListener("click", function () {
+        const isNA = (field.key === "atClinic" && state.timeAtClinicNA) || (field.key === "leftClinic" && state.timeLeftClinicNA);
+        if (isNA) return;
+        state.times[field.key] = formatNowTime();
+        state.timeBlurred[field.key] = true;
+        refresh();
+      });
+    });
+    el("timeAtClinicNA").addEventListener("change", function () {
+      state.timeAtClinicNA = el("timeAtClinicNA").checked;
+      refresh();
+    });
+    el("timeLeftClinicNA").addEventListener("change", function () {
+      state.timeLeftClinicNA = el("timeLeftClinicNA").checked;
+      refresh();
+    });
+  }
+
+  function initTables() {
+    let html = "<thead><tr><th>Base</th><th>Area</th><th>Pin</th><th>Confidence</th></tr></thead><tbody>";
+    BASES.forEach(function (b) {
+      const pin = b.lat != null && b.lon != null ? b.lat.toFixed(3) + ", " + b.lon.toFixed(3) : "Not found";
+      html += "<tr><td>" + escapeHtml(b.name) + "</td><td>" + escapeHtml(b.region) + "</td><td>" + escapeHtml(pin) + "</td><td>" + escapeHtml(confidenceLabel(b.confidence)) + "</td></tr>";
+    });
+    html += "</tbody>";
+    el("basesTable").innerHTML = html;
+    el("baseNotes").innerHTML = BASES.map(function (b) { return "<li>" + escapeHtml(b.name + ": " + b.note) + "</li>"; }).join("");
+    html = "<thead><tr><th>Hospital</th><th>Role</th><th>Public number</th></tr></thead><tbody>";
+    HOSPITALS.forEach(function (h) {
+      const role = h.role + (h.lat == null ? " — no map pin found" : "");
+      const phone = h.phone ? h.phone + " (" + h.phoneNote + ")" : "Not found on an official public page";
+      html += "<tr><td>" + escapeHtml(h.name) + "</td><td>" + escapeHtml(role) + "</td><td>" + escapeHtml(phone) + "</td></tr>";
+    });
+    html += "</tbody>";
+    el("hospitalsTable").innerHTML = html;
+  }
+
+  function squareIcon(selected) {
+    const size = selected ? 20 : 16;
+    return L.divIcon({
+      className: "leaflet-square-icon" + (selected ? " selected" : ""),
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+    });
+  }
+
+  function updateMapMarkers() {
+    if (!map) return;
+    mapLayers.bases.forEach(function (m) { map.removeLayer(m); });
+    mapLayers.hospitals.forEach(function (m) { map.removeLayer(m); });
+    if (mapLayers.origin) { map.removeLayer(mapLayers.origin); mapLayers.origin = null; }
+    mapLayers.bases = [];
+    mapLayers.hospitals = [];
+    const o = origin();
+    const dest = destinationHospital();
+    MAPPED_BASES.forEach(function (b) {
+      const selected = o && o.kind === "base" && o.label === b.name;
+      const marker = L.marker([b.lat, b.lon], { icon: squareIcon(selected), title: b.name, zIndexOffset: selected ? 600 : 400 });
+      marker.on("click", function (e) {
+        L.DomEvent.stopPropagation(e);
+        pickBase(b.id);
+      });
+      marker.addTo(map);
+      mapLayers.bases.push(marker);
+    });
+    MAPPED_HOSPITALS.forEach(function (h) {
+      const selected = dest && dest.id === h.id;
+      const marker = L.circleMarker([h.lat, h.lon], {
+        radius: selected ? 9 : 6,
+        color: "#fff",
+        weight: selected ? 3 : 2,
+        fillColor: h.military ? "#c27800" : "#c43c3c",
+        fillOpacity: 1,
+        title: h.name,
+      });
+      marker.bindTooltip(h.name, { direction: "top" });
+      marker.addTo(map);
+      mapLayers.hospitals.push(marker);
+    });
+    if (o && o.kind !== "base") {
+      mapLayers.origin = L.circleMarker([o.lat, o.lon], {
+        radius: 8,
+        color: "#fff",
+        weight: 2,
+        fillColor: "#0f7b4a",
+        fillOpacity: 1,
+        title: o.label,
+      }).addTo(map);
+    }
+  }
+
+  function initMap() {
+    const mapEl = el("map");
+    const offline = el("mapOffline");
+    const legend = el("mapLegend");
+    if (typeof L === "undefined") {
+      mapEl.classList.add("hidden");
+      offline.classList.add("show");
+      legend.textContent = "Map needs internet. Distances still use the real coordinates, and the form works offline.";
+      return;
+    }
+    map = L.map(mapEl, { zoomControl: true, attributionControl: true }).setView([24.15, 54.0], 7);
+    const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: "Map tiles © OpenStreetMap contributors",
+    });
+    let tileErrors = 0;
+    tiles.on("tileerror", function () {
+      tileErrors += 1;
+      if (tileErrors >= 4 && !offline.classList.contains("show")) {
+        offline.classList.add("show");
+        offline.textContent = "Map needs internet";
+        mapEl.classList.add("hidden");
+        if (map) { try { map.remove(); } catch (e) {} map = null; }
+        legend.textContent = "Map needs internet. Distances still use the real coordinates, and the form works offline.";
+      }
+    });
+    tiles.addTo(map);
+    map.on("click", function (e) {
+      dropPin(e.latlng.lat, e.latlng.lng);
+    });
+    const o = origin();
+    if (o) map.setView([o.lat, o.lon], 9);
+    legend.textContent = "Squares are work bases. Circles are hospitals. Tap a square to choose a base, or tap the map to drop a pin. Drag to move the map. Map tiles © OpenStreetMap contributors.";
+    updateMapMarkers();
+    setTimeout(function () { if (map) map.invalidateSize(); }, 200);
+  }
+
+  function initSelects() {
+    fillSelect(el("workBase"), BASES.map(function (b) {
+      return { value: b.id, label: b.lat == null ? b.name + " (no public pin found)" : b.name };
+    }));
+    el("workBase").value = state.baseId;
+    fillSelect(el("alertBaseId"), BASES.map(function (b) { return { value: b.id, label: b.name }; }).concat([{ value: "other", label: "Other (type in)" }]));
+    el("alertBaseId").value = state.alertBaseId;
+    fillSelect(el("callClass"), CALL_CLASS_OPTIONS);
+    fillSelect(el("subClass"), SUB_CLASS_OPTIONS);
+    fillSelect(el("incidentType"), INCIDENT_TYPE_OPTIONS);
+    fillSelect(el("nationality"), NATIONALITY_OPTIONS);
+    fillSelect(el("gender"), [{ value: "Not stated", label: "Not stated" }, { value: "M", label: "M" }, { value: "F", label: "F" }]);
+    fillSelect(el("primaryA"), PRIMARY_A_OPTIONS);
+    fillSelect(el("primaryB"), PRIMARY_B_OPTIONS);
+    fillSelect(el("primaryC"), PRIMARY_C_OPTIONS);
+    fillSelect(el("primaryD"), PRIMARY_D_AVPU_OPTIONS);
+    fillSelect(el("primaryDFallout"), PRIMARY_D_FALLOUT_OPTIONS);
+    fillSelect(el("primaryEExam"), PRIMARY_E_YESNO_OPTIONS);
+    fillSelect(el("primaryEFindings"), PRIMARY_E_YESNO_OPTIONS);
+    fillSelect(el("gcsE"), GCS_EYE_OPTIONS);
+    fillSelect(el("gcsV"), GCS_VERBAL_OPTIONS);
+    fillSelect(el("gcsM"), GCS_MOTOR_OPTIONS);
+    fillSelect(el("condition"), [{ value: "Not stated", label: "Not stated" }, { value: "Stable", label: "Stable" }, { value: "Unstable", label: "Unstable" }]);
+  }
+
+  function wire() {
+    el("workBase").addEventListener("change", function () { pickBase(el("workBase").value); });
+    el("useLocation").addEventListener("click", useMyLocation);
+    el("military").addEventListener("change", function () { state.military = el("military").checked; refresh(); });
+    el("alertBaseId").addEventListener("change", function () { state.alertBaseId = el("alertBaseId").value; refresh(); });
+    bindValue("alertBaseOther", "alertBaseOther");
+    bindValue("callSign", "callSign");
+    el("incidentDate").addEventListener("input", function () {
+      state.incidentDate = formatDateDigits(el("incidentDate").value);
+      el("incidentDate").value = state.incidentDate;
+      refresh();
+    });
+    el("incidentDate").addEventListener("blur", function () { state.dateBlurred = true; refresh(); });
+    el("dateToday").addEventListener("click", function () {
+      state.incidentDate = formatTodayDate();
+      state.dateBlurred = true;
+      el("incidentDate").value = state.incidentDate;
+      refresh();
+    });
+    bindValue("projectName", "projectName");
+    bindValue("caseNumber", "caseNumber");
+    bindValue("epcrNumber", "epcrNumber");
+    el("callClass").addEventListener("change", function () { state.callClass = el("callClass").value; refresh(); });
+    el("subClass").addEventListener("change", function () { state.subClass = el("subClass").value; refresh(); });
+    bindValue("subClassOther", "subClassOther");
+    el("hospitalId").addEventListener("change", function () { state.hospitalId = el("hospitalId").value; refresh(); });
+    bindValue("hospitalOther", "hospitalOther");
+    el("incidentType").addEventListener("change", function () { state.incidentType = el("incidentType").value; refresh(); });
+    bindValue("incidentTypeOther", "incidentTypeOther");
+    bindValue("incidentLocation", "incidentLocation");
+    el("noCamera").addEventListener("change", function () {
+      state.noCamera = el("noCamera").checked;
+      if (state.noCamera) clearEidPhoto();
+      refresh();
+    });
+    el("eidFile").addEventListener("change", function () { onEidPhotoChange(el("eidFile")); refresh(); });
+    el("eidCamera").addEventListener("change", function () { onEidPhotoChange(el("eidCamera")); refresh(); });
+    bindValue("eidPaste", "eidPaste");
+    el("fillFromCardText").addEventListener("click", fillFromCardText);
+    bindValue("patientName", "patientName");
+    bindValue("patientSurname", "patientSurname");
+    el("dateOfBirth").addEventListener("input", function () {
+      state.dateOfBirth = formatDateDigits(el("dateOfBirth").value);
+      el("dateOfBirth").value = state.dateOfBirth;
+      if (isDobValid(state.dateOfBirth)) {
+        state.age = ageFromDob(state.dateOfBirth);
+        el("age").value = state.age;
+      }
+      refresh();
+    });
+    el("dateOfBirth").addEventListener("blur", function () { state.dobBlurred = true; refresh(); });
+    bindValue("occupation", "occupation");
+    bindValue("employer", "employer");
+    bindValue("issuingPlace", "issuingPlace");
+    bindValue("hospitalNumber", "hospitalNumber");
+    el("nationality").addEventListener("change", function () { state.nationality = el("nationality").value; refresh(); });
+    bindValue("nationalityOther", "nationalityOther");
+    el("gender").addEventListener("change", function () { state.gender = el("gender").value; refresh(); });
+    bindValue("age", "age");
+    el("eid").addEventListener("input", function () {
+      state.eid = el("eid").value;
+      applyBirthYearFromEidField();
+      el("eid").value = state.eid;
+      refresh();
+    });
+    el("eid").addEventListener("blur", function () {
+      applyBirthYearFromEidField();
+      el("eid").value = state.eid;
+      refresh();
+    });
+    el("readCard").addEventListener("click", function () { readCard(); });
+    bindValue("cellphone", "cellphone");
+    bindValue("email", "email");
+    bindValue("complaint", "complaint");
+    bindValue("eventHistory", "eventHistory");
+    bindValue("signs", "signs");
+    bindValue("allergies", "allergies");
+    bindValue("medications", "medications");
+    bindValue("pastMed", "pastMed");
+    bindValue("lastMeal", "lastMeal");
+    el("primaryA").addEventListener("change", function () { state.primaryA = el("primaryA").value; refresh(); });
+    bindValue("primaryAOther", "primaryAOther");
+    bindValue("primaryADetails", "primaryADetails");
+    el("primaryB").addEventListener("change", function () { state.primaryB = el("primaryB").value; refresh(); });
+    bindValue("primaryBOther", "primaryBOther");
+    bindValue("primaryBDetails", "primaryBDetails");
+    el("primaryC").addEventListener("change", function () { state.primaryC = el("primaryC").value; refresh(); });
+    bindValue("primaryCOther", "primaryCOther");
+    bindValue("primaryCDetails", "primaryCDetails");
+    el("primaryD").addEventListener("change", function () { state.primaryD = el("primaryD").value; refresh(); });
+    el("primaryDFallout").addEventListener("change", function () { state.primaryDFallout = el("primaryDFallout").value; refresh(); });
+    bindValue("primaryDDetails", "primaryDDetails");
+    el("primaryEExam").addEventListener("change", function () { state.primaryEExam = el("primaryEExam").value; refresh(); });
+    el("primaryEFindings").addEventListener("change", function () { state.primaryEFindings = el("primaryEFindings").value; refresh(); });
+    bindValue("primaryEDetails", "primaryEDetails");
+    ["respRate","spo2","heartRate","nibp","capRefill","ecg","pupils","hgt","temp","pain","etco2","medicines","iv","airway","circulation","procedures","clinicalNotes"].forEach(function (id) {
+      bindValue(id, id);
+    });
+    el("gcsE").addEventListener("change", function () { state.gcsE = el("gcsE").value; refresh(); });
+    el("gcsV").addEventListener("change", function () { state.gcsV = el("gcsV").value; refresh(); });
+    el("gcsM").addEventListener("change", function () { state.gcsM = el("gcsM").value; refresh(); });
+    el("condition").addEventListener("change", function () { state.condition = el("condition").value; refresh(); });
+    el("copyMessage").addEventListener("click", copyMessage);
+    el("clearForm").addEventListener("click", clearForm);
+    el("hospitalList").addEventListener("click", function (e) {
+      const btn = e.target.closest(".use-hospital");
+      if (!btn) return;
+      state.hospitalId = btn.getAttribute("data-hid");
+      refresh();
+    });
+    el("backToTop").addEventListener("click", function (e) {
+      e.preventDefault();
+      window.scrollTo(0, 0);
+    });
+  }
+
+  // Expose for tests
+  window.__prealert = {
+    state: state,
+    currentMessage: currentMessage,
+    origin: origin,
+    formatTimeDigits: formatTimeDigits,
+    finalizeTimeDigits: finalizeTimeDigits,
+    formatGcs: formatGcs,
+    formatGcsTotalLabel: formatGcsTotalLabel,
+    totalCallTime: totalCallTime,
+    parseEidText: parseEidText,
+    ageFromDob: ageFromDob,
+    isDobValid: isDobValid,
+    isDobFieldInvalid: isDobFieldInvalid,
+    splitPersonName: splitPersonName,
+    formatEidDob: formatEidDob,
+    pickBase: pickBase,
+    refresh: refresh,
+    clearForm: clearForm,
+    fillFromEid: fillFromEid,
+  };
+
+  document.documentElement.id = "top";
+  initSelects();
+  buildTimesGrid();
+  initTables();
+  wire();
+  refresh();
+  initMap();
+})();
+
+  </script>
+</body>
+</html>
