@@ -319,6 +319,25 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
   color: var(--accent-fg);
   border-color: transparent;
 }
+
+.vitals-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 10px 8px;
+}
+@media (max-width: 560px) {
+  .vitals-grid { grid-template-columns: 1fr 1fr; }
+}
+.vital-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vital-input input { flex: 1; min-width: 0; }
+.vital-unit { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.bp-pair { display: flex; align-items: center; gap: 6px; width: 100%; }
+.bp-pair input { flex: 1; min-width: 0; text-align: center; }
+.bp-slash { font-weight: 600; color: var(--fg); }
 </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 </head>
@@ -483,9 +502,6 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
         </div>
         <label class="field"><span>Age</span><input id="age" type="text" placeholder="e.g. 34, or 8 months"></label>
         <label class="field"><span>EID / ID / Passport no</span><input id="eid" type="text" placeholder="784-XXXX-XXXXXXX-X"></label>
-        <label class="field"><span>Occupation</span><input id="occupation" type="text" placeholder="e.g. Engineer"></label>
-        <label class="field"><span>Employer</span><input id="employer" type="text" placeholder="e.g. ADNOC"></label>
-        <label class="field"><span>Issuing place</span><input id="issuingPlace" type="text" placeholder="e.g. Abu Dhabi"></label>
         <label class="field"><span>Hospital number (if applicable)</span><input id="hospitalNumber" type="text" placeholder="Hospital number"></label>
         <label class="field"><span>Cellphone number</span><input id="cellphone" type="text" placeholder="e.g. +971 50 123 4567"></label>
         <label class="field"><span>Email address</span><input id="email" type="text" placeholder="e.g. name@example.com"></label>
@@ -520,16 +536,35 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
       <label class="field" style="margin-top:12px"><span>E details</span><input id="primaryEDetails" type="text" placeholder="Optional, e.g. laceration L forearm"></label>
 
       <p style="margin:12px 0 8px;font-weight:600">Vitals</p>
-      <div class="grid grid-3">
-        <label class="field"><span>Resp rate</span><input id="respRate" type="text" placeholder="e.g. 18"></label>
-        <label class="field"><span>SpO2 %</span><input id="spo2" type="number" placeholder="e.g. 98"></label>
-        <label class="field"><span>Heart rate</span><input id="heartRate" type="text" placeholder="e.g. 88"></label>
-        <label class="field"><span>NIBP</span><input id="nibp" type="text" placeholder="e.g. 120/80"></label>
+            <div class="vitals-grid">
+        <div class="field">
+          <span>BP</span>
+          <div class="bp-pair">
+            <input id="bpSys" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="120" aria-label="Systolic BP">
+            <span class="bp-slash" aria-hidden="true">/</span>
+            <input id="bpDia" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="80" aria-label="Diastolic BP">
+          </div>
+        </div>
+        <label class="field"><span>HR</span>
+          <span class="vital-input"><input id="heartRate" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="88"><span class="vital-unit">bpm</span></span>
+        </label>
+        <label class="field"><span>RR</span>
+          <span class="vital-input"><input id="respRate" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="18"><span class="vital-unit">/min</span></span>
+        </label>
+        <label class="field"><span>SpO2</span>
+          <span class="vital-input"><input id="spo2" type="text" inputmode="numeric" enterkeyhint="next" autocomplete="off" placeholder="98"><span class="vital-unit">%</span></span>
+        </label>
+        <label class="field"><span>Temp</span>
+          <span class="vital-input"><input id="temp" type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="37.2"><span class="vital-unit">°C</span></span>
+        </label>
+        <label class="field"><span>HGT</span>
+          <span class="vital-input"><input id="hgt" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="6.2"><span class="vital-unit">mmol/L</span></span>
+        </label>
+      </div>
+      <div class="grid grid-3" style="margin-top:12px">
         <label class="field"><span>Cap refill</span><input id="capRefill" type="text" placeholder="e.g. under 2 sec"></label>
         <label class="field"><span>ECG rhythm</span><input id="ecg" type="text" placeholder="e.g. sinus tach"></label>
         <label class="field"><span>Pupils</span><input id="pupils" type="text" placeholder="e.g. PEARL 3 mm"></label>
-        <label class="field"><span>HGT</span><input id="hgt" type="text" placeholder="e.g. 6.2"></label>
-        <label class="field"><span>Temp</span><input id="temp" type="text" placeholder="e.g. 37.2"></label>
         <label class="field"><span>Pain</span><input id="pain" type="text" placeholder="e.g. 6/10"></label>
         <label class="field"><span>ETCO2</span><input id="etco2" type="text" placeholder="if recorded"></label>
       </div>
@@ -830,6 +865,25 @@ function nearestHospitals(lat, lon, limit = 5) {
 function filled(value) {
   return value.trim();
 }
+function formatVitalsLine(opts) {
+    var parts = [];
+    var sys = String((opts && opts.bpSys) || "").trim();
+    var dia = String((opts && opts.bpDia) || "").trim();
+    if (sys && dia) parts.push("BP " + sys + "/" + dia);
+    else if (sys) parts.push("BP " + sys);
+    else if (dia) parts.push("BP /" + dia);
+    var hr = String((opts && (opts.hr || opts.heartRate)) || "").trim();
+    var rr = String((opts && (opts.rr || opts.respRate)) || "").trim();
+    var spo2 = String((opts && opts.spo2) || "").trim();
+    var temp = String((opts && opts.temp) || "").trim();
+    var hgt = String((opts && opts.hgt) || "").trim();
+    if (hr) parts.push("HR " + hr);
+    if (rr) parts.push("RR " + rr);
+    if (spo2) parts.push("SpO2 " + spo2 + "%");
+    if (temp) parts.push("Temp " + temp);
+    if (hgt) parts.push("HGT " + hgt);
+    return parts.join(", ");
+  }
 function addLine(lines, label, value, always = false) {
   const text = filled(value);
   if (text) lines.push(`${label}: ${text}`);
@@ -1598,7 +1652,7 @@ function mapEidNationality(raw) {
   }
 function parseEidText(text, now) {
   now = now || new Date();
-  var empty = { name: "", surname: "", eid: "", nationality: "", nationalityOther: "", gender: "", dob: "", age: "", occupation: "", employer: "", issuingPlace: "" };
+  var empty = { name: "", surname: "", eid: "", nationality: "", nationalityOther: "", gender: "", dob: "", age: "" };
   var raw = String(text || "").trim();
   if (!raw) return empty;
   var lines = raw.split(/\r?\n/).map(function (l) { return normalizeOcrLine(l); }).filter(Boolean);
@@ -1621,9 +1675,6 @@ function parseEidText(text, now) {
     var dates = extractDateCandidates(raw);
     dobRaw = dates[0] || "";
   }
-  var occRaw = valueAfterEidLabel(lines, "occupation", isEidWorkValue, "work");
-  var empRaw = valueAfterEidLabel(lines, "employer", isEidWorkValue, "work");
-  var issueRaw = valueAfterEidLabel(lines, "issuingPlace", isEidWorkValue, "work");
   var nat = { nationality: "", nationalityOther: "" };
   if (natRaw) {
     var fuzzy = fuzzyNationalityRaw(natRaw);
@@ -1641,10 +1692,7 @@ function parseEidText(text, now) {
     nationalityOther: nat.nationalityOther,
     gender: gender,
     dob: dob,
-    age: age,
-    occupation: occRaw ? prettyEidName(occRaw) : "",
-    employer: empRaw ? prettyEidName(empRaw) : "",
-    issuingPlace: issueRaw ? tidyIssuingPlace(issueRaw) : ""
+    age: age
   };
 }
 function formatEidFillNote(parsed, hadText) {
@@ -1657,9 +1705,6 @@ function formatEidFillNote(parsed, hadText) {
     ["Gender", !!parsed.gender],
     ["Date of birth", !!parsed.dob],
     ["Age", !!parsed.age],
-    ["Occupation", !!parsed.occupation],
-    ["Employer", !!parsed.employer],
-    ["Issuing place", !!parsed.issuingPlace],
   ];
   const yes = fields.filter((f) => f[1]).map((f) => f[0]);
   const no = fields.filter((f) => !f[1]).map((f) => f[0]);
@@ -1857,9 +1902,6 @@ function buildMessage(opts) {
   addLine(patient, "Cellphone", opts.cellphone);
   addLine(patient, "Email", opts.email);
   addLine(patient, "EID / ID / Passport", opts.eid, true);
-  addLine(patient, "Occupation", opts.occupation);
-  addLine(patient, "Employer", opts.employer);
-  addLine(patient, "Issuing place", opts.issuingPlace);
   addLine(patient, "Hospital no", opts.hospitalNumber);
   if (opts.noCamera) patient.push("EID photo: not taken (no camera available)");
   lines.push("PATIENT");
@@ -1884,23 +1926,22 @@ function buildMessage(opts) {
     lines.push(...survey);
   }
   const gcs = formatGcs(opts.gcsE, opts.gcsV, opts.gcsM);
-  const vitals = [
-    filled(opts.respRate) && `Resp rate ${filled(opts.respRate)}`,
-    filled(opts.spo2) && `SpO2 ${filled(opts.spo2)}%`,
-    filled(opts.heartRate) && `Heart rate ${filled(opts.heartRate)}`,
-    filled(opts.nibp) && `NIBP ${filled(opts.nibp)}`,
-    filled(opts.capRefill) && `Cap refill ${filled(opts.capRefill)}`,
-    filled(opts.ecg) && `ECG rhythm ${filled(opts.ecg)}`,
-    gcs && `GCS: ${gcs}`,
-    filled(opts.pupils) && `Pupils ${filled(opts.pupils)}`,
-    filled(opts.hgt) && `HGT ${filled(opts.hgt)}`,
-    filled(opts.temp) && `Temp ${filled(opts.temp)}`,
-    filled(opts.pain) && `Pain ${filled(opts.pain)}`,
-    filled(opts.etco2) && `ETCO2 ${filled(opts.etco2)}`,
-  ].filter(Boolean);
-  if (vitals.length) {
+  const vitalLine = formatVitalsLine(opts);
+  if (vitalLine) {
     lines.push("");
-    lines.push(`Vitals: ${vitals.join("; ")}`);
+    lines.push("Vitals: " + vitalLine);
+  }
+  const otherVitals = [
+    filled(opts.capRefill) && ("Cap refill: " + filled(opts.capRefill)),
+    filled(opts.ecg) && ("ECG rhythm: " + filled(opts.ecg)),
+    gcs && ("GCS: " + gcs),
+    filled(opts.pupils) && ("Pupils: " + filled(opts.pupils)),
+    filled(opts.pain) && ("Pain: " + filled(opts.pain)),
+    filled(opts.etco2) && ("ETCO2: " + filled(opts.etco2)),
+  ].filter(Boolean);
+  if (otherVitals.length) {
+    if (!vitalLine) lines.push("");
+    otherVitals.forEach(function (line) { lines.push(line); });
   }
   const treatment = [];
   addLine(treatment, "Medicines", opts.medicines);
@@ -2122,9 +2163,6 @@ if (typeof module !== "undefined" && module.exports) {
     dateOfBirth: "",
     dobBlurred: false,
     hospitalNumber: "",
-    occupation: "",
-    employer: "",
-    issuingPlace: "",
     eidPaste: "",
     eidFillNote: "",
     eidPhotos: [],
@@ -2168,7 +2206,8 @@ if (typeof module !== "undefined" && module.exports) {
     respRate: "",
     spo2: "",
     heartRate: "",
-    nibp: "",
+    bpSys: "",
+    bpDia: "",
     capRefill: "",
     ecg: "",
     gcsE: "",
@@ -2242,9 +2281,6 @@ if (typeof module !== "undefined" && module.exports) {
       cellphone: state.cellphone,
       email: state.email,
       eid: state.eid,
-      occupation: state.occupation,
-      employer: state.employer,
-      issuingPlace: state.issuingPlace,
       hospitalNumber: state.hospitalNumber,
       noCamera: state.noCamera,
       complaint: state.complaint,
@@ -2262,7 +2298,8 @@ if (typeof module !== "undefined" && module.exports) {
       respRate: state.respRate,
       spo2: state.spo2,
       heartRate: state.heartRate,
-      nibp: state.nibp,
+      bpSys: state.bpSys,
+      bpDia: state.bpDia,
       capRefill: state.capRefill,
       ecg: state.ecg,
       gcsE: state.gcsE,
@@ -2578,9 +2615,6 @@ if (typeof module !== "undefined" && module.exports) {
     take("Name", "patientName", "patientName", parsed.name);
     take("Surname", "patientSurname", "patientSurname", parsed.surname);
     take("EID / ID / Passport", "eid", "eid", parsed.eid);
-    take("Occupation", "occupation", "occupation", parsed.occupation);
-    take("Employer", "employer", "employer", parsed.employer);
-    take("Issuing place", "issuingPlace", "issuingPlace", parsed.issuingPlace);
     if (parsed.nationality) {
       if (fieldIsEmpty(state.nationality, ["Not stated"])) {
         state.nationality = parsed.nationality;
@@ -2978,7 +3012,7 @@ if (typeof module !== "undefined" && module.exports) {
 
   function countParsedFields(parsed) {
     if (!parsed) return 0;
-    var keys = ["name", "surname", "eid", "nationality", "gender", "dob", "age", "occupation", "employer", "issuingPlace"];
+    var keys = ["name", "surname", "eid", "nationality", "gender", "dob", "age"];
     var n = 0;
     for (var i = 0; i < keys.length; i++) {
       if (parsed[keys[i]]) n += 1;
@@ -3073,14 +3107,11 @@ if (typeof module !== "undefined" && module.exports) {
     if (!parsed.name) missing.push("Name");
     if (!parsed.surname) missing.push("Surname");
     if (!parsed.eid) missing.push("EID / ID / Passport");
-    if (!parsed.occupation) missing.push("Occupation");
-    if (!parsed.employer) missing.push("Employer");
-    if (!parsed.issuingPlace) missing.push("Issuing place");
     if (!parsed.nationality) missing.push("Nationality");
     if (!parsed.gender) missing.push("Gender");
     if (!parsed.dob) missing.push("Date of birth");
     if (!parsed.age) missing.push("Age");
-    var foundAny = !!(parsed.eid || parsed.name || parsed.dob || parsed.gender || parsed.nationality || parsed.occupation || parsed.employer || parsed.issuingPlace);
+    var foundAny = !!(parsed.eid || parsed.name || parsed.surname || parsed.dob || parsed.gender || parsed.nationality);
     if (!filled.length && !foundAny) {
       return "Done: couldn't read the card. Try a sharper picture of the front and back, and check every field by hand.";
     }
@@ -3138,7 +3169,7 @@ if (typeof module !== "undefined" && module.exports) {
   }
   function parsedLooksUseful(parsed) {
     if (!parsed) return false;
-    return !!(parsed.eid || parsed.name || parsed.occupation || parsed.employer || parsed.issuingPlace || (countParsedFields(parsed) >= 2));
+    return !!(parsed.eid || parsed.name || parsed.surname || parsed.dob || parsed.gender || parsed.nationality || (countParsedFields(parsed) >= 2));
   }
   function applyCardText(raw, applyParsed) {
     var text = String(raw || "").trim();
@@ -3369,9 +3400,6 @@ if (typeof module !== "undefined" && module.exports) {
     state.cellphone = "";
     state.email = "";
     state.eid = "";
-    state.occupation = "";
-    state.employer = "";
-    state.issuingPlace = "";
     state.complaint = "";
     state.eventHistory = "";
     state.signs = "";
@@ -3397,7 +3425,8 @@ if (typeof module !== "undefined" && module.exports) {
     state.respRate = "";
     state.spo2 = "";
     state.heartRate = "";
-    state.nibp = "";
+    state.bpSys = "";
+    state.bpDia = "";
     state.capRefill = "";
     state.ecg = "";
     state.gcsE = "";
@@ -3418,9 +3447,9 @@ if (typeof module !== "undefined" && module.exports) {
     const ids = [
       "hospitalOther","alertBaseOther","callSign","incidentDate","projectName","caseNumber","epcrNumber",
       "subClassOther","patientName","patientSurname","dateOfBirth","hospitalNumber","eidPaste","incidentLocation","incidentTypeOther","nationalityOther",
-      "age","cellphone","email","eid","occupation","employer","issuingPlace","complaint","eventHistory","signs","allergies","medications","pastMed",
+      "age","cellphone","email","eid","complaint","eventHistory","signs","allergies","medications","pastMed",
       "lastMeal","primaryAOther","primaryADetails","primaryBOther","primaryBDetails","primaryCOther","primaryCDetails",
-      "primaryDDetails","primaryEDetails","respRate","spo2","heartRate","nibp","capRefill","ecg","pupils","hgt",
+      "primaryDDetails","primaryEDetails","respRate","spo2","heartRate","bpSys","bpDia","capRefill","ecg","pupils","hgt",
       "temp","pain","etco2","medicines","iv","airway","circulation","procedures","clinicalNotes"
     ];
     ids.forEach(function (id) { const n = el(id); if (n) n.value = ""; });
@@ -3693,9 +3722,6 @@ if (typeof module !== "undefined" && module.exports) {
       refresh();
     });
     el("dateOfBirth").addEventListener("blur", function () { state.dobBlurred = true; refresh(); });
-    bindValue("occupation", "occupation");
-    bindValue("employer", "employer");
-    bindValue("issuingPlace", "issuingPlace");
     bindValue("hospitalNumber", "hospitalNumber");
     el("nationality").addEventListener("change", function () { state.nationality = el("nationality").value; refresh(); });
     bindValue("nationalityOther", "nationalityOther");
@@ -3739,7 +3765,7 @@ if (typeof module !== "undefined" && module.exports) {
     el("primaryEExam").addEventListener("change", function () { state.primaryEExam = el("primaryEExam").value; refresh(); });
     el("primaryEFindings").addEventListener("change", function () { state.primaryEFindings = el("primaryEFindings").value; refresh(); });
     bindValue("primaryEDetails", "primaryEDetails");
-    ["respRate","spo2","heartRate","nibp","capRefill","ecg","pupils","hgt","temp","pain","etco2","medicines","iv","airway","circulation","procedures","clinicalNotes"].forEach(function (id) {
+    ["respRate","spo2","heartRate","bpSys","bpDia","capRefill","ecg","pupils","hgt","temp","pain","etco2","medicines","iv","airway","circulation","procedures","clinicalNotes"].forEach(function (id) {
       bindValue(id, id);
     });
     el("gcsE").addEventListener("change", function () { state.gcsE = el("gcsE").value; refresh(); });
