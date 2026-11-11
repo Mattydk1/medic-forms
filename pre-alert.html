@@ -534,8 +534,10 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
         <textarea id="copyFallback" class="hidden" readonly aria-hidden="true"></textarea>
         <div class="actions">
           <button type="button" class="primary" id="copyMessage">Copy message</button>
+          <button type="button" id="shareMessage">Share</button>
           <button type="button" id="clearForm">Clear form</button>
         </div>
+        <div id="shareNote" class="hint hidden" style="margin-top:8px"></div>
       </div>
     </section>
 
@@ -3035,6 +3037,53 @@ if (typeof module !== "undefined" && module.exports) {
     }
   }
 
+  function showShareNote(text) {
+    const note = el("shareNote");
+    if (!note) return;
+    if (!text) {
+      note.textContent = "";
+      note.classList.add("hidden");
+      return;
+    }
+    note.textContent = text;
+    note.classList.remove("hidden");
+  }
+  function canShareFiles(files) {
+    if (!files.length) return false;
+    try {
+      return typeof navigator.canShare === "function" && navigator.canShare({ files: files });
+    } catch (e) {
+      return false;
+    }
+  }
+  async function shareMessage() {
+    showShareNote("");
+    const text = currentMessage();
+    const files = (state.eidPhotos || []).map(function (item) { return item.file; });
+    const images = files.filter(function (file) { return file.type.indexOf("image/") === 0; });
+    const hasShare = typeof navigator.share === "function";
+    try {
+      if (hasShare) {
+        if (files.length && canShareFiles(files)) {
+          await navigator.share({ text: text, files: files });
+          return;
+        }
+        if (images.length && canShareFiles(images)) {
+          await navigator.share({ text: text, files: images });
+          showShareNote("Some files couldn't be included; attach the rest in WhatsApp yourself.");
+          return;
+        }
+        await navigator.share({ text: text });
+        if (files.length) showShareNote("Message shared; this browser couldn't include the files, so attach them in WhatsApp yourself.");
+        return;
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+    }
+    await copyMessage();
+    showShareNote("Sharing not supported here, message copied; attach the files in WhatsApp yourself.");
+  }
+
   function clearForm() {
     state.hospitalId = "";
     state.hospitalOther = "";
@@ -3157,6 +3206,7 @@ if (typeof module !== "undefined" && module.exports) {
       el("eidFillNotePaste").classList.remove("is-on");
     }
     el("copyMessage").textContent = "Copy message";
+    showShareNote("");
     refresh();
   }
 
@@ -3448,6 +3498,7 @@ if (typeof module !== "undefined" && module.exports) {
     el("gcsM").addEventListener("change", function () { state.gcsM = el("gcsM").value; refresh(); });
     el("condition").addEventListener("change", function () { state.condition = el("condition").value; refresh(); });
     el("copyMessage").addEventListener("click", copyMessage);
+    el("shareMessage").addEventListener("click", shareMessage);
     el("clearForm").addEventListener("click", clearForm);
     el("hospitalList").addEventListener("click", function (e) {
       const btn = e.target.closest(".use-hospital");
