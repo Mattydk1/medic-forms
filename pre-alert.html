@@ -363,6 +363,22 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
 
 .chip-row, .quick-times { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .quick-times { margin-top: 12px; }
+.quick-time { display: inline-flex; align-items: stretch; gap: 4px; }
+.quick-times button.time-clear {
+  min-width: var(--tap);
+  width: var(--tap);
+  min-height: var(--tap);
+  padding: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--fg);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+}
+.quick-times button.time-clear[hidden],
+.quick-times button.time-clear.hidden { display: none !important; }
+
 button.chip, .chip-row button, .quick-times button, button.gcs-btn {
   font-weight: 700;
 }
@@ -519,10 +535,22 @@ button.clear-form-btn {
 
       <p style="margin:12px 0 8px;font-weight:600">Times</p>
       <div class="quick-times" id="quickTimes">
-        <button type="button" data-time-key="callReceived" data-label="Call received">Call received</button>
-        <button type="button" data-time-key="onScene" data-label="On scene">On scene</button>
-        <button type="button" data-time-key="leavingScene" data-label="Leaving scene">Leaving scene</button>
-        <button type="button" data-time-key="arrivalHospital" data-label="Arrival at hospital">Arrival at hospital</button>
+        <span class="quick-time">
+          <button type="button" data-time-key="callReceived" data-label="Call received">Call received</button>
+          <button type="button" class="time-clear hidden" data-clear-time="callReceived" hidden aria-label="Clear Call received">✕</button>
+        </span>
+        <span class="quick-time">
+          <button type="button" data-time-key="onScene" data-label="On scene">On scene</button>
+          <button type="button" class="time-clear hidden" data-clear-time="onScene" hidden aria-label="Clear On scene">✕</button>
+        </span>
+        <span class="quick-time">
+          <button type="button" data-time-key="leavingScene" data-label="Leaving scene">Leaving scene</button>
+          <button type="button" class="time-clear hidden" data-clear-time="leavingScene" hidden aria-label="Clear Leaving scene">✕</button>
+        </span>
+        <span class="quick-time">
+          <button type="button" data-time-key="arrivalHospital" data-label="Arrival at hospital">Arrival at hospital</button>
+          <button type="button" class="time-clear hidden" data-clear-time="arrivalHospital" hidden aria-label="Clear Arrival at hospital">✕</button>
+        </span>
       </div>
       <div id="timesGrid" class="grid grid-2"></div>
 
@@ -4604,6 +4632,11 @@ if (typeof module !== "undefined" && module.exports) {
       var value = (state.times && state.times[key]) || "";
       btn.textContent = btn.getAttribute("data-label") + (value ? (": " + value) : "");
       btn.classList.toggle("is-on", Boolean(value));
+      var clearBtn = document.querySelector('#quickTimes [data-clear-time="' + key + '"]');
+      if (clearBtn) {
+        clearBtn.hidden = !value;
+        clearBtn.classList.toggle("hidden", !value);
+      }
     });
     var nkda = el("nkdaBtn");
     if (nkda) nkda.classList.toggle("is-on", String(state.allergies || "").trim().toLowerCase() === NKDA_TEXT.toLowerCase());
@@ -5048,6 +5081,17 @@ if (typeof module !== "undefined" && module.exports) {
       refresh();
     });
     el("quickTimes").addEventListener("click", function (e) {
+      var clearBtn = e.target.closest("[data-clear-time]");
+      if (clearBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        var clearKey = clearBtn.getAttribute("data-clear-time");
+        state.times[clearKey] = "";
+        if (state.timeBlurred) state.timeBlurred[clearKey] = false;
+        if (typeof touchForm === "function") touchForm();
+        refresh();
+        return;
+      }
       var btn = e.target.closest("[data-time-key]");
       if (!btn) return;
       var key = btn.getAttribute("data-time-key");
