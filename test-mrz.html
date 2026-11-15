@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#0b5fff">
-  <title>Patient details — MRZ test</title>
+  <title>Patient details — MRZ and SA ID test</title>
   <style>
 :root {
   --bg: #f4f5f7;
@@ -252,14 +252,14 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
 </head>
 <body>
   <div class="wrap" data-fast-fill="1">
-    <div class="test-banner" role="status">TEST PAGE – MRZ preview</div>
+    <div class="test-banner" role="status">TEST PAGE – MRZ and SA ID preview</div>
     <header>
       <h1>Patient details</h1>
       <p class="lede">A short form to capture patient details at an event, or when someone needs a quick handover. Fill in what you know, edit anything before you copy, and send it the way you need to.</p>
     </header>
     <div class="callout">
       <div class="lead">Nothing is sent</div>
-      This is a TEST copy for MRZ reading. It works on the back of an Emirates ID and other GCC IDs, and on the photo page of a passport. A PDF scan is also fine. It runs only on this device. A draft is kept separately from the live Patient details form. Check every field by hand.
+      This is a TEST copy for MRZ and SA ID barcode reading. It works on the back of an Emirates ID and other GCC IDs, on the photo page of a passport, and on the thin barcode on the back of a South African smart ID. A PDF scan is also fine. It runs only on this device. A draft is kept separately from the live Patient details form. Check every field by hand.
     </div>
     <button type="button" id="darkModeToggle" class="theme-toggle" aria-pressed="false">Dark mode: off</button>
     <p>Leave blank what you do not know — blank fields are left out of the message. If you change a form field after editing the message, the message is rebuilt from the form.</p>
@@ -329,6 +329,18 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
         <button type="button" id="readMrz">Read ID / passport code (MRZ)</button>
       </div>
       <div class="hint" style="margin-top:6px">Works on the back of Emirates ID and other GCC IDs, and the photo page of passports. Photo of the whole page is fine. A PDF scan is also fine. You don't need to crop or rotate first. Photos stay on this device.</div>
+      <div class="photo-btns" style="margin-top:10px">
+        <button type="button" id="readSaId">Read SA ID barcode (back)</button>
+        <label class="btn photo-btn">
+          <input id="saIdCamera" type="file" accept="image/*" capture="environment">
+          Take photo
+        </label>
+        <label class="btn photo-btn">
+          <input id="saIdFile" type="file" accept="image/*,application/pdf">
+          Choose file
+        </label>
+      </div>
+      <div class="hint" style="margin-top:6px">SA smart ID: take a photo of the back, with the thin line barcode in the frame. A PDF scan is also fine. Names are not in this barcode; use Read card on the front or type them. Check every detail by hand. Photos stay on this device.</div>
       <div id="eidFillNote" class="hint hidden" style="margin-top:8px"></div>
       <label class="field" style="margin-top:10px">
         <span>Paste card text</span>
@@ -2503,6 +2515,14 @@ function mapEidNationality(raw) {
         return mrzParsed;
       }
     }
+    if (typeof SaId !== "undefined" && SaId.looksLikeSaId(text)) {
+      var saParsed = SaId.parseSaIdText(text);
+      if (saParsed && saParsed.idNumber) {
+        var saApplied = applySaIdToForm(saParsed);
+        showEidOcrStatus(formatSaIdReadStatus(saParsed, saApplied));
+        return saParsed;
+      }
+    }
     var parsed = parseEidText(text);
     var applied = applyParsed(parsed);
     showEidOcrStatus(formatReadCardDone(applied, parsed));
@@ -3271,6 +3291,244 @@ function mapEidNationality(raw) {
   root.MrzTd1 = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
 
+(function (root) {
+  "use strict";
+  var CITIZEN_NATIONALITY = "South African";
+  var NAME_HINT = "Names are not in this barcode; use Read card on the front or type them.";
+  var CHECK_HINT = "Check every detail by hand.";
+  var LUHN_FAIL = "ID number check failed, please check it";
+
+  function pad2(n) {
+    n = String(n);
+    return n.length < 2 ? "0" + n : n;
+  }
+
+  function onlyDigitsMapped(text) {
+    return String(text || "").replace(/[Oo]/g, "0").replace(/[Il|]/g, "1").replace(/[^\d]/g, "");
+  }
+
+  function daysInMonth(year, month) {
+    if (month === 2) {
+      var leap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+      return leap ? 29 : 28;
+    }
+    return [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month] || 0;
+  }
+
+  function isValidYmd(year, month, day) {
+    if (!year || month < 1 || month > 12 || day < 1) return false;
+    return day <= daysInMonth(year, month);
+  }
+
+  function luhnSum(digits) {
+    var s = String(digits || "");
+    var sum = 0;
+    var i, n;
+    for (i = 0; i < s.length; i++) {
+      n = s.charCodeAt(i) - 48;
+      if (n < 0 || n > 9) return NaN;
+      if (i % 2 === 1) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+    }
+    return sum;
+  }
+
+  function luhnOk(digits) {
+    var s = String(digits || "");
+    if (!/^\d{13}$/.test(s)) return false;
+    var sum = luhnSum(s);
+    return sum % 10 === 0;
+  }
+
+  function luhnCheckDigit(first12) {
+    var s = String(first12 || "");
+    if (!/^\d{12}$/.test(s)) return "";
+    var sum = luhnSum(s + "0");
+    if (!isFinite(sum)) return "";
+    return String((10 - (sum % 10)) % 10);
+  }
+
+  function currentYy(now) {
+    now = now || new Date();
+    return now.getFullYear() % 100;
+  }
+
+  function centuryYear(yy, now) {
+    yy = Number(yy);
+    if (!isFinite(yy) || yy < 0 || yy > 99) return 0;
+    var cur = currentYy(now);
+    return yy > cur ? 1900 + yy : 2000 + yy;
+  }
+
+  function emptyResult() {
+    return {
+      ok: false,
+      idNumber: "",
+      eid: "",
+      dob: "",
+      gender: "",
+      nationality: "",
+      citizenship: "",
+      luhnOk: false,
+      dateOk: false,
+      rawText: "",
+      notes: []
+    };
+  }
+
+  function parseSaIdNumber(id, now) {
+    var result = emptyResult();
+    var s = onlyDigitsMapped(id);
+    if (s.length !== 13) return result;
+    result.idNumber = s;
+    result.eid = s;
+    result.rawText = s;
+    result.luhnOk = luhnOk(s);
+    var yy = Number(s.slice(0, 2));
+    var mm = Number(s.slice(2, 4));
+    var dd = Number(s.slice(4, 6));
+    var seq = Number(s.slice(6, 10));
+    var cit = s.charAt(10);
+    var year = centuryYear(yy, now);
+    now = now || new Date();
+    if (isValidYmd(year, mm, dd)) {
+      var dobDate = new Date(year, mm - 1, dd);
+      if (dobDate.getTime() > now.getTime()) {
+        if (year >= 2000) {
+          var older = year - 100;
+          if (isValidYmd(older, mm, dd)) year = older;
+        }
+      }
+    }
+    if (isValidYmd(year, mm, dd)) {
+      result.dateOk = true;
+      result.dob = pad2(dd) + "/" + pad2(mm) + "/" + year;
+    }
+    if (isFinite(seq)) result.gender = seq < 5000 ? "Female" : "Male";
+    if (cit === "0") {
+      result.citizenship = "citizen";
+      result.nationality = CITIZEN_NATIONALITY;
+    } else if (cit === "1") {
+      result.citizenship = "permanent-resident";
+      result.nationality = "";
+      result.notes.push("This ID is for a permanent resident, so nationality was left for you to fill.");
+    } else {
+      result.citizenship = "";
+      result.nationality = "";
+    }
+    result.ok = !!(result.idNumber && result.luhnOk && result.dateOk);
+    return result;
+  }
+
+  function uniquePush(arr, value, seen) {
+    if (!value || seen[value]) return;
+    seen[value] = 1;
+    arr.push(value);
+  }
+
+  function findSaIdCandidates(text) {
+    var out = [];
+    var seen = {};
+    var raw = String(text || "");
+    var mapped = raw.replace(/[Oo]/g, "0").replace(/[Il|]/g, "1");
+    var compact = onlyDigitsMapped(raw);
+    var m, re, i, window;
+    re = /\d{6}[\s\-\.\/]?\d{4}[\s\-\.\/]?\d[\s\-\.\/]?\d[\s\-\.\/]?\d/g;
+    while ((m = re.exec(mapped))) uniquePush(out, m[0].replace(/[^\d]/g, ""), seen);
+    re = /\d{13}/g;
+    while ((m = re.exec(mapped))) uniquePush(out, m[0], seen);
+    if (compact.length >= 13) {
+      if (compact.length === 13) uniquePush(out, compact, seen);
+      else {
+        for (i = 0; i <= compact.length - 13; i++) {
+          window = compact.slice(i, i + 13);
+          uniquePush(out, window, seen);
+        }
+      }
+    }
+    return out;
+  }
+
+  function scoreParsedSaId(p) {
+    if (!p || !p.idNumber) return -1;
+    var n = 0;
+    if (p.luhnOk) n += 20;
+    if (p.dateOk) n += 10;
+    if (p.gender) n += 2;
+    if (p.nationality || p.citizenship === "permanent-resident") n += 1;
+    if (p.ok) n += 5;
+    return n;
+  }
+
+  function parseSaIdText(text, now) {
+    var raw = String(text || "").trim();
+    var best = emptyResult();
+    best.rawText = raw;
+    var candidates = findSaIdCandidates(raw);
+    var i, parsed, score, bestScore = -1;
+    for (i = 0; i < candidates.length; i++) {
+      parsed = parseSaIdNumber(candidates[i], now);
+      parsed.rawText = raw || parsed.idNumber;
+      score = scoreParsedSaId(parsed);
+      if (score > bestScore) {
+        best = parsed;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
+  function looksLikeSaId(text) {
+    var candidates = findSaIdCandidates(text);
+    var i, p;
+    for (i = 0; i < candidates.length; i++) {
+      p = parseSaIdNumber(candidates[i]);
+      if (p.idNumber && (p.luhnOk || p.dateOk)) return true;
+    }
+    return candidates.length > 0 && /^\d{13}$/.test(candidates[0]);
+  }
+
+  function formatSaIdStatus(parsed, filledNames) {
+    var bits = [];
+    if (!parsed || !parsed.idNumber) {
+      return "Couldn't read the line barcode on the back of the SA ID. Try more light and keep the thin barcode in the frame, or type the 13-digit ID number. " + NAME_HINT + " " + CHECK_HINT;
+    }
+    if (filledNames && filledNames.length) bits.push("filled " + filledNames.join(", "));
+    else {
+      if (parsed.idNumber) bits.push("ID " + parsed.idNumber);
+      if (parsed.dob) bits.push("DOB " + parsed.dob);
+      if (parsed.gender) bits.push(parsed.gender);
+      if (parsed.nationality) bits.push(parsed.nationality);
+    }
+    var msg = "SA ID barcode: " + (bits.length ? bits.join("; ") : "partial data") + ".";
+    if (!parsed.luhnOk) msg += " " + LUHN_FAIL + ".";
+    if (parsed.notes && parsed.notes.length) msg += " " + parsed.notes.join(" ");
+    msg += " " + NAME_HINT + " " + CHECK_HINT;
+    return msg;
+  }
+
+  var api = {
+    CITIZEN_NATIONALITY: CITIZEN_NATIONALITY,
+    NAME_HINT: NAME_HINT,
+    CHECK_HINT: CHECK_HINT,
+    LUHN_FAIL: LUHN_FAIL,
+    luhnOk: luhnOk,
+    luhnCheckDigit: luhnCheckDigit,
+    centuryYear: centuryYear,
+    parseSaIdNumber: parseSaIdNumber,
+    parseSaIdText: parseSaIdText,
+    findSaIdCandidates: findSaIdCandidates,
+    looksLikeSaId: looksLikeSaId,
+    formatSaIdStatus: formatSaIdStatus,
+    scoreParsedSaId: scoreParsedSaId
+  };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.SaId = api;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
 
   var MRZ_OCRB_LANG_PATHS = [
     "https://cdn.jsdelivr.net/gh/uwolfer/tesseract-mrz@master/lang",
@@ -3870,9 +4128,11 @@ function mapEidNationality(raw) {
     }
     var btn = el("readMrz");
     var other = el("readCard");
+    var saBtn = el("readSaId");
     var prev = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "Reading MRZ…"; }
     if (other) other.disabled = true;
+    if (saBtn) saBtn.disabled = true;
     var worker = null;
     try {
       var Tesseract = await loadTesseractLibrary(showEidOcrStatus);
@@ -3903,8 +4163,615 @@ function mapEidNationality(raw) {
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = prev || "Read ID / passport code (MRZ)"; }
       if (other) other.disabled = false;
+      if (saBtn) saBtn.disabled = false;
     }
   }
+
+  var ZXING_VERSION = "0.21.3";
+  var ZXING_SCRIPT_URLS = [
+    "https://cdn.jsdelivr.net/npm/@zxing/library@" + ZXING_VERSION + "/umd/index.min.js"
+  ];
+  var SA_ID_ORIENT_ANGLES = [0, 90, 180, 270];
+  var SA_ID_MAX_SIDE = 2000;
+  var SA_ID_MIN_WIDTH = 900;
+
+  function loadZxingLibrary(onStatus) {
+    var lib = window.ZXing || (typeof ZXing !== "undefined" ? ZXing : null);
+    if (lib && (lib.MultiFormatReader || lib.BrowserMultiFormatReader)) return Promise.resolve(lib);
+    if (onStatus) onStatus("Loading barcode reader...");
+    var chain = Promise.reject(new Error("start"));
+    var i;
+    for (i = 0; i < ZXING_SCRIPT_URLS.length; i++) {
+      (function (src) {
+        chain = chain.catch(function () { return loadScriptSrc(src); });
+      })(ZXING_SCRIPT_URLS[i]);
+    }
+    return chain.then(function () {
+      var loaded = window.ZXing || (typeof ZXing !== "undefined" ? ZXing : null);
+      if (loaded && (loaded.MultiFormatReader || loaded.BrowserMultiFormatReader)) return loaded;
+      throw new Error("The barcode reader did not start.");
+    }).catch(function (err) {
+      var orig = err && err.message ? err.message : "";
+      throw new Error("Could not load the barcode reader. Open this page in Chrome with an internet connection, then try again." + (orig && orig.indexOf("script failed") === -1 ? " " + orig : ""));
+    });
+  }
+
+  function saIdNewCanvas(w, h) {
+    return mrzNewCanvas(w, h);
+  }
+
+  function saIdScaleTo(src, maxSide, minWidth) {
+    var sw = src.width;
+    var sh = src.height;
+    if (!sw || !sh) return src;
+    var longSide = Math.max(sw, sh);
+    var scale = 1;
+    if (maxSide && longSide > maxSide) scale = maxSide / longSide;
+    else if (minWidth && sw < minWidth) scale = minWidth / sw;
+    if (Math.abs(scale - 1) < 0.02) return src;
+    var w = Math.max(1, Math.round(sw * scale));
+    var h = Math.max(1, Math.round(sh * scale));
+    var made = saIdNewCanvas(w, h);
+    made.ctx.imageSmoothingEnabled = true;
+    made.ctx.imageSmoothingQuality = "high";
+    made.ctx.fillStyle = "#fff";
+    made.ctx.fillRect(0, 0, w, h);
+    made.ctx.drawImage(src, 0, 0, sw, sh, 0, 0, w, h);
+    return made.canvas;
+  }
+
+  function saIdDefaultBands(w, h) {
+    var bands = [];
+    function add(x, y, bw, bh) {
+      x = Math.max(0, Math.floor(x));
+      y = Math.max(0, Math.floor(y));
+      bw = Math.max(8, Math.min(w - x, Math.ceil(bw)));
+      bh = Math.max(8, Math.min(h - y, Math.ceil(bh)));
+      if (bw >= 40 && bh >= 8) bands.push({ x: x, y: y, w: bw, h: bh });
+    }
+    add(0, 0, w, h);
+    add(0, 0, w, Math.round(h * 0.38));
+    add(0, 0, w, Math.round(h * 0.55));
+    add(0, Math.round(h * 0.04), w, Math.round(h * 0.28));
+    add(0, Math.round(h * 0.22), w, Math.round(h * 0.36));
+    add(0, Math.round(h * 0.40), w, Math.round(h * 0.30));
+    add(Math.round(w * 0.04), Math.round(h * 0.03), Math.round(w * 0.92), Math.round(h * 0.32));
+    add(0, Math.round(h * 0.70), w, Math.round(h * 0.30));
+    return bands;
+  }
+
+  function find1dBarcodeBands(canvas) {
+    var w = canvas.width;
+    var h = canvas.height;
+    if (!w || !h) return [];
+    var aw = Math.min(w, 480);
+    var scale = aw / w;
+    var ah = Math.max(1, Math.round(h * scale));
+    var tmp = saIdNewCanvas(aw, ah);
+    tmp.ctx.drawImage(canvas, 0, 0, w, h, 0, 0, aw, ah);
+    var data = tmp.ctx.getImageData(0, 0, aw, ah).data;
+    var scores = new Array(ah);
+    var y, x, i, g, bit, prev, trans, sum = 0;
+    for (y = 0; y < ah; y++) {
+      trans = 0;
+      prev = -1;
+      for (x = 0; x < aw; x++) {
+        i = (y * aw + x) * 4;
+        g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        bit = g < 128 ? 0 : 1;
+        if (prev !== -1 && bit !== prev) trans += 1;
+        prev = bit;
+      }
+      scores[y] = trans;
+      sum += trans;
+    }
+    var mean = sum / ah;
+    var threshold = Math.max(18, mean * 1.8);
+    var bands = [];
+    var runStart = -1;
+    function flush(end) {
+      if (runStart < 0) return;
+      var runH = end - runStart;
+      if (runH >= 2) {
+        var pad = Math.max(4, Math.round(runH * 0.8));
+        var y0 = Math.max(0, runStart - pad);
+        var y1 = Math.min(ah, end + pad);
+        bands.push({
+          x: 0,
+          y: Math.round(y0 / scale),
+          w: w,
+          h: Math.max(8, Math.round((y1 - y0) / scale))
+        });
+      }
+      runStart = -1;
+    }
+    for (y = 0; y < ah; y++) {
+      if (scores[y] >= threshold) {
+        if (runStart < 0) runStart = y;
+      } else flush(y);
+    }
+    flush(ah);
+    return bands;
+  }
+
+  function uniqueDecodedTexts(list) {
+    var out = [];
+    var seen = {};
+    var i, t, key;
+    for (i = 0; i < (list || []).length; i++) {
+      t = String(list[i] || "").trim();
+      if (!t) continue;
+      key = t.replace(/\s+/g, "");
+      if (seen[key]) continue;
+      seen[key] = 1;
+      out.push(t);
+    }
+    return out;
+  }
+
+  async function decodeWithBarcodeDetector(canvas) {
+    if (typeof BarcodeDetector !== "function") return [];
+    var formats = ["code_128", "code_39", "codabar", "itf", "code_93", "ean_13", "upc_a"];
+    try {
+      if (typeof BarcodeDetector.getSupportedFormats === "function") {
+        var supported = await BarcodeDetector.getSupportedFormats();
+        if (supported && supported.length) {
+          formats = formats.filter(function (f) { return supported.indexOf(f) !== -1; });
+        }
+      }
+    } catch (e1) {}
+    if (!formats.length) return [];
+    try {
+      var detector = new BarcodeDetector({ formats: formats });
+      var found = await detector.detect(canvas);
+      return uniqueDecodedTexts((found || []).map(function (d) { return d && (d.rawValue || d.raw || d.value); }));
+    } catch (e2) {
+      return [];
+    }
+  }
+
+  function zxingOneDHints(lib) {
+    var hints = new Map();
+    var formats = [
+      lib.BarcodeFormat.CODE_128,
+      lib.BarcodeFormat.CODE_39,
+      lib.BarcodeFormat.CODE_93,
+      lib.BarcodeFormat.ITF,
+      lib.BarcodeFormat.CODABAR,
+      lib.BarcodeFormat.EAN_13,
+      lib.BarcodeFormat.UPC_A
+    ];
+    hints.set(lib.DecodeHintType.POSSIBLE_FORMATS, formats);
+    hints.set(lib.DecodeHintType.TRY_HARDER, true);
+    return hints;
+  }
+
+  function decodeZxingFromSource(lib, reader, hints, source) {
+    var texts = [];
+    var binarizers = [];
+    try { binarizers.push(new lib.HybridBinarizer(source)); } catch (e1) {}
+    try { binarizers.push(new lib.GlobalHistogramBinarizer(source)); } catch (e2) {}
+    var i, bitmap, result, text;
+    for (i = 0; i < binarizers.length; i++) {
+      try {
+        bitmap = new lib.BinaryBitmap(binarizers[i]);
+        result = reader.decode(bitmap, hints);
+        text = result && (typeof result.getText === "function" ? result.getText() : result.text);
+        if (text) texts.push(String(text));
+      } catch (e3) {
+        /* no barcode in this pass */
+      }
+      if (reader.reset) try { reader.reset(); } catch (e4) {}
+    }
+    return texts;
+  }
+
+  function decodeZxingCanvas(lib, canvas) {
+    if (!lib || !canvas) return [];
+    var hints = zxingOneDHints(lib);
+    var reader = new lib.MultiFormatReader();
+    if (reader.setHints) reader.setHints(hints);
+    var texts = [];
+    var source = null;
+    try {
+      if (lib.HTMLCanvasElementLuminanceSource) {
+        source = new lib.HTMLCanvasElementLuminanceSource(canvas, false);
+      }
+    } catch (e1) { source = null; }
+    if (!source && lib.RGBLuminanceSource) {
+      try {
+        var ctx = canvas.getContext("2d");
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        source = new lib.RGBLuminanceSource(imageData.data, canvas.width, canvas.height);
+      } catch (e2) { source = null; }
+    }
+    if (!source) return [];
+    texts = texts.concat(decodeZxingFromSource(lib, reader, hints, source));
+    if (lib.InvertedLuminanceSource) {
+      try {
+        texts = texts.concat(decodeZxingFromSource(lib, reader, hints, new lib.InvertedLuminanceSource(source)));
+      } catch (e3) {}
+    }
+    return uniqueDecodedTexts(texts);
+  }
+
+  async function decodeZxingFromImage(lib, canvas) {
+    var texts = decodeZxingCanvas(lib, canvas);
+    if (texts.length) return texts;
+    if (!lib || !lib.BrowserMultiFormatReader || typeof lib.BrowserMultiFormatReader !== "function") return texts;
+    try {
+      var hints = zxingOneDHints(lib);
+      var browserReader = new lib.BrowserMultiFormatReader(hints);
+      var result = null;
+      if (typeof browserReader.decodeFromImage === "function") {
+        try {
+          result = await browserReader.decodeFromImage(undefined, canvas.toDataURL("image/png"));
+        } catch (e1) {
+          result = null;
+        }
+      }
+      if (!result && typeof browserReader.decodeFromImageElement === "function") {
+        result = await new Promise(function (resolve, reject) {
+          var img = new Image();
+          img.onload = function () {
+            browserReader.decodeFromImageElement(img).then(resolve).catch(reject);
+          };
+          img.onerror = function () { reject(new Error("image")); };
+          img.src = canvas.toDataURL("image/png");
+        });
+      }
+      var text = result && (typeof result.getText === "function" ? result.getText() : result.text);
+      if (text) texts = uniqueDecodedTexts(texts.concat([String(text)]));
+    } catch (e2) {}
+    return texts;
+  }
+
+  function bestSaIdFromTexts(texts) {
+    var joined = uniqueDecodedTexts(texts).join("\n");
+    var parsed = typeof SaId !== "undefined" ? SaId.parseSaIdText(joined) : null;
+    if (!parsed) parsed = { ok: false, idNumber: "", rawText: joined };
+    parsed.rawText = joined || parsed.rawText || "";
+    return parsed;
+  }
+
+  function considerSaId(best, parsed, sourceText) {
+    if (!parsed) return best;
+    var score = typeof SaId !== "undefined" && SaId.scoreParsedSaId ? SaId.scoreParsedSaId(parsed) : (parsed.ok ? 30 : (parsed.idNumber ? 5 : -1));
+    if (!best || score > best.score) {
+      return { parsed: parsed, score: score, text: sourceText || parsed.rawText || (best && best.text) || "" };
+    }
+    return best;
+  }
+
+  async function decodeSaIdOnCanvas(canvas, lib, onStatus) {
+    var variants = [canvas];
+    try { variants.push(mrzPreparePixels(mrzScaleCanvas(canvas, canvas.width), "contrast")); } catch (e1) {}
+    var texts = [];
+    var best = { parsed: null, score: -1, text: "" };
+    var v, bands, b, crop, detected, zxingTexts, parsed;
+    for (v = 0; v < variants.length; v++) {
+      var src = variants[v];
+      bands = find1dBarcodeBands(src).concat(saIdDefaultBands(src.width, src.height));
+      detected = await decodeWithBarcodeDetector(src);
+      if (detected.length) {
+        texts = texts.concat(detected);
+        parsed = bestSaIdFromTexts(detected);
+        best = considerSaId(best, parsed, detected.join("\n"));
+        if (best.parsed && best.parsed.ok) return best;
+      }
+      if (lib) {
+        zxingTexts = await decodeZxingFromImage(lib, src);
+        if (zxingTexts.length) {
+          texts = texts.concat(zxingTexts);
+          parsed = bestSaIdFromTexts(zxingTexts);
+          best = considerSaId(best, parsed, zxingTexts.join("\n"));
+          if (best.parsed && best.parsed.ok) return best;
+        }
+      }
+      for (b = 0; b < bands.length; b++) {
+        if (b === 0 && bands[b].x === 0 && bands[b].y === 0 && bands[b].w === src.width && bands[b].h === src.height) continue;
+        crop = mrzCropCanvas(src, bands[b].x, bands[b].y, bands[b].w, bands[b].h);
+        crop = saIdScaleTo(crop, SA_ID_MAX_SIDE, SA_ID_MIN_WIDTH);
+        detected = await decodeWithBarcodeDetector(crop);
+        if (detected.length) {
+          texts = texts.concat(detected);
+          parsed = bestSaIdFromTexts(detected);
+          best = considerSaId(best, parsed, detected.join("\n"));
+          if (best.parsed && best.parsed.ok) return best;
+        }
+        if (lib) {
+          zxingTexts = decodeZxingCanvas(lib, crop);
+          if (zxingTexts.length) {
+            texts = texts.concat(zxingTexts);
+            parsed = bestSaIdFromTexts(zxingTexts);
+            best = considerSaId(best, parsed, zxingTexts.join("\n"));
+            if (best.parsed && best.parsed.ok) return best;
+          }
+        }
+      }
+    }
+    if (!best.parsed && texts.length) best = considerSaId(best, bestSaIdFromTexts(texts), texts.join("\n"));
+    if (!best.text && texts.length) best.text = uniqueDecodedTexts(texts).join("\n");
+    return best;
+  }
+
+  async function recognizeSaIdSource(src, lib, onStatus, alreadyUpright) {
+    var best = { parsed: null, score: -1, text: "" };
+    var angles = alreadyUpright ? [0, 90, 270, 180] : SA_ID_ORIENT_ANGLES;
+    var a, angle, rotated, fitted, one;
+    for (a = 0; a < angles.length; a++) {
+      angle = angles[a];
+      if (onStatus) onStatus(angle === 0 ? "Reading the SA ID barcode…" : "Trying another orientation…");
+      rotated = mrzDrawRotated(src, angle);
+      fitted = saIdScaleTo(rotated, SA_ID_MAX_SIDE, SA_ID_MIN_WIDTH);
+      one = await decodeSaIdOnCanvas(fitted, lib, onStatus);
+      if (one && one.parsed) best = considerSaId(best, one.parsed, one.text);
+      else if (one && one.text && !best.text) best.text = one.text;
+      if (best.parsed && best.parsed.ok) return best;
+    }
+    return best;
+  }
+
+  async function ocrSaIdDigits(worker, src, onStatus) {
+    if (!worker) return { parsed: null, score: -1, text: "" };
+    if (onStatus) onStatus("Trying to read the printed ID number…");
+    if (worker.setParameters) {
+      try {
+        await worker.setParameters({
+          tessedit_char_whitelist: "0123456789",
+          tessedit_pageseg_mode: "6"
+        });
+      } catch (e1) {}
+    }
+    var best = { parsed: null, score: -1, text: "" };
+    var angles = [0, 90, 180, 270];
+    var a, rotated, fitted, rec, parsed, bands, b, crop, psms, p;
+    psms = ["6", "7", "11"];
+    for (a = 0; a < angles.length; a++) {
+      rotated = mrzDrawRotated(src, angles[a]);
+      fitted = saIdScaleTo(rotated, 1800, 800);
+      var targets = [fitted];
+      bands = find1dBarcodeBands(fitted).concat(saIdDefaultBands(fitted.width, fitted.height).slice(0, 4));
+      for (b = 0; b < bands.length && targets.length < 6; b++) {
+        if (bands[b].w === fitted.width && bands[b].h === fitted.height) continue;
+        crop = mrzCropCanvas(fitted, bands[b].x, bands[b].y, bands[b].w, bands[b].h);
+        targets.push(mrzPreparePixels(saIdScaleTo(crop, 1600, 800), "contrast"));
+      }
+      var t;
+      for (t = 0; t < targets.length; t++) {
+        for (p = 0; p < (t === 0 ? psms.length : 1); p++) {
+          try {
+            rec = await recognizeMrzCanvas(worker, targets[t], psms[p]);
+          } catch (e2) {
+            rec = null;
+          }
+          if (!rec || !rec.text) continue;
+          parsed = typeof SaId !== "undefined" ? SaId.parseSaIdText(rec.text) : null;
+          if (parsed) best = considerSaId(best, parsed, rec.text);
+          if (best.parsed && best.parsed.ok) return best;
+        }
+      }
+    }
+    return best;
+  }
+
+  async function renderSaIdPdfPages(file, onStatus) {
+    if (onStatus) onStatus("Reading PDF...");
+    var pdfjs = await loadPdfJsLibrary(onStatus);
+    var data = await file.arrayBuffer();
+    var loading = pdfjs.getDocument({ data: new Uint8Array(data), isEvalSupported: false, disableFontFace: false });
+    var pdf;
+    try {
+      pdf = await withTimeout(loading.promise, PDF_RENDER_MS, "This PDF is taking too long to open. Try a photo of the page instead.");
+    } catch (err) {
+      var msg = err && err.message ? String(err.message) : String(err || "");
+      if (/password/i.test(msg)) throw new Error("This PDF is locked. Save the page as a photo and try that, or use an unlocked PDF.");
+      throw err;
+    }
+    var pageCount = pdf.numPages || 1;
+    var last = Math.min(pageCount, 3);
+    var pages = [];
+    var p;
+    for (p = 1; p <= last; p++) {
+      if (onStatus) onStatus(p === 1 ? "Reading PDF..." : "Reading PDF page " + p + "...");
+      try {
+        pages.push(await renderPdfPageToCanvas(pdf, p));
+      } catch (err2) {
+        if (p === 1) {
+          if (pdf && pdf.destroy) try { await pdf.destroy(); } catch (eD) {}
+          throw err2;
+        }
+      }
+    }
+    if (pdf && pdf.destroy) try { await pdf.destroy(); } catch (eD2) {}
+    return pages;
+  }
+
+  async function recognizeSaIdFile(file, lib, onStatus) {
+    if (isProbablyPdf(file)) {
+      var pages = await renderSaIdPdfPages(file, onStatus);
+      var best = { parsed: null, score: -1, text: "" };
+      var i, one;
+      for (i = 0; i < pages.length; i++) {
+        one = await recognizeSaIdSource(pages[i], lib, onStatus, true);
+        if (one && one.parsed) best = considerSaId(best, one.parsed, one.text);
+        else if (one && one.text && !best.text) best.text = one.text;
+        if (best.parsed && best.parsed.ok) return best;
+      }
+      return best;
+    }
+    if (onStatus) onStatus("Opening photo…");
+    var src = await loadMrzSource(file);
+    try {
+      return await recognizeSaIdSource(src, lib, onStatus, false);
+    } finally {
+      if (src && src.close) try { src.close(); } catch (eClose) {}
+    }
+  }
+
+  function applySaIdToForm(parsed) {
+    var filled = [];
+    if (!parsed || !parsed.idNumber) return { filledNames: filled, skipped: [] };
+    function put(label, key, id, val) {
+      if (!val) return;
+      state[key] = val;
+      if (id && el(id)) el(id).value = val;
+      filled.push(label);
+    }
+    put("ID number", "eid", "eid", parsed.idNumber || parsed.eid);
+    if (parsed.nationality) {
+      state.nationality = parsed.nationality;
+      if (el("nationality")) el("nationality").value = parsed.nationality;
+      state.nationalityOther = "";
+      if (el("nationalityOther")) el("nationalityOther").value = "";
+      filled.push("Nationality");
+    }
+    if (parsed.gender) {
+      state.gender = parsed.gender;
+      if (el("gender")) el("gender").value = parsed.gender;
+      filled.push("Gender");
+    }
+    if (parsed.dob) {
+      state.dateOfBirth = parsed.dob;
+      state.dobBlurred = true;
+      if (el("dateOfBirth")) el("dateOfBirth").value = parsed.dob;
+      filled.push("Date of birth");
+      var sel = ageFromDobSelection(parsed.dob);
+      if (sel && sel.mode) {
+        state.ageMode = sel.mode;
+        state.ageMonths = sel.months || "";
+        if (el("ageMode")) el("ageMode").value = sel.mode;
+        if (el("ageMonths")) el("ageMonths").value = state.ageMonths;
+        filled.push("Age");
+      }
+    }
+    if (typeof syncGenderButtons === "function") syncGenderButtons();
+    if (typeof touchForm === "function") touchForm();
+    if (typeof refresh === "function") refresh();
+    return { filledNames: filled, skipped: [] };
+  }
+
+  function formatSaIdReadStatus(parsed, applied) {
+    var names = applied && applied.filledNames ? applied.filledNames : [];
+    if (typeof SaId !== "undefined" && SaId.formatSaIdStatus) return SaId.formatSaIdStatus(parsed, names);
+    return "Check every detail by hand.";
+  }
+
+  function setSaIdButtonsBusy(busy) {
+    var ids = ["readSaId", "readMrz", "readCard"];
+    var i, node;
+    for (i = 0; i < ids.length; i++) {
+      node = el(ids[i]);
+      if (node) node.disabled = !!busy;
+    }
+    var inputs = ["saIdCamera", "saIdFile"];
+    for (i = 0; i < inputs.length; i++) {
+      node = el(inputs[i]);
+      if (node) node.disabled = !!busy;
+    }
+  }
+
+  async function readSaIdFromFiles(files) {
+    showEidOcrStatus("Loading SA ID barcode reader...");
+    var items = [];
+    var i, file;
+    for (i = 0; i < (files || []).length; i++) {
+      file = files[i] && files[i].file ? files[i].file : files[i];
+      if (file && (isProbablyPdf(file) || isProbablyImage(file))) items.push({ file: file });
+    }
+    if (!items.length) {
+      showEidOcrStatus("Take a photo or choose a file of the back of the SA smart ID first. Keep the thin line barcode in the frame. A PDF scan is also fine.");
+      return null;
+    }
+    var btn = el("readSaId");
+    var prev = btn ? btn.textContent : "";
+    if (btn) btn.textContent = "Reading barcode…";
+    setSaIdButtonsBusy(true);
+    var lib = null;
+    var worker = null;
+    try {
+      try {
+        lib = await loadZxingLibrary(showEidOcrStatus);
+      } catch (loadErr) {
+        if (typeof BarcodeDetector !== "function") throw loadErr;
+        lib = null;
+      }
+      var best = { parsed: null, score: -1, text: "" };
+      for (i = 0; i < items.length; i++) {
+        if (items.length > 1) showEidOcrStatus("Reading photo " + (i + 1) + " of " + items.length + "...");
+        var one = await recognizeSaIdFile(items[i].file, lib, showEidOcrStatus);
+        if (one && one.parsed) best = considerSaId(best, one.parsed, one.text);
+        else if (one && one.text && !best.text) best.text = one.text;
+        if (best.parsed && best.parsed.ok) break;
+      }
+      if (!(best.parsed && best.parsed.ok)) {
+        try {
+          var Tesseract = await loadTesseractLibrary(showEidOcrStatus);
+          worker = await createMrzOcrWorker(Tesseract, showEidOcrStatus);
+          for (i = 0; i < items.length; i++) {
+            var src = null;
+            var pages = [];
+            if (isProbablyPdf(items[i].file)) {
+              pages = await renderSaIdPdfPages(items[i].file, showEidOcrStatus);
+            } else {
+              src = await loadMrzSource(items[i].file);
+              pages = [src];
+            }
+            var p, ocrOne;
+            for (p = 0; p < pages.length; p++) {
+              ocrOne = await ocrSaIdDigits(worker, pages[p], showEidOcrStatus);
+              if (ocrOne && ocrOne.parsed) best = considerSaId(best, ocrOne.parsed, ocrOne.text);
+              if (best.parsed && best.parsed.ok) break;
+            }
+            if (src && src.close) try { src.close(); } catch (eC) {}
+            if (best.parsed && best.parsed.ok) break;
+          }
+        } catch (ocrErr) {
+          if (!(best.parsed && best.parsed.idNumber)) {
+            /* keep barcode result if we have one; otherwise continue to status */
+          }
+        }
+        if (worker && worker.terminate) try { await worker.terminate(); } catch (eT) {}
+        worker = null;
+      }
+      var parsed = best.parsed || (typeof SaId !== "undefined" ? SaId.parseSaIdText(best.text || "") : null);
+      var raw = (parsed && parsed.rawText) ? parsed.rawText : (best.text || "");
+      if (raw) writeEidPasteBox(raw);
+      var applied = { filledNames: [], skipped: [] };
+      if (parsed && parsed.idNumber) applied = applySaIdToForm(parsed);
+      showEidOcrStatus(formatSaIdReadStatus(parsed, applied));
+      return parsed;
+    } catch (err) {
+      if (worker && worker.terminate) try { await worker.terminate(); } catch (e) {}
+      if (isCspOrReaderLoadError(err)) showEidOcrStatus(READER_PASTE_FALLBACK);
+      else showEidOcrStatus(err && err.message ? err.message : "Could not read the SA ID barcode.");
+      return null;
+    } finally {
+      setSaIdButtonsBusy(false);
+      if (btn) btn.textContent = prev || "Read SA ID barcode (back)";
+    }
+  }
+
+  async function readSaId() {
+    var images = collectMrzSourceItems(state.attachments || []);
+    if (images.length) return await readSaIdFromFiles(images);
+    var picker = el("saIdFile");
+    if (picker) {
+      showEidOcrStatus("Take a photo or choose a file of the back of the SA smart ID. Keep the thin line barcode in the frame.");
+      try { picker.click(); } catch (e) {}
+      return null;
+    }
+    showEidOcrStatus("Take a photo or choose a file of the back of the SA smart ID first. Keep the thin line barcode in the frame. A PDF scan is also fine.");
+    return null;
+  }
+
+  function onSaIdFilePicked(input) {
+    var list = input && input.files ? Array.prototype.slice.call(input.files) : [];
+    if (input) input.value = "";
+    if (!list.length) return;
+    readSaIdFromFiles(list);
+  }
+
 
   function onStatusBusy() { return true; }
 
@@ -4061,6 +4928,9 @@ function mapEidNationality(raw) {
   });
   el("readCard").addEventListener("click", function () { readCard(); });
   el("readMrz").addEventListener("click", function () { readMrz(); });
+  el("readSaId").addEventListener("click", function () { readSaId(); });
+  el("saIdCamera").addEventListener("change", function () { onSaIdFilePicked(el("saIdCamera")); });
+  el("saIdFile").addEventListener("change", function () { onSaIdFilePicked(el("saIdFile")); });
   el("fillFromCardText").addEventListener("click", function () {
     applyCardText(el("eidPaste").value, function (parsed) {
       var applied = applyParsedToEmptyFields(parsed);
@@ -4175,6 +5045,9 @@ function mapEidNationality(raw) {
     parseTd1Mrz: (typeof MrzTd1 !== "undefined" ? MrzTd1.parseTd1Mrz : null),
     parseMrz: (typeof MrzTd1 !== "undefined" ? MrzTd1.parseMrz : null),
     readMrz: readMrz,
+    parseSaIdNumber: (typeof SaId !== "undefined" ? SaId.parseSaIdNumber : null),
+    parseSaIdText: (typeof SaId !== "undefined" ? SaId.parseSaIdText : null),
+    readSaId: readSaId,
   };
   refresh();
 })();
