@@ -1056,12 +1056,33 @@ function parseEidGender(raw) {
     kind = kind || (key === "name" ? "name" : key === "nationality" ? "nationality" : "work");
     return pickBestValue(collectLabeledCandidates(lines, key), kind, isValue);
   }
+  function eidNumberLuhn(d) {
+    var sum = 0, alt = false;
+    for (var i = d.length - 1; i >= 0; i--) {
+      var n = d.charCodeAt(i) - 48;
+      if (alt) { n *= 2; if (n > 9) n -= 9; }
+      sum += n; alt = !alt;
+    }
+    return sum % 10 === 0;
+  }
   function parseEidNumber(text) {
     var mapped = String(text || "").replace(/[Oo]/g, "0").replace(/[Il|]/g, "1");
-    var digits = mapped.replace(/[^\d]/g, "");
-    var m = digits.match(/784\d{12}/);
-    if (!m) return "";
-    var d = m[0];
+    // Several OCR passes are merged into one text, so the number can appear more than once with
+    // different misreads. Prefer a copy whose check digit (Luhn) is right; else the first one seen.
+    var chunks = mapped.split(/\r?\n/);
+    chunks.push(mapped);
+    var first = "", good = "";
+    for (var c = 0; c < chunks.length && !good; c++) {
+      var digits = chunks[c].replace(/[^\d]/g, "");
+      var re = /784\d{12}/g, m;
+      while ((m = re.exec(digits))) {
+        if (!first) first = m[0];
+        if (eidNumberLuhn(m[0])) { good = m[0]; break; }
+        re.lastIndex = m.index + 1;
+      }
+    }
+    var d = good || first;
+    if (!d) return "";
     return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7, 14) + "-" + d.slice(14);
   }
   function birthYearFromEid(value) {
@@ -2874,6 +2895,11 @@ function mapEidNationality(raw) {
         parsed = one;
         score = oneScore;
       }
+    }
+    // The best-scoring pass can still have a misread ID number; use a check-digit-valid copy from any pass.
+    if (parsed && parsed.cardKind === "eid-front") {
+      var goodEid = parseEidNumber(merged);
+      if (goodEid && eidNumberLuhn(goodEid.replace(/\D/g, "")) && !(parsed.eid && eidNumberLuhn(String(parsed.eid).replace(/\D/g, "")))) parsed.eid = goodEid;
     }
     return { text: merged, confidence: confidence, angle: angle, parsed: parsed, score: score };
   }
@@ -7913,6 +7939,19 @@ function mapEidNationality(raw) {
     return { parsed: best, text: mergeOcrTexts(bestText) };
   }
 
+  // True when an MRZ read is trustworthy enough to skip reading the card front.
+  function mrzReadLooksReal(p) {
+    if (!p || !p.ok) return false;
+    if (p.confidence === "pass") return true;
+    // Real code lines are full of "<" fillers; random printed text read as code lines has few or none,
+    // even when a check digit happens to match by chance.
+    var raw = String(p.rawText || "");
+    var chevrons = (raw.match(/</g) || []).length;
+    var fillers = (raw.match(/<</g) || []).length;
+    if (p.confidence === "mixed") return chevrons >= 5 && fillers >= 1;
+    return chevrons >= 6 && fillers >= 2;
+  }
+
   // Read one prepared picture: code lines first, then the card front. Returns { kind, parsed }.
   async function readIdSource(src, o) {
     var say = o.say || function () {};
@@ -7924,15 +7963,22 @@ function mapEidNationality(raw) {
     say("Looking for the code lines (MRZ)…");
     var hit = findMrzLinesQuick(src);
     var res = null;
+    var weakMrz = null;
     if (hit) {
       if (!workers.mrz) workers.mrz = await createMrzOcrWorker(Tesseract, say);
       var one = o.pdfFile
         ? await recognizeMrzPdf(workers.mrz, o.pdfFile, say)
         : await recognizeMrzSource(workers.mrz, src, say, !!o.isPdf);
       if (one && one.parsed && one.parsed.ok) {
-        res = { kind: "mrz", parsed: one.parsed };
-        rawParts.push(one.parsed.rawText || one.text || "");
-        return res;
+        if (mrzReadLooksReal(one.parsed)) {
+          res = { kind: "mrz", parsed: one.parsed };
+          rawParts.push(one.parsed.rawText || one.text || "");
+          return res;
+        }
+        // Printed lines on a card front (e.g. Emirates ID) can look like code lines to the quick finder.
+        // A read with failed check digits and no "<<" fillers is not real code lines, so read the front instead
+        // and only fall back to this weak read if the front gives nothing.
+        weakMrz = { kind: "mrz", parsed: one.parsed, raw: one.parsed.rawText || one.text || "" };
       }
     }
     // 2) Card front: Emirates ID / SA ID parsers, else the general reader.
@@ -7951,6 +7997,10 @@ function mapEidNationality(raw) {
       }
     }
     var kind = parsed.cardKind === "sa-front" ? "sa-front" : (parsed.cardKind === "eid-front" ? "eid-front" : "general");
+    if (weakMrz && kind === "general" && countParsedFields(parsed) < 2 && countParsedFields(weakMrz.parsed) > countParsedFields(parsed)) {
+      rawParts.push(weakMrz.raw);
+      return { kind: "mrz", parsed: weakMrz.parsed };
+    }
     if (kind === "general" && typeof GeneralCard !== "undefined" && GeneralCard.needsArabic(parsed, text, o.forceArabic)) {
       try {
         if (!workers.ara) workers.ara = await createAraOcrWorker(Tesseract, say);
