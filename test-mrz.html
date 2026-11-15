@@ -331,7 +331,10 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     <label class="field" style="margin-top:12px"><span>Name</span><input id="patientName" type="text" placeholder="e.g. Ahmed"></label>
     <label class="field" style="margin-top:12px"><span>Surname</span><input id="patientSurname" type="text" placeholder="e.g. Ali"></label>
     <div style="margin-top:12px">
-      <label class="field"><span>EID / ID / Passport</span><input id="eid" type="text" placeholder="784-XXXX-XXXXXXX-X"></label>
+      <label class="field"><span>ID / Passport number</span>
+        <input id="eid" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="25" placeholder="Emirates ID, SA ID or passport no.">
+        <div id="idFieldHint" class="hint hidden"></div>
+      </label>
       <div class="photo-btns">
         <label class="btn photo-btn">
           <input id="eidFile" type="file" accept="image/*,application/pdf" multiple>
@@ -380,6 +383,8 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
         <label class="field"><span>Age</span><select id="ageMode"></select></label>
         <label class="field hidden" id="ageMonthsWrap" style="margin-top:12px"><span>Age in months</span><select id="ageMonths"></select></label>
       </div>
+      <label class="field"><span>Country of birth</span><input id="countryOfBirth" type="text" autocomplete="off" placeholder="e.g. South Africa"></label>
+      <label class="field"><span>Country (from)</span><input id="countryFrom" type="text" autocomplete="off" placeholder="Issuing country or country of residence"></label>
       <label class="field"><span>Cellphone</span><input id="cellphone" type="text" placeholder="e.g. +971 50 123 4567"></label>
     </div>
 
@@ -1231,7 +1236,9 @@ function mapEidNationality(raw) {
     addLine(patient, "Participant type", opts.participantType);
     addLine(patient, "Name", opts.patientName);
     addLine(patient, "Surname", opts.patientSurname);
-    addLine(patient, "EID / ID / Passport", opts.eid);
+    addLine(patient, "ID / Passport", opts.eid);
+    addLine(patient, "Country of birth", opts.countryOfBirth);
+    addLine(patient, "Country (from)", opts.countryFrom);
     addLine(patient, "Gender", opts.gender);
     addLine(patient, "Nationality", opts.nationality);
     if (isDobValid(opts.dateOfBirth)) addLine(patient, "DOB", opts.dateOfBirth);
@@ -1389,7 +1396,8 @@ function mapEidNationality(raw) {
     var field = el("eid");
     if (!field) return;
     var digits = String(state.eid || field.value || "").replace(/\D/g, "");
-    if (digits.length >= 15) {
+    var isEid = digits.length === 15 && /^784\d{12}$/.test(digits);
+    if (isEid) {
       if (eidAdvanceArmed) {
         eidAdvanceArmed = false;
         focusNextField(field);
@@ -1427,7 +1435,7 @@ function mapEidNationality(raw) {
   const state = {
     eventName: "", eventDate: "", dateBlurred: false, eventTime: "", timeBlurred: false, eventTimeOut: "", timeOutBlurred: false, callReceived: "", onScene: "", leavingScene: "", location: "",
     participantType: "", participantTypeOther: "", patientName: "", patientSurname: "", dateOfBirth: "", dobBlurred: false, ageMode: "", ageMonths: "", gender: "",
-    nationality: "", nationalityOther: "", eid: "", attachments: [], cellphone: "",
+    nationality: "", nationalityOther: "", eid: "", countryOfBirth: "", countryFrom: "", attachments: [], cellphone: "",
     complaint: "", description: "", allergies: "", medications: "", medicalHistory: "",
     condition: "", bpSys: "", bpDia: "", hr: "", rr: "", spo2: "", temp: "", hgt: "", extraVitals: [], gcsE: "", gcsV: "", gcsM: "", treatment: "", outcome: "", outcomeOther: "", hospital: "",
     nextOfKinName: "", relationship: "", nextOfKinNumber: "", completedBy: "", callSign: "",
@@ -1454,6 +1462,8 @@ function mapEidNationality(raw) {
       gender: state.gender,
       nationality: state.nationality === "Other" ? state.nationalityOther : state.nationality,
       eid: state.eid,
+      countryOfBirth: state.countryOfBirth,
+      countryFrom: state.countryFrom,
       cellphone: state.cellphone,
       complaint: state.complaint,
       description: state.description,
@@ -1687,7 +1697,7 @@ function mapEidNationality(raw) {
           location: state.location, participantType: state.participantType, participantTypeOther: state.participantTypeOther,
           patientName: state.patientName, patientSurname: state.patientSurname, dateOfBirth: state.dateOfBirth,
           ageMode: state.ageMode, ageMonths: state.ageMonths, gender: state.gender, nationality: state.nationality,
-          nationalityOther: state.nationalityOther, eid: state.eid, cellphone: state.cellphone, complaint: state.complaint,
+          nationalityOther: state.nationalityOther, eid: state.eid, countryOfBirth: state.countryOfBirth, countryFrom: state.countryFrom, cellphone: state.cellphone, complaint: state.complaint,
           description: state.description, allergies: state.allergies, medications: state.medications, medicalHistory: state.medicalHistory,
           condition: state.condition, bpSys: state.bpSys, bpDia: state.bpDia, hr: state.hr, rr: state.rr, spo2: state.spo2,
           temp: state.temp, hgt: state.hgt, extraVitals: state.extraVitals, gcsE: state.gcsE, gcsV: state.gcsV, gcsM: state.gcsM,
@@ -1699,7 +1709,7 @@ function mapEidNationality(raw) {
     }, 250);
   }
   function writeDraftFields(d) {
-    var keys = ["eventName","eventDate","eventTime","eventTimeOut","callReceived","onScene","leavingScene","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","ageMode","ageMonths","gender","nationality","nationalityOther","eid","cellphone","complaint","description","allergies","medications","medicalHistory","condition","bpSys","bpDia","hr","rr","spo2","temp","hgt","gcsE","gcsV","gcsM","treatment","outcome","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign"];
+    var keys = ["eventName","eventDate","eventTime","eventTimeOut","callReceived","onScene","leavingScene","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","ageMode","ageMonths","gender","nationality","nationalityOther","eid","countryOfBirth","countryFrom","cellphone","complaint","description","allergies","medications","medicalHistory","condition","bpSys","bpDia","hr","rr","spo2","temp","hgt","gcsE","gcsV","gcsM","treatment","outcome","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign"];
     keys.forEach(function (k) {
       if (typeof d[k] === "string") {
         state[k] = d[k];
@@ -1812,7 +1822,7 @@ function mapEidNationality(raw) {
     function clearForm() {
     if (!confirm("Clear this form? This also clears the saved draft.")) return;
     try { localStorage.removeItem(PD_STORAGE_KEY); } catch (err) {}
-    const keys = ["eventName","eventDate","eventTime","eventTimeOut","callReceived","onScene","leavingScene","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","eid","eidPaste","cellphone","complaint","description","allergies","medications","medicalHistory","bpSys","bpDia","hr","rr","spo2","temp","hgt","treatment","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign","nationalityOther"];
+    const keys = ["eventName","eventDate","eventTime","eventTimeOut","callReceived","onScene","leavingScene","location","participantType","participantTypeOther","patientName","patientSurname","dateOfBirth","eid","countryOfBirth","countryFrom","eidPaste","cellphone","complaint","description","allergies","medications","medicalHistory","bpSys","bpDia","hr","rr","spo2","temp","hgt","treatment","outcomeOther","hospital","nextOfKinName","relationship","nextOfKinNumber","completedBy","callSign","nationalityOther"];
     keys.forEach(function (k) { state[k] = ""; const n = el(k); if (n) n.value = ""; });
     state.dateBlurred = false;
     state.timeBlurred = false;
@@ -1841,6 +1851,7 @@ function mapEidNationality(raw) {
     clearAttachments();
     showShareNote("");
     clearAllFieldChecks();
+    if (typeof updateIdFieldHint === "function") updateIdFieldHint({ hint: "" });
     renderExtraVitals();
     refresh();
   }
@@ -1864,9 +1875,47 @@ function mapEidNationality(raw) {
     if (node && node.classList) node.classList.toggle("needs-check", !!on);
   }
   function clearAllFieldChecks() {
-    ["patientName", "patientSurname", "eid", "nationality", "gender", "dateOfBirth", "ageMode"].forEach(function (id) {
+    ["patientName", "patientSurname", "eid", "nationality", "gender", "dateOfBirth", "ageMode", "countryOfBirth", "countryFrom"].forEach(function (id) {
       markFieldCheck(id, false);
     });
+  }
+  function countryNameFromIso3(code) {
+    if (typeof MrzTd1 !== "undefined" && typeof MrzTd1.mapIso3ToCountry === "function") {
+      return MrzTd1.mapIso3ToCountry(code) || "";
+    }
+    return "";
+  }
+  function inferCountryFrom(parsed) {
+    parsed = parsed || {};
+    if (parsed.countryFrom) return parsed.countryFrom;
+    if (parsed.issuingState || parsed.issuer) {
+      return countryNameFromIso3(parsed.issuingState || parsed.issuer);
+    }
+    var idRaw = parsed.eid || parsed.docNumber || parsed.idNumber || "";
+    var norm = (typeof IdField !== "undefined" && IdField.normalizeIdField)
+      ? IdField.normalizeIdField(idRaw)
+      : { kind: "" };
+    if (norm.kind === "eid") return "United Arab Emirates";
+    if (norm.kind === "sa-id") return "South Africa";
+    return "";
+  }
+  function updateIdFieldHint(norm) {
+    var node = el("idFieldHint");
+    if (!node) return;
+    var hint = (norm && norm.hint) || "";
+    node.textContent = hint;
+    if (hint) node.classList.remove("hidden");
+    else node.classList.add("hidden");
+  }
+  function applyIdFieldValue(raw) {
+    var source = raw == null ? (state.eid || "") : raw;
+    var norm = (typeof IdField !== "undefined" && IdField.normalizeIdField)
+      ? IdField.normalizeIdField(source)
+      : { value: String(source || ""), hint: "" };
+    state.eid = norm.value;
+    if (el("eid")) el("eid").value = norm.value;
+    updateIdFieldHint(norm);
+    return norm;
   }
   function applyParsedCardFields(parsed) {
     parsed = parsed || {};
@@ -1874,7 +1923,8 @@ function mapEidNationality(raw) {
     const unread = [];
     const skipped = [];
     clearAllFieldChecks();
-    function take(label, key, elId, val) {
+    function take(label, key, elId, val, opts) {
+      opts = opts || {};
       if (val) {
         state[key] = val;
         if (elId && el(elId)) el(elId).value = val;
@@ -1883,12 +1933,23 @@ function mapEidNationality(raw) {
         return true;
       }
       unread.push(label);
-      if (elId) markFieldCheck(elId, true);
+      if (elId && !opts.optional) markFieldCheck(elId, true);
       return false;
     }
     take("Name", "patientName", "patientName", parsed.name);
     take("Surname", "patientSurname", "patientSurname", parsed.surname);
-    take("EID / ID / Passport", "eid", "eid", parsed.eid || parsed.docNumber || parsed.idNumber || "");
+    var idRaw = parsed.eid || parsed.docNumber || parsed.idNumber || "";
+    if (idRaw) {
+      applyIdFieldValue(idRaw);
+      filledNames.push("ID / Passport");
+      markFieldCheck("eid", false);
+    } else {
+      unread.push("ID / Passport");
+      markFieldCheck("eid", true);
+      updateIdFieldHint((typeof IdField !== "undefined" && IdField.normalizeIdField)
+        ? IdField.normalizeIdField(state.eid || "")
+        : { hint: "" });
+    }
     if (parsed.nationality) {
       state.nationality = parsed.nationality;
       if (el("nationality")) el("nationality").value = parsed.nationality;
@@ -1930,27 +1991,10 @@ function mapEidNationality(raw) {
     } else {
       unread.push("Date of birth");
       markFieldCheck("dateOfBirth", true);
-      if ((parsed.age || parsed.eid) && !state.ageMode) {
-        const year = birthYearFromEid(parsed.eid || "");
-        const a = year ? ageFromBirthYear(year) : "";
-        const n = Number(a);
-        if (a && isFinite(n) && n >= 1) {
-          state.ageMode = String(Math.min(n, 110));
-          state.ageMonths = "";
-          if (el("ageMode")) el("ageMode").value = state.ageMode;
-          if (el("ageMonths")) el("ageMonths").value = "";
-          if (!parsed.age) parsed.age = state.ageMode;
-          filledNames.push("Age");
-          markFieldCheck("ageMode", false);
-        } else {
-          unread.push("Age");
-          markFieldCheck("ageMode", true);
-        }
-      } else if (!parsed.age) {
-        unread.push("Age");
-        markFieldCheck("ageMode", true);
-      }
     }
+    take("Country of birth", "countryOfBirth", "countryOfBirth", parsed.countryOfBirth, { optional: parsed.cardKind !== "sa-front" });
+    var fromCountry = inferCountryFrom(parsed);
+    take("Country (from)", "countryFrom", "countryFrom", fromCountry, { optional: true });
     return { filledNames: filledNames, skipped: skipped, unread: unread };
   }
   function applyParsedToEmptyFields(parsed) {
@@ -2676,7 +2720,9 @@ function mapEidNationality(raw) {
     var filled = applied && applied.filledNames ? applied.filledNames : [];
     var missing = [];
     var nameMsg = unreadNameStatus(parsed);
-    if (!parsed.eid && !parsed.idNumber && !parsed.docNumber) missing.push("EID / ID / Passport");
+    if (!parsed.eid && !parsed.idNumber && !parsed.docNumber) missing.push("ID / Passport");
+    if (!parsed.countryOfBirth && parsed.cardKind === "sa-front") missing.push("Country of birth");
+    if (!parsed.countryFrom && !inferCountryFrom(parsed)) missing.push("Country (from)");
     if (!parsed.nationality) missing.push("Nationality");
     if (!parsed.gender) missing.push("Gender");
     if (!parsed.dob) missing.push("Date of birth");
@@ -3053,6 +3099,82 @@ function mapEidNationality(raw) {
     return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7, 14) + "-" + d.slice(14);
   }
 
+  var ISO3_TO_COUNTRY = {
+    ABW:"Aruba",AFG:"Afghanistan",AGO:"Angola",AIA:"Anguilla",
+    ALA:"Åland Islands",ALB:"Albania",AND:"Andorra",ARE:"United Arab Emirates",
+    ARG:"Argentina",ARM:"Armenia",ASM:"American Samoa",ATA:"Antarctica",
+    ATG:"Antigua and Barbuda",AUS:"Australia",AUT:"Austria",AZE:"Azerbaijan",
+    BDI:"Burundi",BEL:"Belgium",BEN:"Benin",BFA:"Burkina Faso",
+    BGD:"Bangladesh",BGR:"Bulgaria",BHR:"Bahrain",BHS:"Bahamas",
+    BIH:"Bosnia and Herzegovina",BLM:"Saint Barthélemy",BLR:"Belarus",BLZ:"Belize",
+    BMU:"Bermuda",BOL:"Bolivia",BRA:"Brazil",BRB:"Barbados",
+    BRN:"Brunei",BTN:"Bhutan",BWA:"Botswana",CAF:"Central African Republic",
+    CAN:"Canada",CHE:"Switzerland",CHL:"Chile",CHN:"China",
+    CIV:"Côte d'Ivoire",CMR:"Cameroon",COD:"Democratic Republic of the Congo",COG:"Congo",
+    COK:"Cook Islands",COL:"Colombia",COM:"Comoros",CPV:"Cabo Verde",
+    CRI:"Costa Rica",CUB:"Cuba",CUW:"Curaçao",CYM:"Cayman Islands",
+    CYP:"Cyprus",CZE:"Czechia",DEU:"Germany",DJI:"Djibouti",
+    DMA:"Dominica",DNK:"Denmark",DOM:"Dominican Republic",DZA:"Algeria",
+    ECU:"Ecuador",EGY:"Egypt",ERI:"Eritrea",ESH:"Western Sahara",
+    ESP:"Spain",EST:"Estonia",ETH:"Ethiopia",FIN:"Finland",
+    FJI:"Fiji",FLK:"Falkland Islands",FRA:"France",FRO:"Faroe Islands",
+    FSM:"Micronesia",GAB:"Gabon",GBD:"United Kingdom",GBN:"United Kingdom",
+    GBO:"United Kingdom",GBP:"United Kingdom",GBR:"United Kingdom",GBS:"United Kingdom",
+    GEO:"Georgia",GGY:"Guernsey",GHA:"Ghana",GIB:"Gibraltar",
+    GIN:"Guinea",GLP:"Guadeloupe",GMB:"Gambia",GNB:"Guinea-Bissau",
+    GNQ:"Equatorial Guinea",GRC:"Greece",GRD:"Grenada",GRL:"Greenland",
+    GTM:"Guatemala",GUM:"Guam",GUY:"Guyana",HKG:"Hong Kong",
+    HND:"Honduras",HRV:"Croatia",HTI:"Haiti",HUN:"Hungary",
+    IDN:"Indonesia",IMN:"Isle of Man",IND:"India",IRL:"Ireland",
+    IRN:"Iran",IRQ:"Iraq",ISL:"Iceland",ISR:"Israel",
+    ITA:"Italy",JAM:"Jamaica",JEY:"Jersey",JOR:"Jordan",
+    JPN:"Japan",KAZ:"Kazakhstan",KEN:"Kenya",KGZ:"Kyrgyzstan",
+    KHM:"Cambodia",KIR:"Kiribati",KNA:"Saint Kitts and Nevis",KOS:"Kosovo",
+    KOR:"South Korea",KWT:"Kuwait",LAO:"Laos",LBN:"Lebanon",
+    LBR:"Liberia",LBY:"Libya",LCA:"Saint Lucia",LIE:"Liechtenstein",
+    LKA:"Sri Lanka",LSO:"Lesotho",LTU:"Lithuania",LUX:"Luxembourg",
+    LVA:"Latvia",MAC:"Macao",MAF:"Saint Martin",MAR:"Morocco",
+    MCO:"Monaco",MDA:"Moldova",MDG:"Madagascar",MDV:"Maldives",
+    MEX:"Mexico",MHL:"Marshall Islands",MKD:"North Macedonia",MLI:"Mali",
+    MLT:"Malta",MMR:"Myanmar",MNE:"Montenegro",MNG:"Mongolia",
+    MNP:"Northern Mariana Islands",MOZ:"Mozambique",MRT:"Mauritania",MTQ:"Martinique",
+    MUS:"Mauritius",MWI:"Malawi",MYS:"Malaysia",MYT:"Mayotte",
+    NAM:"Namibia",NCL:"New Caledonia",NER:"Niger",NGA:"Nigeria",
+    NIC:"Nicaragua",NIU:"Niue",NLD:"Netherlands",NOR:"Norway",
+    NPL:"Nepal",NRU:"Nauru",NZL:"New Zealand",OMN:"Oman",
+    PAK:"Pakistan",PAN:"Panama",PCN:"Pitcairn",PER:"Peru",
+    PHL:"Philippines",PLW:"Palau",PNG:"Papua New Guinea",POL:"Poland",
+    PRI:"Puerto Rico",PRK:"North Korea",PRT:"Portugal",PRY:"Paraguay",
+    PSE:"Palestine",PYF:"French Polynesia",QAT:"Qatar",REU:"Réunion",
+    ROU:"Romania",RUS:"Russia",RWA:"Rwanda",SAU:"Saudi Arabia",
+    SDN:"Sudan",SEN:"Senegal",SGP:"Singapore",SGS:"South Georgia",
+    SHN:"Saint Helena",SJM:"Svalbard and Jan Mayen",SLB:"Solomon Islands",SLE:"Sierra Leone",
+    SLV:"El Salvador",SMR:"San Marino",SOM:"Somalia",SPM:"Saint Pierre and Miquelon",
+    SRB:"Serbia",SSD:"South Sudan",STP:"Sao Tome and Principe",SUR:"Suriname",
+    SVK:"Slovakia",SVN:"Slovenia",SWE:"Sweden",SWZ:"Eswatini",
+    SXM:"Sint Maarten",SYC:"Seychelles",SYR:"Syria",TCA:"Turks and Caicos Islands",
+    TCD:"Chad",TGO:"Togo",THA:"Thailand",TJK:"Tajikistan",
+    TKL:"Tokelau",TKM:"Turkmenistan",TLS:"Timor-Leste",TON:"Tonga",
+    TTO:"Trinidad and Tobago",TUN:"Tunisia",TUR:"Türkiye",TUV:"Tuvalu",
+    TWN:"Taiwan",TZA:"Tanzania",UGA:"Uganda",UKR:"Ukraine",
+    UMI:"United States Minor Outlying Islands",URY:"Uruguay",USA:"United States",UZB:"Uzbekistan",
+    VAT:"Vatican City",VCT:"Saint Vincent and the Grenadines",VEN:"Venezuela",VGB:"British Virgin Islands",
+    VIR:"U.S. Virgin Islands",VNM:"Vietnam",VUT:"Vanuatu",WLF:"Wallis and Futuna",
+    WSM:"Samoa",XKX:"Kosovo",YEM:"Yemen",ZAF:"South Africa",
+    ZMB:"Zambia",ZWE:"Zimbabwe"
+  };
+
+  function mapIso3ToCountry(code) {
+    code = toAlphaField(String(code || "").toUpperCase().replace(/</g, ""));
+    if (code.length === 3 && ISO3_TO_COUNTRY[code]) return ISO3_TO_COUNTRY[code];
+    if (code && code.length === 3 && code !== "XXX") return code;
+    return "";
+  }
+
+  function issuingStateFromLine1(l1) {
+    return toAlphaField(String(l1 || "").slice(2, 5).toUpperCase().replace(/</g, ""));
+  }
+
   function mapIso3ToForm(code) {
     code = toAlphaField(String(code || "").toUpperCase().replace(/</g, ""));
     if (code.length === 3 && ISO3_TO_FORM[code]) return { nationality: ISO3_TO_FORM[code], nationalityOther: "", iso3: code };
@@ -3184,6 +3306,9 @@ function mapEidNationality(raw) {
       nationality: "",
       nationalityOther: "",
       iso3: "",
+      issuingState: "",
+      countryFrom: "",
+      countryOfBirth: "",
       checks: { document: false, dob: false, expiry: false, composite: false },
       corrected: [],
       confidence: "fail"
@@ -3245,6 +3370,8 @@ function mapEidNationality(raw) {
     result.nationality = nat.nationality;
     result.nationalityOther = nat.nationalityOther;
     result.iso3 = nat.iso3;
+    result.issuingState = issuingStateFromLine1(l1);
+    result.countryFrom = mapIso3ToCountry(result.issuingState);
 
     var names = parseNameLine(l3);
     result.name = names.name;
@@ -3386,6 +3513,9 @@ function mapEidNationality(raw) {
       nationality: "",
       nationalityOther: "",
       iso3: "",
+      issuingState: "",
+      countryFrom: "",
+      countryOfBirth: "",
       checks: { document: false, dob: false, expiry: false, personalNumber: null, composite: false },
       corrected: [],
       confidence: "fail",
@@ -3411,6 +3541,8 @@ function mapEidNationality(raw) {
     var names = parseNameLine(l1.slice(5));
     result.name = names.name;
     result.surname = names.surname;
+    result.issuingState = issuingStateFromLine1(l1);
+    result.countryFrom = mapIso3ToCountry(result.issuingState);
 
     var docNum = l2.slice(0, 9);
     var docCheck = l2.charAt(9);
@@ -3562,6 +3694,9 @@ function mapEidNationality(raw) {
     parseMrz: parseMrz,
     looksLikeMrz: looksLikeMrz,
     mapIso3ToForm: mapIso3ToForm,
+    mapIso3ToCountry: mapIso3ToCountry,
+    issuingStateFromLine1: issuingStateFromLine1,
+    ISO3_TO_COUNTRY: ISO3_TO_COUNTRY,
     formatEid15: formatEid15,
     formatDobYymmdd: formatDobYymmdd,
     ISO3_TO_FORM: ISO3_TO_FORM,
@@ -3652,6 +3787,8 @@ function mapEidNationality(raw) {
       gender: "",
       nationality: "",
       citizenship: "",
+      countryOfBirth: "",
+      countryFrom: "",
       luhnOk: false,
       dateOk: false,
       rawText: "",
@@ -3699,6 +3836,7 @@ function mapEidNationality(raw) {
       result.citizenship = "";
       result.nationality = "";
     }
+    if (result.idNumber) result.countryFrom = "South Africa";
     result.ok = !!(result.idNumber && result.luhnOk && result.dateOk);
     return result;
   }
@@ -4152,6 +4290,18 @@ function mapEidNationality(raw) {
     return "";
   }
 
+  function mapSaFrontCountry(raw) {
+    var s = String(raw || "").toUpperCase().replace(/[^A-Z]/g, " ").replace(/\s+/g, " ").trim();
+    if (!s) return "";
+    if (s === "RSA" || s === "ZA" || s === "ZAF" || s === "SA" || s === "SOUTH AFRICA" || s === "SOUTH AFRICAN" || s === "REPUBLIC OF SOUTH AFRICA") {
+      return "South Africa";
+    }
+    return s.split(" ").map(function (w) {
+      if (!w) return w;
+      return w.charAt(0) + w.slice(1).toLowerCase();
+    }).join(" ");
+  }
+
   function prettySaName(s) {
     var x = stripSaNameJunk(s);
     if (!x) return "";
@@ -4253,6 +4403,8 @@ function mapEidNationality(raw) {
       result.notes.push("The printed nationality did not match the ID number; the nationality from the ID number was used.");
     }
     result.age = ageFromSaDob(result.dob, now);
+    result.countryOfBirth = mapSaFrontCountry(fields.countryOfBirth);
+    result.countryFrom = "South Africa";
     result.ok = !!(result.surname || result.name || result.idNumber);
     return result;
   }
@@ -4271,6 +4423,8 @@ function mapEidNationality(raw) {
       if (parsed.age) bits.push("age " + parsed.age);
       if (parsed.gender) bits.push(parsed.gender);
       if (parsed.nationality) bits.push(parsed.nationality);
+      if (parsed.countryOfBirth) bits.push("born in " + parsed.countryOfBirth);
+      if (parsed.countryFrom) bits.push("from " + parsed.countryFrom);
     }
     var msg = "SA ID front: " + (bits.length ? bits.join("; ") : "partial data") + ".";
     var nameMsg = unreadNameStatus(parsed);
@@ -4323,10 +4477,115 @@ function mapEidNationality(raw) {
     extractSaFrontNames: extractSaFrontNames,
     isSaNameValueLine: isSaNameValueLine,
     ageFromSaDob: ageFromSaDob,
-    unreadNameStatus: unreadNameStatus
+    unreadNameStatus: unreadNameStatus,
+    mapSaFrontCountry: mapSaFrontCountry
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.SaId = api;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+/* ID / Passport field helpers. Works in the browser and in Node. */
+(function (root) {
+  "use strict";
+  var ID_FIELD_MAX = 25;
+  var EID_LUHN_FAIL = "Emirates ID check failed, please check it";
+  var SA_ID_HINT = "SA ID";
+
+  function idDigitsOnly(value) {
+    return String(value || "").replace(/\D/g, "");
+  }
+
+  function luhnOkAny(digits) {
+    var s = String(digits || "");
+    if (!/^\d+$/.test(s) || !s.length) return false;
+    var sum = 0, i, n;
+    for (i = 0; i < s.length; i++) {
+      n = s.charCodeAt(i) - 48;
+      if (i % 2 === 1) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+    }
+    return sum % 10 === 0;
+  }
+
+  function eidLuhnOk(digits) {
+    var s = idDigitsOnly(digits);
+    if (!/^\d{15}$/.test(s) || !/^784/.test(s)) return false;
+    return luhnOkAny(s);
+  }
+
+  function saIdLuhnOk(digits) {
+    var s = idDigitsOnly(digits);
+    if (!/^\d{13}$/.test(s)) return false;
+    if (typeof SaId !== "undefined" && typeof SaId.luhnOk === "function") return SaId.luhnOk(s);
+    return luhnOkAny(s);
+  }
+
+  function formatEidExact(digits) {
+    var d = idDigitsOnly(digits);
+    if (!/^784\d{12}$/.test(d)) return "";
+    return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7, 14) + "-" + d.slice(14);
+  }
+
+  function sanitizeIdFieldInput(value) {
+    var s = String(value || "").toUpperCase().replace(/[^A-Z0-9 \-]/g, "");
+    if (s.length > ID_FIELD_MAX) s = s.slice(0, ID_FIELD_MAX);
+    return s;
+  }
+
+  function compactIdChars(value) {
+    return String(value || "").replace(/[\s\-]/g, "");
+  }
+
+  function isExactDigitId(cleaned) {
+    var compact = compactIdChars(cleaned);
+    return !!compact && /^\d+$/.test(compact);
+  }
+
+  function normalizeIdField(value) {
+    var cleaned = sanitizeIdFieldInput(value);
+    var digits = idDigitsOnly(cleaned);
+    var compact = compactIdChars(cleaned);
+    var hint = "";
+    var kind = "";
+    var valueOut = cleaned;
+    var luhnOk = null;
+
+    if (isExactDigitId(cleaned) && digits.length === 15 && /^784\d{12}$/.test(digits)) {
+      valueOut = formatEidExact(digits);
+      kind = "eid";
+      luhnOk = eidLuhnOk(digits);
+      if (!luhnOk) hint = EID_LUHN_FAIL;
+    } else if (isExactDigitId(cleaned) && digits.length === 13 && saIdLuhnOk(digits)) {
+      kind = "sa-id";
+      luhnOk = true;
+      hint = SA_ID_HINT;
+      valueOut = cleaned;
+    }
+    return {
+      value: valueOut,
+      hint: hint,
+      kind: kind,
+      luhnOk: luhnOk,
+      digits: digits
+    };
+  }
+
+  var api = {
+    ID_FIELD_MAX: ID_FIELD_MAX,
+    EID_LUHN_FAIL: EID_LUHN_FAIL,
+    SA_ID_HINT: SA_ID_HINT,
+    idDigitsOnly: idDigitsOnly,
+    eidLuhnOk: eidLuhnOk,
+    saIdLuhnOk: saIdLuhnOk,
+    formatEidExact: formatEidExact,
+    sanitizeIdFieldInput: sanitizeIdFieldInput,
+    normalizeIdField: normalizeIdField
+  };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.IdField = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
 
 
@@ -4359,6 +4618,8 @@ function mapEidNationality(raw) {
     if (parsed.nationality) {
       bits.push(parsed.nationality === "Other" && parsed.nationalityOther ? parsed.nationalityOther : parsed.nationality);
     }
+    if (parsed.countryFrom) bits.push("from " + parsed.countryFrom);
+    if (parsed.countryOfBirth) bits.push("born in " + parsed.countryOfBirth);
     var failed = [];
     if (parsed.checks) {
       if (!parsed.checks.document) failed.push("document number");
@@ -5059,29 +5320,30 @@ function mapEidNationality(raw) {
   bindFastFill();
   el("nationality").addEventListener("change", function () { state.nationality = el("nationality").value; if (typeof markFieldCheck === "function") markFieldCheck("nationality", false); touchForm(); refresh(); });
   bind("nationalityOther", "nationalityOther");
+  bind("countryOfBirth", "countryOfBirth");
+  bind("countryFrom", "countryFrom");
   el("eid").addEventListener("input", function () {
-    state.eid = el("eid").value;
-    const formatted = parseEidNumber(state.eid);
-    if (formatted) {
-      state.eid = formatted;
-      el("eid").value = formatted;
-      if (!state.ageMode) {
-        const year = birthYearFromEid(formatted);
-        const a = year ? ageFromBirthYear(year) : "";
-        if (a) {
-          const n = Number(a);
-          if (isFinite(n) && n >= 1) {
-            state.ageMode = String(Math.min(n, 110));
-            state.ageMonths = "";
-            el("ageMode").value = state.ageMode;
-            el("ageMonths").value = "";
-          }
+    var field = el("eid");
+    var start = field.selectionStart;
+    var end = field.selectionEnd;
+    var old = field.value;
+    var norm = applyIdFieldValue(old);
+    if (old !== norm.value) {
+      try {
+        if (norm.kind === "eid") field.setSelectionRange(norm.value.length, norm.value.length);
+        else {
+          var delta = norm.value.length - old.length;
+          var nextStart = Math.max(0, Math.min(norm.value.length, (typeof start === "number" ? start : norm.value.length) + (delta < 0 ? delta : 0)));
+          var nextEnd = Math.max(0, Math.min(norm.value.length, (typeof end === "number" ? end : nextStart) + (delta < 0 ? delta : 0)));
+          field.setSelectionRange(nextStart, nextEnd);
         }
-      }
+      } catch (err) {}
     }
+    if (typeof markFieldCheck === "function") markFieldCheck("eid", false);
     touchForm();
     refresh();
-    maybeAdvanceEid();
+    if (norm.kind === "eid") maybeAdvanceEid();
+    else eidAdvanceArmed = true;
   });
   el("readCard").addEventListener("click", function () { readCard(); });
   el("readMrz").addEventListener("click", function () { readMrz(); });
@@ -5179,6 +5441,7 @@ function mapEidNationality(raw) {
   });
   loadTheme();
   restoreDraft();
+  applyIdFieldValue(state.eid);
   renderExtraVitals();
   draftReady = true;
 
@@ -5208,6 +5471,10 @@ function mapEidNationality(raw) {
     applyParsedCardFields: applyParsedCardFields,
     formatReadCardDone: formatReadCardDone,
     unreadNameStatus: unreadNameStatus,
+    normalizeIdField: (typeof IdField !== "undefined" ? IdField.normalizeIdField : null),
+    applyIdFieldValue: applyIdFieldValue,
+    inferCountryFrom: inferCountryFrom,
+    updateIdFieldHint: updateIdFieldHint,
   };
   refresh();
 })();
