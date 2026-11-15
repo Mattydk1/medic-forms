@@ -297,20 +297,6 @@ button.clear-form-btn {
         </div>
       </div>
     </div>
-    <div class="quick-times" id="quickTimes">
-      <span class="quick-time">
-        <button type="button" data-time-key="callReceived" data-label="Call received">Call received</button>
-        <button type="button" class="time-clear hidden" data-clear-time="callReceived" hidden aria-label="Clear Call received">✕</button>
-      </span>
-      <span class="quick-time">
-        <button type="button" data-time-key="onScene" data-label="On scene">On scene</button>
-        <button type="button" class="time-clear hidden" data-clear-time="onScene" hidden aria-label="Clear On scene">✕</button>
-      </span>
-      <span class="quick-time">
-        <button type="button" data-time-key="leavingScene" data-label="Leaving scene">Leaving scene</button>
-        <button type="button" class="time-clear hidden" data-clear-time="leavingScene" hidden aria-label="Clear Leaving scene">✕</button>
-      </span>
-    </div>
     <label class="field" style="margin-top:12px"><span>Location / area</span><input id="location" type="text" placeholder="e.g. Hall A, west entrance"></label>
 
     <h2>Patient details</h2>
@@ -1211,9 +1197,6 @@ function mapEidNationality(raw) {
     if (parseDateDDMMYYYY(opts.eventDate)) addLine(event, "Date", opts.eventDate);
     if (parseHHMM(opts.eventTime) != null) addLine(event, "Time in", opts.eventTime);
     if (parseHHMM(opts.eventTimeOut) != null) addLine(event, "Time out", opts.eventTimeOut);
-    if (parseHHMM(opts.callReceived) != null) addLine(event, "Call received", opts.callReceived);
-    if (parseHHMM(opts.onScene) != null) addLine(event, "On scene", opts.onScene);
-    if (parseHHMM(opts.leavingScene) != null) addLine(event, "Leaving scene", opts.leavingScene);
     addLine(event, "Location", opts.location);
     addSection(lines, "EVENT", event);
     const patient = [];
@@ -1776,17 +1759,6 @@ function mapEidNationality(raw) {
     });
   }
   function syncPreviewButtons() {
-    document.querySelectorAll("#quickTimes [data-time-key]").forEach(function (btn) {
-      var key = btn.getAttribute("data-time-key");
-      var value = state[key] || "";
-      btn.textContent = btn.getAttribute("data-label") + (value ? (": " + value) : "");
-      btn.classList.toggle("is-on", Boolean(value));
-      var clearBtn = document.querySelector('#quickTimes [data-clear-time="' + key + '"]');
-      if (clearBtn) {
-        clearBtn.hidden = !value;
-        clearBtn.classList.toggle("hidden", !value);
-      }
-    });
     var nkda = el("nkdaBtn");
     if (nkda) nkda.classList.toggle("is-on", String(state.allergies || "").trim().toLowerCase() === NKDA_TEXT.toLowerCase());
     var nomeds = el("noMedsBtn");
@@ -3568,24 +3540,6 @@ function mapEidNationality(raw) {
     state.eventTimeOut = formatNowTime();
     state.timeOutBlurred = true;
     el("eventTimeOut").value = state.eventTimeOut;
-    touchForm();
-    refresh();
-  });
-  el("quickTimes").addEventListener("click", function (e) {
-    var clearBtn = e.target.closest("[data-clear-time]");
-    if (clearBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      var clearKey = clearBtn.getAttribute("data-clear-time");
-      state[clearKey] = "";
-      touchForm();
-      refresh();
-      return;
-    }
-    var btn = e.target.closest("[data-time-key]");
-    if (!btn) return;
-    var key = btn.getAttribute("data-time-key");
-    state[key] = formatNowTime();
     touchForm();
     refresh();
   });
