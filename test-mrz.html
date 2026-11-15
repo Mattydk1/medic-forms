@@ -269,6 +269,107 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) .test-banner { background: #f0c36b; color: #3a2d12; }
 }
+/* Optional MRZ crop step (test page only) */
+.mrz-crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  background: #0b0c0e;
+  color: var(--fg);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  overscroll-behavior: none;
+}
+.mrz-crop-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.mrz-crop-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.mrz-crop-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  touch-action: none;
+  cursor: move;
+  z-index: 1;
+}
+.mrz-crop-handle {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  z-index: 2;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.mrz-crop-handle::after {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background: #ffffff;
+  border: 3px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+.mrz-crop-handle[data-handle="nw"] { left: -22px; top: -22px; cursor: nwse-resize; }
+.mrz-crop-handle[data-handle="nw"]::after { left: 11px; top: 11px; }
+.mrz-crop-handle[data-handle="ne"] { right: -22px; top: -22px; cursor: nesw-resize; }
+.mrz-crop-handle[data-handle="ne"]::after { right: 11px; top: 11px; }
+.mrz-crop-handle[data-handle="sw"] { left: -22px; bottom: -22px; cursor: nesw-resize; }
+.mrz-crop-handle[data-handle="sw"]::after { left: 11px; bottom: 11px; }
+.mrz-crop-handle[data-handle="se"] { right: -22px; bottom: -22px; cursor: nwse-resize; }
+.mrz-crop-handle[data-handle="se"]::after { right: 11px; bottom: 11px; }
+.mrz-crop-bar {
+  flex: 0 0 auto;
+  padding: 12px 14px 14px;
+  background: var(--bg-card);
+  color: var(--fg);
+  border-top: 1px solid var(--border);
+}
+.mrz-crop-hint {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.mrz-crop-bar #mrzCropRead {
+  width: 100%;
+  min-height: 56px;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+.mrz-crop-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mrz-crop-row button {
+  flex: 1 1 30%;
+  min-height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
 </style>
 </head>
 <body>
@@ -352,7 +453,7 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
         <button type="button" id="readCard">Read card</button>
         <button type="button" id="readMrz">Read ID / passport code (MRZ)</button>
       </div>
-      <div class="hint" style="margin-top:6px">Works on the back of Emirates ID and other GCC IDs, and the photo page of passports. Photo of the whole page is fine. A PDF scan is also fine. You don't need to crop or rotate first. Photos stay on this device.</div>
+      <div class="hint" style="margin-top:6px">Works on the back of Emirates ID and other GCC IDs, and the photo page of passports. After you tap the button, you can drag a box over the code lines, or use the whole photo. A PDF scan is also fine. Photos stay on this device.</div>
       <div id="eidFillNote" class="hint hidden" style="margin-top:8px"></div>
       <label class="field" style="margin-top:10px">
         <span>Paste card text</span>
@@ -468,6 +569,27 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     <button type="button" id="clearForm" class="clear-form-btn">Clear form</button>
     <div id="shareNote" class="hint hidden" style="margin-top:8px"></div>
   </div>
+  <div id="mrzCropOverlay" class="mrz-crop-overlay hidden" hidden role="dialog" aria-modal="true" aria-labelledby="mrzCropTitle">
+    <div id="mrzCropStage" class="mrz-crop-stage">
+      <canvas id="mrzCropCanvas"></canvas>
+      <div id="mrzCropBox" class="mrz-crop-box" aria-label="Code area">
+        <button type="button" class="mrz-crop-handle" data-handle="nw" aria-label="Resize from top left"></button>
+        <button type="button" class="mrz-crop-handle" data-handle="ne" aria-label="Resize from top right"></button>
+        <button type="button" class="mrz-crop-handle" data-handle="sw" aria-label="Resize from bottom left"></button>
+        <button type="button" class="mrz-crop-handle" data-handle="se" aria-label="Resize from bottom right"></button>
+      </div>
+    </div>
+    <div class="mrz-crop-bar">
+      <p id="mrzCropTitle" class="mrz-crop-hint">Drag the box over the code lines, then tap Read this area.</p>
+      <button type="button" id="mrzCropRead" class="primary">Read this area</button>
+      <div class="mrz-crop-row">
+        <button type="button" id="mrzCropWhole">Use whole photo</button>
+        <button type="button" id="mrzCropRotate">Turn 90°</button>
+        <button type="button" id="mrzCropCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
 (function () {
   "use strict";
@@ -6064,8 +6186,345 @@ function mapEidNationality(raw) {
     }
   }
 
+  var MRZ_CROP_LOCATE_MS = 600;
+  var mrzCropState = null;
+  var mrzCropWait = null;
+
+  function sourceToCanvas(src) {
+    if (src && src.getContext) return src;
+    return mrzCropCanvas(src, 0, 0, src.width, src.height);
+  }
+
+  function clampMrzCropBox(box, sw, sh) {
+    sw = Math.max(1, sw || 1);
+    sh = Math.max(1, sh || 1);
+    var minW = Math.max(32, Math.min(120, sw * 0.18));
+    var minH = Math.max(24, Math.min(48, sh * 0.12));
+    if (minW > sw) minW = sw;
+    if (minH > sh) minH = sh;
+    var x = Number(box && box.x) || 0;
+    var y = Number(box && box.y) || 0;
+    var w = Number(box && box.w) || 0;
+    var h = Number(box && box.h) || 0;
+    if (w < minW) w = minW;
+    if (h < minH) h = minH;
+    if (w > sw) w = sw;
+    if (h > sh) h = sh;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x + w > sw) x = sw - w;
+    if (y + h > sh) y = sh - h;
+    if (x < 0) { x = 0; w = sw; }
+    if (y < 0) { y = 0; h = sh; }
+    return { x: x, y: y, w: w, h: h };
+  }
+
+  // Default box: around auto-found code lines, or the bottom third (passport code),
+  // or almost the whole photo if it is already a short wide strip.
+  function defaultMrzCropRect(src, loc) {
+    var w = (src && src.width) || 0;
+    var h = (src && src.height) || 0;
+    if (w < 1 || h < 1) return { x: 0, y: 0, w: 1, h: 1 };
+    if (loc && loc.w > 20 && loc.h > 10) {
+      var padX = Math.max(8, loc.charH || 16);
+      var padY = Math.max(8, (loc.charH || 16) * 0.8);
+      var x0 = Math.max(0, loc.x - padX);
+      var y0 = Math.max(0, loc.y - padY);
+      var x1 = Math.min(w, loc.x + loc.w + padX);
+      var y1 = Math.min(h, loc.y + loc.h + padY);
+      return clampMrzCropBox({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, w, h);
+    }
+    if (h <= w * 0.45) {
+      var m = Math.max(2, Math.round(Math.min(w, h) * 0.02));
+      return clampMrzCropBox({ x: m, y: m, w: w - m * 2, h: h - m * 2 }, w, h);
+    }
+    var marginX = Math.max(4, Math.round(w * 0.02));
+    var boxH = Math.max(1, h / 3);
+    return clampMrzCropBox({
+      x: marginX,
+      y: Math.max(0, h - boxH - Math.round(h * 0.03)),
+      w: w - marginX * 2,
+      h: boxH
+    }, w, h);
+  }
+
+  function quickMrzCropRect(src) {
+    var loc = null;
+    var t0 = Date.now();
+    try { loc = mrzLocate(src); } catch (err) { loc = null; }
+    if (loc && (Date.now() - t0) > MRZ_CROP_LOCATE_MS) {
+      if (!(loc.rows >= 2 && (loc.score || 0) >= 80)) loc = null;
+    }
+    return defaultMrzCropRect(src, loc);
+  }
+
+  function applyMrzCrop(src, rect) {
+    var box = clampMrzCropBox(rect || { x: 0, y: 0, w: src.width, h: src.height }, src.width, src.height);
+    return mrzCropCanvas(src, box.x, box.y, box.w, box.h);
+  }
+
+  function mrzCropPointerPos(ev) {
+    var stage = el("mrzCropStage");
+    var r = stage.getBoundingClientRect();
+    return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+  }
+
+  function syncMrzCropBoxEl() {
+    if (!mrzCropState || !mrzCropState.disp) return;
+    var boxEl = el("mrzCropBox");
+    if (!boxEl) return;
+    var d = mrzCropState.disp;
+    var b = mrzCropState.box;
+    boxEl.style.left = (d.x + b.x * d.scale) + "px";
+    boxEl.style.top = (d.y + b.y * d.scale) + "px";
+    boxEl.style.width = (b.w * d.scale) + "px";
+    boxEl.style.height = (b.h * d.scale) + "px";
+  }
+
+  function layoutMrzCrop() {
+    if (!mrzCropState || !mrzCropState.open || !mrzCropState.src) return;
+    var stage = el("mrzCropStage");
+    var canvas = el("mrzCropCanvas");
+    if (!stage || !canvas) return;
+    var src = mrzCropState.src;
+    var sw = src.width, sh = src.height;
+    var rect = stage.getBoundingClientRect();
+    var dw = Math.max(1, Math.floor(rect.width));
+    var dh = Math.max(1, Math.floor(rect.height));
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.max(1, Math.round(dw * dpr));
+    canvas.height = Math.max(1, Math.round(dh * dpr));
+    canvas.style.width = dw + "px";
+    canvas.style.height = dh + "px";
+    var inset = 26;
+    var innerW = Math.max(1, dw - inset * 2);
+    var innerH = Math.max(1, dh - inset * 2);
+    var scale = Math.min(innerW / sw, innerH / sh);
+    var vw = sw * scale, vh = sh * scale;
+    var vx = (dw - vw) / 2, vy = (dh - vh) / 2;
+    mrzCropState.disp = { x: vx, y: vy, w: vw, h: vh, scale: scale, dw: dw, dh: dh };
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, dw, dh);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(src, 0, 0, sw, sh, vx, vy, vw, vh);
+    mrzCropState.box = clampMrzCropBox(mrzCropState.box, sw, sh);
+    syncMrzCropBoxEl();
+  }
+
+  function onMrzCropResize() {
+    if (mrzCropState && mrzCropState.open) layoutMrzCrop();
+  }
+
+  function onMrzCropPointerDown(ev) {
+    if (!mrzCropState || !mrzCropState.open) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (mrzCropState.drag) return;
+    mrzCropState.touched = true;
+    var handle = ev.currentTarget.getAttribute("data-handle") || "move";
+    var pt = mrzCropPointerPos(ev);
+    var b = mrzCropState.box;
+    mrzCropState.drag = {
+      handle: handle,
+      pointerId: ev.pointerId,
+      startX: pt.x,
+      startY: pt.y,
+      orig: { x: b.x, y: b.y, w: b.w, h: b.h }
+    };
+    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (eCap) {}
+  }
+
+  function onMrzCropPointerMove(ev) {
+    if (!mrzCropState || !mrzCropState.drag) return;
+    if (ev.pointerId !== mrzCropState.drag.pointerId) return;
+    ev.preventDefault();
+    var d = mrzCropState.disp;
+    if (!d || !d.scale) return;
+    var pt = mrzCropPointerPos(ev);
+    var dx = (pt.x - mrzCropState.drag.startX) / d.scale;
+    var dy = (pt.y - mrzCropState.drag.startY) / d.scale;
+    var o = mrzCropState.drag.orig;
+    var handle = mrzCropState.drag.handle;
+    var box;
+    if (handle === "move") {
+      box = { x: o.x + dx, y: o.y + dy, w: o.w, h: o.h };
+    } else {
+      var x0 = o.x, y0 = o.y, x1 = o.x + o.w, y1 = o.y + o.h;
+      if (handle.indexOf("w") !== -1) x0 = o.x + dx;
+      if (handle.indexOf("e") !== -1) x1 = o.x + o.w + dx;
+      if (handle.indexOf("n") !== -1) y0 = o.y + dy;
+      if (handle.indexOf("s") !== -1) y1 = o.y + o.h + dy;
+      if (x1 < x0) { var tx = x0; x0 = x1; x1 = tx; }
+      if (y1 < y0) { var ty = y0; y0 = y1; y1 = ty; }
+      box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    }
+    mrzCropState.box = clampMrzCropBox(box, mrzCropState.src.width, mrzCropState.src.height);
+    syncMrzCropBoxEl();
+  }
+
+  function onMrzCropPointerUp(ev) {
+    if (!mrzCropState || !mrzCropState.drag) return;
+    if (ev && ev.pointerId !== mrzCropState.drag.pointerId) return;
+    ev.preventDefault();
+    try { ev.currentTarget.releasePointerCapture(ev.pointerId); } catch (eRel) {}
+    mrzCropState.drag = null;
+  }
+
+  function onMrzCropKey(ev) {
+    if (!mrzCropState || !mrzCropState.open) return;
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      finishMrzCrop("cancel");
+    }
+  }
+
+  function closeMrzCropUI() {
+    var ov = el("mrzCropOverlay");
+    if (ov) {
+      ov.classList.add("hidden");
+      ov.setAttribute("hidden", "");
+    }
+    if (mrzCropState && mrzCropState.prevOverflow != null) {
+      document.body.style.overflow = mrzCropState.prevOverflow;
+    }
+    window.removeEventListener("resize", onMrzCropResize);
+    if (window.visualViewport) window.visualViewport.removeEventListener("resize", onMrzCropResize);
+    document.removeEventListener("keydown", onMrzCropKey);
+    if (mrzCropState) mrzCropState.open = false;
+  }
+
+  function finishMrzCrop(action) {
+    if (!mrzCropWait) return;
+    var resolve = mrzCropWait;
+    mrzCropWait = null;
+    var src = mrzCropState && mrzCropState.src;
+    var box = mrzCropState && mrzCropState.box;
+    var canvas = null;
+    if (action === "crop" && src && box) canvas = applyMrzCrop(src, box);
+    var rotated = !!(mrzCropState && mrzCropState.rotated);
+    closeMrzCropUI();
+    resolve({ action: action, canvas: canvas, src: src, box: box, rotated: rotated });
+  }
+
+  function rotateMrzCrop() {
+    if (!mrzCropState || !mrzCropState.open || !mrzCropState.src) return;
+    mrzCropState.src = mrzDrawRotated(mrzCropState.src, 90);
+    mrzCropState.rotated = true;
+    mrzCropState.touched = false;
+    mrzCropState.box = defaultMrzCropRect(mrzCropState.src, null);
+    layoutMrzCrop();
+    window.setTimeout(function () {
+      if (!mrzCropState || !mrzCropState.open || mrzCropState.touched) return;
+      try { mrzCropState.box = quickMrzCropRect(mrzCropState.src); } catch (eRot) {}
+      if (mrzCropState && mrzCropState.open) layoutMrzCrop();
+    }, 0);
+  }
+
+  function bindMrzCropUi() {
+    var box = el("mrzCropBox");
+    var handles, i;
+    if (box && !box._mrzBound) {
+      box._mrzBound = true;
+      box.addEventListener("pointerdown", onMrzCropPointerDown);
+      box.addEventListener("pointermove", onMrzCropPointerMove);
+      box.addEventListener("pointerup", onMrzCropPointerUp);
+      box.addEventListener("pointercancel", onMrzCropPointerUp);
+      handles = box.querySelectorAll(".mrz-crop-handle");
+      for (i = 0; i < handles.length; i++) {
+        handles[i].addEventListener("pointerdown", onMrzCropPointerDown);
+        handles[i].addEventListener("pointermove", onMrzCropPointerMove);
+        handles[i].addEventListener("pointerup", onMrzCropPointerUp);
+        handles[i].addEventListener("pointercancel", onMrzCropPointerUp);
+      }
+    }
+    function bindBtn(id, fn) {
+      var b = el(id);
+      if (b && !b._mrzBound) {
+        b._mrzBound = true;
+        b.addEventListener("click", fn);
+      }
+    }
+    bindBtn("mrzCropRead", function () { finishMrzCrop("crop"); });
+    bindBtn("mrzCropWhole", function () { finishMrzCrop("whole"); });
+    bindBtn("mrzCropRotate", function () { rotateMrzCrop(); });
+    bindBtn("mrzCropCancel", function () { finishMrzCrop("cancel"); });
+  }
+
+  function openMrzCropUI(src) {
+    bindMrzCropUi();
+    return new Promise(function (resolve) {
+      if (mrzCropWait) {
+        var old = mrzCropWait;
+        mrzCropWait = null;
+        closeMrzCropUI();
+        old({ action: "cancel", canvas: null, src: src, box: null });
+      }
+      var canvas = sourceToCanvas(src);
+      var ov = el("mrzCropOverlay");
+      if (!ov) {
+        resolve({ action: "whole", canvas: null, src: canvas, box: defaultMrzCropRect(canvas, null) });
+        return;
+      }
+      mrzCropState = {
+        src: canvas,
+        box: defaultMrzCropRect(canvas, null),
+        disp: { x: 0, y: 0, w: 1, h: 1, scale: 1 },
+        drag: null,
+        rotated: false,
+        touched: false,
+        prevOverflow: document.body.style.overflow,
+        open: true
+      };
+      ov.classList.remove("hidden");
+      ov.removeAttribute("hidden");
+      document.body.style.overflow = "hidden";
+      window.addEventListener("resize", onMrzCropResize);
+      if (window.visualViewport) window.visualViewport.addEventListener("resize", onMrzCropResize);
+      document.addEventListener("keydown", onMrzCropKey);
+      layoutMrzCrop();
+      window.requestAnimationFrame(function () { layoutMrzCrop(); });
+      mrzCropWait = resolve;
+      var readBtn = el("mrzCropRead");
+      if (readBtn) try { readBtn.focus(); } catch (eF) {}
+      window.setTimeout(function () {
+        if (!mrzCropState || !mrzCropState.open || mrzCropState.touched) return;
+        try { mrzCropState.box = quickMrzCropRect(mrzCropState.src); } catch (eQ) {}
+        if (mrzCropState && mrzCropState.open && !mrzCropState.touched) layoutMrzCrop();
+      }, 0);
+    });
+  }
+
+  async function canvasFromMrzFile(file, onStatus) {
+    if (isProbablyPdf(file)) {
+      if (onStatus) onStatus("Opening PDF…");
+      var pdfjs = await loadPdfJsLibrary(onStatus);
+      var data = await file.arrayBuffer();
+      var loading = pdfjs.getDocument({ data: new Uint8Array(data), isEvalSupported: false, disableFontFace: false });
+      var pdf;
+      try {
+        pdf = await withTimeout(loading.promise, PDF_RENDER_MS, "This PDF is taking too long to open. Try a photo of the page instead.");
+      } catch (err) {
+        var msg = err && err.message ? String(err.message) : String(err || "");
+        if (/password/i.test(msg)) throw new Error("This PDF is locked. Save the page as a photo and try that, or use an unlocked PDF.");
+        throw err;
+      }
+      var canvas = await renderPdfPageToCanvas(pdf, 1);
+      if (pdf && pdf.destroy) try { await pdf.destroy(); } catch (eD) {}
+      return { src: canvas, isPdf: true, file: file };
+    }
+    if (onStatus) onStatus("Opening photo…");
+    var src = await loadMrzSource(file);
+    var canvas = sourceToCanvas(src);
+    if (src !== canvas && src.close) try { src.close(); } catch (eC) {}
+    return { src: canvas, isPdf: false, file: file };
+  }
+
+
   async function readMrz() {
-    showEidOcrStatus("Loading MRZ reader...");
     var images = collectMrzSourceItems(state.attachments || []);
     if (!images.length) {
       showEidOcrStatus("Take or attach a photo (or a PDF scan) of the ID back or passport photo page first. A photo of the whole page is fine — you don't need to crop to the code lines.");
@@ -6074,18 +6533,35 @@ function mapEidNationality(raw) {
     var btn = el("readMrz");
     var other = el("readCard");
     var prev = btn ? btn.textContent : "";
-    if (btn) { btn.disabled = true; btn.textContent = "Reading MRZ…"; }
+    if (btn) { btn.disabled = true; btn.textContent = "Choose area…"; }
     if (other) other.disabled = true;
     var worker = null;
     try {
-      var Tesseract = await loadTesseractLibrary(showEidOcrStatus);
-      worker = await createMrzOcrWorker(Tesseract, showEidOcrStatus);
       var best = { text: "", parsed: null, score: -1 };
       var i;
       for (i = 0; i < images.length; i++) {
         var file = images[i].file || images[i];
-        if (images.length > 1) showEidOcrStatus("Reading photo " + (i + 1) + " of " + images.length + "...");
-        var one = await recognizeMrzPhoto(worker, file, showEidOcrStatus);
+        var nOf = images.length > 1 ? ("Photo " + (i + 1) + " of " + images.length + ". ") : "";
+        showEidOcrStatus(nOf + "Choose the code area…");
+        var prepared = await canvasFromMrzFile(file, showEidOcrStatus);
+        var choice = await openMrzCropUI(prepared.src);
+        if (!choice || choice.action === "cancel") {
+          showEidOcrStatus("Cancelled. No details were filled.");
+          return null;
+        }
+        showEidOcrStatus(nOf + "Loading MRZ reader...");
+        if (btn) btn.textContent = "Reading MRZ…";
+        if (!worker) {
+          var Tesseract = await loadTesseractLibrary(showEidOcrStatus);
+          worker = await createMrzOcrWorker(Tesseract, showEidOcrStatus);
+        }
+        var one;
+        if (choice.action === "whole" && prepared.isPdf && !choice.rotated) {
+          one = await recognizeMrzPdf(worker, file, showEidOcrStatus);
+        } else {
+          var src = (choice.action === "crop" && choice.canvas) ? choice.canvas : (choice.src || prepared.src);
+          one = await recognizeMrzSource(worker, src, showEidOcrStatus, !!prepared.isPdf);
+        }
         if (one.score > best.score) best = one;
         if (mrzIsPass(one.parsed)) break;
       }
@@ -6100,10 +6576,13 @@ function mapEidNationality(raw) {
       return parsed;
     } catch (err) {
       if (worker && worker.terminate) try { await worker.terminate(); } catch (e) {}
+      closeMrzCropUI();
+      if (mrzCropWait) { var leftover = mrzCropWait; mrzCropWait = null; leftover({ action: "cancel", canvas: null, src: null, box: null }); }
       if (isCspOrReaderLoadError(err)) showEidOcrStatus(READER_PASTE_FALLBACK);
       else showEidOcrStatus(err && err.message ? err.message : "Could not read the MRZ.");
       return null;
     } finally {
+      closeMrzCropUI();
       if (btn) { btn.disabled = false; btn.textContent = prev || "Read ID / passport code (MRZ)"; }
       if (other) other.disabled = false;
     }
@@ -6262,6 +6741,7 @@ function mapEidNationality(raw) {
     else eidAdvanceArmed = true;
   });
   el("readCard").addEventListener("click", function () { readCard(); });
+  bindMrzCropUi();
   el("readMrz").addEventListener("click", function () { readMrz(); });
   el("fillFromCardText").addEventListener("click", function () {
     applyCardText(el("eidPaste").value, function (parsed) {
@@ -6378,6 +6858,13 @@ function mapEidNationality(raw) {
     parseTd1Mrz: (typeof MrzTd1 !== "undefined" ? MrzTd1.parseTd1Mrz : null),
     parseMrz: (typeof MrzTd1 !== "undefined" ? MrzTd1.parseMrz : null),
     readMrz: readMrz,
+    defaultMrzCropRect: defaultMrzCropRect,
+    quickMrzCropRect: quickMrzCropRect,
+    clampMrzCropBox: clampMrzCropBox,
+    applyMrzCrop: applyMrzCrop,
+    mrzCropCanvas: mrzCropCanvas,
+    mrzLocate: mrzLocate,
+    mrzDrawRotated: mrzDrawRotated,
     parseSaIdNumber: (typeof SaId !== "undefined" ? SaId.parseSaIdNumber : null),
     parseSaIdText: (typeof SaId !== "undefined" ? SaId.parseSaIdText : null),
     parseSaIdFrontText: (typeof SaId !== "undefined" ? SaId.parseSaIdFrontText : null),
@@ -6395,5 +6882,6 @@ function mapEidNationality(raw) {
   refresh();
 })();
   </script>
+
 </body>
 </html>
