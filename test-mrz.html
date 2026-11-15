@@ -860,6 +860,15 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     });
   })();
   function eidLabelMatchInfo(line, aliases) {
+    // The same lines are checked many times while reading passes are merged; remember the answers.
+    var memo = aliases && (aliases.__labelMemo || (aliases.__labelMemo = {}));
+    var mk = "k" + String(line);
+    if (memo && Object.prototype.hasOwnProperty.call(memo, mk)) return memo[mk] ? Object.assign({}, memo[mk]) : null;
+    var res = eidLabelMatchInfoRaw(line, aliases);
+    if (memo) { memo[mk] = res; if (++memo.__n > 5000) aliases.__labelMemo = null; else if (!memo.__n) memo.__n = 1; }
+    return res ? Object.assign({}, res) : null;
+  }
+  function eidLabelMatchInfoRaw(line, aliases) {
     var n = normalizeOcrLine(line);
     if (!n) return null;
     var lower = n.toLowerCase();
@@ -884,6 +893,8 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
         var phrase = words.slice(i, i + len).join(" ");
         for (var b = 0; b < aliases.length; b++) {
           var al = aliases[b];
+          // Edit distance is at least the length difference: skip pairs that can't match (keeps big reads quick).
+          if (Math.abs(phrase.length - al.length) > maxTypo(al)) continue;
           var d = levenshtein(phrase, al);
           if (d <= maxTypo(al) && d / Math.max(al.length, 1) <= 0.4) {
             var restWords = n.split(" ").filter(Boolean).slice(i + len).join(" ").replace(/^[:\-]\s*/, "");
@@ -1290,8 +1301,12 @@ function mapEidNationality(raw) {
     if (!raw) return empty;
     var lines = raw.split(/\r?\n/).map(function (l) { return normalizeOcrLine(l); }).filter(Boolean);
     var nameRaw = valueAfterEidLabel(lines, "name", isEidNameValue, "name");
+    var nameFromLabel = !!nameRaw;
+    if (nameRaw && eidNameLooksLikeCardText(isolateEnglishPhrase(nameRaw))) { nameRaw = ""; nameFromLabel = false; }
     if (!nameRaw) nameRaw = guessEidName(lines);
     if (nameRaw) nameRaw = isolateEnglishPhrase(nameRaw);
+    // Card headings ("Federal Authority…", "ID Number") are not names; leave the box empty instead.
+    if (nameRaw && eidNameLooksLikeCardText(nameRaw)) { nameRaw = ""; nameFromLabel = false; }
     var natRaw = valueAfterEidLabel(lines, "nationality", isEidNationalityValue, "nationality");
     if (!natRaw || !fuzzyNationalityRaw(natRaw)) {
       for (var i = 0; i < lines.length; i++) {
@@ -1325,8 +1340,12 @@ function mapEidNationality(raw) {
       nationalityOther: nat.nationalityOther,
       gender: gender,
       dob: dob,
-      age: age
+      age: age,
+      nameFromLabel: nameFromLabel && !!split.name
     };
+  }
+  function eidNameLooksLikeCardText(v) {
+    return /\b(FEDERAL|AUTHORITY|IDENTITY|IDENTIT\w*|NUMBER|EMIRATES|CARD|RESIDENT|CITIZENSHIP|CUSTOMS|PORT|SECURITY|UNITED|NATIONALITY|SIGNATURE|DATE|BIRTH|EXPIRY|ISSUING|ID|MIRATES)\b/i.test(String(v || ""));
   }
   function formatNowTime() {
     const d = new Date();
@@ -2189,9 +2208,9 @@ function mapEidNationality(raw) {
   var TESS_WORKER_PATH = "https://cdn.jsdelivr.net/npm/tesseract.js@" + TESS_JS_VERSION + "/dist/worker.min.js";
   var TESS_CORE_PATH = "https://cdn.jsdelivr.net/npm/tesseract.js-core@" + TESS_CORE_VERSION + "/tesseract-core.wasm.js";
   var TESS_LANG_PATH = "https://tessdata.projectnaptha.com/4.0.0_fast";
-  var EID_OCR_MIN_SIDE = 1800;
-  var EID_OCR_MAX_SIDE = 2400;
-  var EID_OCR_TARGET_SIDE = 2000;
+  var EID_OCR_MIN_SIDE = 1400;
+  var EID_OCR_MAX_SIDE = 1800;
+  var EID_OCR_TARGET_SIDE = 1600;
   var EID_OCR_WORKER_MS = 60000;
   var EID_OCR_RECOGNIZE_MS = 60000;
   var PDFJS_VERSION = "3.11.174";
@@ -2275,9 +2294,16 @@ function mapEidNationality(raw) {
     });
   }
 
+  var tessLibLoading = null;
   function loadTesseractLibrary(onStatus) {
     if (window.Tesseract) return Promise.resolve(window.Tesseract);
     if (onStatus) onStatus("Loading reader...");
+    // One download at a time (the background warm-up and a read can both ask for it).
+    if (tessLibLoading) return tessLibLoading;
+    tessLibLoading = loadTesseractLibraryNow().then(function (T) { tessLibLoading = null; return T; }, function (err) { tessLibLoading = null; throw err; });
+    return tessLibLoading;
+  }
+  function loadTesseractLibraryNow() {
     var chain = Promise.reject(new Error("start"));
     for (var i = 0; i < TESS_SCRIPT_URLS.length; i++) {
       (function (src) {
@@ -2299,7 +2325,7 @@ function mapEidNationality(raw) {
       corePath: TESS_CORE_PATH,
       langPath: TESS_LANG_PATH,
       workerBlobURL: true,
-      cacheMethod: "none",
+      cacheMethod: "write",
       logger: function (m) {
         if (!onStatus || !m || !m.status) return;
         var status = String(m.status);
@@ -2631,7 +2657,7 @@ function mapEidNationality(raw) {
     var longSide = Math.max(sw, sh);
     var scale = 1;
     if (longSide < EID_OCR_MIN_SIDE) scale = EID_OCR_TARGET_SIDE / longSide;
-    else if (longSide > EID_OCR_MAX_SIDE) scale = 2200 / longSide;
+    else if (longSide > EID_OCR_MAX_SIDE) scale = EID_OCR_TARGET_SIDE / longSide;
     var dw = Math.max(1, Math.round(sw * scale));
     var dh = Math.max(1, Math.round(sh * scale));
     var angle = ((rotation || 0) % 360 + 360) % 360;
@@ -2743,7 +2769,7 @@ function mapEidNationality(raw) {
   }
 
 
-  var FRONT_ORIENT_WORDS = ["SURNAME", "NAMES", "NATIONALITY", "IDENTITY", "REPUBLIC", "UNITED ARAB EMIRATES", "SOUTH AFRICA", "DATE OF BIRTH", "IDENTITY NUMBER", "CITIZEN", "PASSPORT", "CARD NUMBER", "KINGDOM", "REPUBLIQUE", "APELLIDOS", "COGNOME", "NACIMIENTO", "NAISSANCE", "GEBURT", "NASCITA", "KIMLIK", "NAMA", "PROVINSI"];
+  var FRONT_ORIENT_WORDS = ["DOB", "SURNAME", "NAMES", "NATIONALITY", "IDENTITY", "REPUBLIC", "UNITED ARAB EMIRATES", "SOUTH AFRICA", "DATE OF BIRTH", "IDENTITY NUMBER", "CITIZEN", "PASSPORT", "CARD NUMBER", "KINGDOM", "REPUBLIQUE", "APELLIDOS", "COGNOME", "NACIMIENTO", "NAISSANCE", "GEBURT", "NASCITA", "KIMLIK", "NAMA", "PROVINSI"];
   var FRONT_ORIENT_MAX_SIDE = 1000;
 
   function downscaleCanvasTo(src, maxSide) {
@@ -2846,37 +2872,48 @@ function mapEidNationality(raw) {
     if (parsed && parsed.surname) score += 40;
     if (parsed && parsed.name && parsed.surname) score += 20;
     if (parsed && parsed.luhnOk) score += 15;
+    if (parsed && parsed.nameFromLabel) score += 30;
     return score;
   }
 
-  async function recognizePhotoBest(worker, file, onStatus, index, total) {
-    var label = "photo " + (index + 1) + " of " + total;
-    var orient = await pickFrontOrientation(worker, file, onStatus, index, total);
-    var angle = orient && isFinite(orient.angle) ? orient.angle : 0;
-    if (onStatus) onStatus("Reading " + label + "…");
-    var modes = ["contrast", "sharpen", "threshold"];
-    var psms = [6, 4, 11];
-    var allParts = [];
-    var m, p, canvas, rec, left, lp;
-    var leftModes = ["contrast", "sharpen"];
-    var leftPsms = [6, 4];
-    for (m = 0; m < modes.length; m++) {
-      canvas = await prepareEidImage(file, angle, modes[m]);
-      for (p = 0; p < psms.length; p++) {
-        rec = await recognizeCanvasPsm(worker, canvas, psms[p]);
-        allParts.push(rec);
-      }
-      if (modes[m] === "contrast" || modes[m] === "sharpen") {
-        left = cropFrontLeftColumn(canvas);
-        if (left && left !== canvas) {
-          if (onStatus) onStatus("Reading the name area on " + label + "…");
-          for (lp = 0; lp < leftPsms.length; lp++) {
-            rec = await recognizeCanvasPsm(worker, left, leftPsms[lp]);
-            allParts.push(rec);
-          }
-        }
-      }
+  // True once a card-front read has everything the form needs, so no more reading passes are run.
+  function frontReadComplete(p, passes) {
+    if (!p) return false;
+    if (p.cardKind === "eid-front") {
+      // The ID number's check digit must pass; after a few passes accept it anyway (it gets highlighted).
+      var eidOk = p.eid && (eidNumberLuhn(String(p.eid).replace(/\D/g, "")) || (passes || 0) >= 4);
+      return !!(eidOk && p.nameFromLabel && (p.nameVotes || 0) >= 2 && p.name && p.surname && p.dob && p.gender && p.nationality);
     }
+    if (p.cardKind === "sa-front") {
+      return !!((p.idNumber || p.eid) && p.luhnOk !== false && p.surname && p.name && p.dob);
+    }
+    if (p.cardKind === "saudi-front") {
+      // Small print on these cards is often misread, so each value must have been read the same way twice.
+      var v = p.votes || {};
+      return !!(p.eid && p.surname && p.name && p.dob && v.id >= 3 && v.name >= 2 && v.dob >= 2);
+    }
+    return !!(p.name && p.surname && p.dob && p.gender && (p.eid || p.docNumber) && (p.nationality || p.nationalityOther));
+  }
+
+  var FRONT_PASS_BUDGET_MS = 20000;
+  // Reading passes for a card front, best first. Reading stops as soon as the card is fully read.
+  var FRONT_PASSES = [
+    { mode: "contrast", psm: 6 },
+    { mode: "contrast", psm: 6, left: true },
+    { mode: "sharpen", psm: 6 },
+    { mode: "threshold", psm: 6 },
+    { mode: "contrast", psm: 4 },
+    { mode: "sharpen", psm: 6, left: true },
+    { mode: "sharpen", psm: 4 },
+    { mode: "threshold", psm: 4 },
+    { mode: "contrast", psm: 11 },
+    { mode: "contrast", psm: 4, left: true },
+    { mode: "sharpen", psm: 11 },
+    { mode: "sharpen", psm: 4, left: true },
+    { mode: "threshold", psm: 11 }
+  ];
+
+  function pickFrontParse(allParts, orient) {
     var merged = mergeOcrTexts(allParts);
     if (orient && orient.text) merged = mergeOcrTexts([{ text: orient.text }, { text: merged }]);
     var confSum = 0;
@@ -2886,13 +2923,17 @@ function mapEidNationality(raw) {
     var parsed = parseCardFrontText(merged);
     var score = scoreParsedCardCandidate(parsed, confidence);
     var candidates = allParts.slice();
-    if (orient && orient.text) candidates.push({ text: orient.text, confidence: orient.confidence || 0 });
-    candidates.push({ text: merged, confidence: confidence });
+    if (orient && orient.text) candidates.push(orient);
+    // Each pass is parsed once and remembered; reading stops after every pass, so this keeps it quick.
+    function parseOf(cand) {
+      if (!cand._parsed) cand._parsed = parseCardFrontText((cand && cand.text) || "", undefined, cand && cand.lines);
+      return cand._parsed;
+    }
     for (c = 0; c < candidates.length; c++) {
-      var one = parseCardFrontText((candidates[c] && candidates[c].text) || "", undefined, candidates[c] && candidates[c].lines);
+      var one = parseOf(candidates[c]);
       var oneScore = scoreParsedCardCandidate(one, (candidates[c] && candidates[c].confidence) || 0);
       if (oneScore > score) {
-        parsed = one;
+        parsed = Object.assign({}, one);
         score = oneScore;
       }
     }
@@ -2900,8 +2941,72 @@ function mapEidNationality(raw) {
     if (parsed && parsed.cardKind === "eid-front") {
       var goodEid = parseEidNumber(merged);
       if (goodEid && eidNumberLuhn(goodEid.replace(/\D/g, "")) && !(parsed.eid && eidNumberLuhn(String(parsed.eid).replace(/\D/g, "")))) parsed.eid = goodEid;
+      // Each pass votes for the name and nationality it read; a value two passes agree on wins,
+      // and boxes the best pass missed (e.g. "Sex: M" read only in another pass) are filled from the others.
+      var others = [], nameVotes = {}, natVotes = {}, o2;
+      for (c = 0; c < candidates.length; c++) {
+        o2 = parseOf(candidates[c]);
+        if (!o2 || o2.cardKind !== "eid-front") continue;
+        others.push(o2);
+        if (o2.nameFromLabel && o2.name) { var nk = o2.name + "|" + o2.surname; nameVotes[nk] = (nameVotes[nk] || 0) + 1; }
+        if (o2.nationality) { var tk = o2.nationality + "|" + (o2.nationalityOther || ""); natVotes[tk] = (natVotes[tk] || 0) + 1; }
+      }
+      function topVote(votes) {
+        var bestK = "", bestN = 0;
+        Object.keys(votes).forEach(function (k) { if (votes[k] > bestN) { bestK = k; bestN = votes[k]; } });
+        return { key: bestK, n: bestN };
+      }
+      var tn = topVote(nameVotes), curName = parsed.name + "|" + parsed.surname;
+      if (tn.n >= 2 && (nameVotes[curName] || 0) < tn.n) {
+        parsed.name = tn.key.split("|")[0]; parsed.surname = tn.key.split("|")[1]; parsed.nameFromLabel = true;
+      }
+      parsed.nameVotes = nameVotes[parsed.name + "|" + parsed.surname] || 0;
+      var tt = topVote(natVotes), curNat = parsed.nationality + "|" + (parsed.nationalityOther || "");
+      if (tt.n >= 2 && (natVotes[curNat] || 0) < tt.n) {
+        parsed.nationality = tt.key.split("|")[0]; parsed.nationalityOther = tt.key.split("|")[1];
+      }
+      ["gender", "dob", "nationality"].forEach(function (k) {
+        if (parsed[k]) return;
+        for (var j = 0; j < others.length; j++) {
+          if (!others[j][k]) continue;
+          parsed[k] = others[j][k];
+          if (k === "nationality") parsed.nationalityOther = others[j].nationalityOther || "";
+          if (k === "dob" && others[j].age) parsed.age = others[j].age;
+          break;
+        }
+      });
     }
-    return { text: merged, confidence: confidence, angle: angle, parsed: parsed, score: score };
+    return { text: merged, confidence: confidence, parsed: parsed, score: score };
+  }
+
+  async function recognizePhotoBest(worker, file, onStatus, index, total) {
+    var label = "photo " + (index + 1) + " of " + total;
+    var t0 = Date.now();
+    var orient = await pickFrontOrientation(worker, file, onStatus, index, total);
+    var angle = orient && isFinite(orient.angle) ? orient.angle : 0;
+    var allParts = [];
+    var out = pickFrontParse(allParts, orient);
+    var prepared = {};
+    var i, pass, canvas, rec;
+    for (i = 0; i < FRONT_PASSES.length && !frontReadComplete(out.parsed, i); i++) {
+      // Past the time budget, stop once the basics are in; the rest can be typed.
+      if (i >= 2 && Date.now() - t0 > FRONT_PASS_BUDGET_MS && countParsedFields(out.parsed) >= 3) break;
+      // Other cards: more passes rarely add anything after six; the Arabic pass (if needed) fills the rest.
+      if (i >= 6 && (!out.parsed || out.parsed.cardKind === "general") && countParsedFields(out.parsed) >= 3) break;
+      pass = FRONT_PASSES[i];
+      if (onStatus) onStatus(pass.left ? ("Reading the name area on " + label + "…") : ("Reading " + label + "…"));
+      if (!prepared[pass.mode]) prepared[pass.mode] = await prepareEidImage(file, angle, pass.mode);
+      canvas = prepared[pass.mode];
+      if (pass.left) {
+        if (!prepared[pass.mode + "-left"]) prepared[pass.mode + "-left"] = cropFrontLeftColumn(canvas);
+        canvas = prepared[pass.mode + "-left"];
+        if (!canvas || canvas === prepared[pass.mode]) continue;
+      }
+      rec = await recognizeCanvasPsm(worker, canvas, pass.psm);
+      allParts.push(rec);
+      out = pickFrontParse(allParts, orient);
+    }
+    return { text: out.text, confidence: out.confidence, angle: angle, parsed: out.parsed, score: out.score, passes: allParts.length };
   }
 
   function unreadNameStatus(parsed) {
@@ -3015,12 +3120,76 @@ function mapEidNationality(raw) {
     eidFallback.cardKind = "eid-front";
     return eidFallback;
   }
+  // Saudi national ID front: mostly Arabic, with "No: 1xxxxxxxxx", "DOB:", "DOE:" and (newer cards)
+  // the English name as "SURNAME, GIVEN NAMES". Several reading passes are merged, so each value is
+  // chosen by how often it was read.
+  function saudiVote(votes, key) { if (key) votes[key] = (votes[key] || 0) + 1; }
+  function saudiTop(votes) {
+    var best = "", n = 0;
+    Object.keys(votes).forEach(function (k) { if (votes[k] > n) { best = k; n = votes[k]; } });
+    return best;
+  }
+  function looksLikeSaudiFront(raw) {
+    var t = String(raw || "");
+    var hasNo = /\bN[o0]\s*[:.]?\s*[12]\d{9}\b/i.test(t);
+    var hasDates = /\bDO[BRE8]\b\s*[:.]?\s*\d/i.test(t);
+    var saudiWords = /SAUDI|السعودية|الهوية الوطنية/i.test(t);
+    return (hasNo && (hasDates || saudiWords)) || (saudiWords && /\b[12]\d{9}\b/.test(t) && !/\b784\d{12}\b/.test(t.replace(/[\s-]/g, "")));
+  }
+  function parseSaudiFrontText(raw, now) {
+    now = now || new Date();
+    var lines = String(raw || "").split(/\r?\n/);
+    var idVotes = {}, nameVotes = {}, dobVotes = {};
+    lines.forEach(function (line) {
+      var m, re = /(?:^|[^0-9])([12]\d{9})(?![0-9])/g;
+      var labelled = /\bN[o0]\s*[:.]?\s*[12]\d{9}/i.test(line);
+      while ((m = re.exec(line))) { saudiVote(idVotes, m[1]); if (labelled) saudiVote(idVotes, m[1]); }
+      var nm = line.match(/([A-Z][A-Z'\-]{1,}(?:\s+[A-Z][A-Z'\-]{1,})*)\s*,\s*([A-Z][A-Z'\-]{1,}(?:\s+[A-Z][A-Z'\-]{1,}){0,4})/);
+      if (nm) saudiVote(nameVotes, nm[1].trim() + "|" + nm[2].trim());
+      var dm = line.match(/\b(?:DO[BR8]|D0B|BIRTH)\b\s*[:.]?\s*([0-9OoIl][0-9OoIl\/.\- ]{6,11})/i);
+      if (dm) {
+        var d = dm[1].replace(/[Oo]/g, "0").replace(/[Il]/g, "1").replace(/[^0-9]/g, "");
+        if (d.length === 8) {
+          var dd = +d.slice(0, 2), mo = +d.slice(2, 4), yy = +d.slice(4);
+          if (dd >= 1 && dd <= 31 && mo >= 1 && mo <= 12 && yy >= 1900 && yy <= now.getFullYear()) saudiVote(dobVotes, d.slice(0, 2) + "/" + d.slice(2, 4) + "/" + d.slice(4));
+        }
+      }
+    });
+    var id = saudiTop(idVotes);
+    var nameKey = saudiTop(nameVotes);
+    var dob = saudiTop(dobVotes);
+    var surname = nameKey ? nameKey.split("|")[0] : "";
+    var given = nameKey ? nameKey.split("|")[1] : "";
+    var citizen = /^1/.test(id);
+    var out = {
+      cardKind: "saudi-front",
+      name: given, surname: surname,
+      eid: id, docNumber: id, idNumber: id,
+      gender: "",
+      dob: dob,
+      age: dob ? ageFromParsedDob(dob, now) : "",
+      nationality: citizen ? "Saudi Arabian" : "",
+      nationalityOther: "",
+      countryFrom: citizen ? "Saudi Arabia" : "",
+      countryOfBirth: "",
+      unsure: [],
+      notes: [],
+      votes: { id: idVotes[id] || 0, name: nameVotes[nameKey] || 0, dob: dobVotes[dob] || 0 }
+    };
+    if (!citizen && id) out.notes.push("this looks like a Saudi resident (Iqama) number, so nationality was left for you to fill");
+    return out;
+  }
+
   // Emirates ID front or SA smart ID front, using their own parsers. Returns null for other cards.
   function parseCardFrontKnown(raw, now) {
     if (looksLikeEidFront(raw)) {
       var eidParsed = parseEidText(raw, now);
       eidParsed.cardKind = "eid-front";
       return eidParsed;
+    }
+    if (looksLikeSaudiFront(raw)) {
+      var saudi = parseSaudiFrontText(raw, now);
+      if (saudi.eid || saudi.surname) return saudi;
     }
     if (typeof SaId !== "undefined" && SaId.parseSaIdFrontText) {
       var useSa = SaId.looksLikeSaIdFront && SaId.looksLikeSaIdFront(raw);
@@ -6378,7 +6547,7 @@ function mapEidNationality(raw) {
         workerPath: TESS_WORKER_PATH,
         corePath: TESS_CORE_PATH,
         workerBlobURL: blobUrl,
-        cacheMethod: "none",
+        cacheMethod: "write",
         logger: function (m) {
           if (!onStatus || !m || !m.status) return;
           var status = String(m.status);
@@ -6780,6 +6949,10 @@ function mapEidNationality(raw) {
       if (!isFinite(slope) || Math.abs(slope) > 0.25) slope = 0;
       var icpt = (sy - slope * sx) / m;
       // How much the row looks like machine-readable code: capitals of one height on an even pitch.
+      // A barcode is a row of thin bars of one height: not code lines.
+      var thin = 0;
+      items.forEach(function (c) { if ((c.x1 - c.x0) < c.hh * 0.22) thin++; });
+      if (thin > m * 0.7) return;
       var med = hh[Math.floor(m / 2)], same = 0, xs = [], gaps = [], even = 0, q;
       items.forEach(function (c) { if (Math.abs(c.hh - med) <= med * 0.16) same++; xs.push(c.cx); });
       xs.sort(function (p, q2) { return p - q2; });
@@ -7054,8 +7227,11 @@ function mapEidNationality(raw) {
       return !fixedUp || (out.minVotes || 0) >= 2;
     }
     var v, f, b, rec, cleaned;
+    var chevSeen = 0;
     for (v = 0; v < variants.length; v++) {
       if (v > 0 && Date.now() - t0 > budget) break;
+      // Real code lines are full of "<" fillers. Two clean-ups with almost none: this is printed text, stop.
+      if (v >= 2 && chevSeen < 3) break;
       tries++;
       if (onStatus) onStatus((label || "Reading the code lines") + "… (step " + tries + " of " + variants.length + ")");
       f = mrzFlatten(mrzBoxBlur(G.g, w, h, variants[v].blur * charH / 32), w, h, charH);
@@ -7076,6 +7252,7 @@ function mapEidNationality(raw) {
       }
       // Whole block in one pass.
       rec = await recognizeMrzCanvas(worker, mrzBinaryCanvas(cleaned, w, h, null, pad), "6");
+      chevSeen += (String(rec.text || "").match(/</g) || []).length;
       var blockLines = String(rec.text || "").split(/\n/).map(mrzCleanLine).filter(function (l) { return l.length >= 12; });
       if (blockLines.length) {
         if (rowsBase.length && blockLines.length === rowsBase.length) blockLines.forEach(function (l, i) { addLine(i, l); });
@@ -7087,6 +7264,7 @@ function mapEidNationality(raw) {
         var r, lr;
         for (r = 0; r < rowsBase.length; r++) {
           lr = await recognizeMrzCanvas(worker, mrzRowCanvas(cleaned, w, h, rowsBase[r], charH, pad, rowsBase[r + 1], rowsBase[r - 1]), "7");
+          chevSeen += (String(lr.text || "").match(/</g) || []).length;
           var lt = mrzCleanLine(lr.text);
           if (lt.length >= 12) addLine(r, lt);
         }
@@ -7097,6 +7275,7 @@ function mapEidNationality(raw) {
       if (v >= 1 && out.score < 0) break;
     }
     out.ms = Date.now() - t0;
+    out.chev = chevSeen;
     out.charHeight = loc.charH;
     out.tries = tries;
     return out;
@@ -7108,7 +7287,8 @@ function mapEidNationality(raw) {
     return mrzScaleCanvas(rotated, Math.max(1, Math.round(rotated.width * k)));
   }
 
-  async function recognizeMrzSource(worker, src, onStatus, alreadyUpright) {
+  // stage: "fast" = only the quick code-line cut-out reads; "slow" = skip those and run the full search.
+  async function recognizeMrzSource(worker, src, onStatus, alreadyUpright, stage) {
     var best = { text: "", parsed: null, score: -1, confidence: -1 };
     var orientations = [];
     var a, angle, rotated, coarse, rec, parsed, score;
@@ -7118,6 +7298,8 @@ function mapEidNationality(raw) {
     function overTime() { return Date.now() - tStart > MRZ_TOTAL_BUDGET_MS * (best.score >= 0 ? 1 : 1.5); }
     // Fast path: find the code lines without OCR (upright or sideways), cut them out at the ideal
     // letter size and read them. Most photos finish here in a second or two.
+    var fastChev = 0;
+    if (stage !== "slow") {
     if (onStatus) onStatus("Finding the code lines…");
     var base0 = src.getContext ? src : mrzDrawRotated(src, 0);
     var found = [], fr, floc;
@@ -7142,11 +7324,14 @@ function mapEidNationality(raw) {
         if (flip) fl = { charH: fl.charH, angle: fl.angle, rows: fl.rows, score: fl.score, w: fl.w, h: fl.h,
           x: fcan.width - fl.x - fl.w, y: fcan.height - fl.y - fl.h };
         fone = await mrzReadStrip(worker, fcan, onStatus, "Reading the code lines", stripBudget(), fl);
+        if ((fone.chev || 0) > fastChev) fastChev = fone.chev;
         best = considerMrz(best, { text: fone.text, confidence: fone.confidence }, fone.parsed);
         if (mrzIsPass(fone.parsed)) return best;
         if (fone.parsed && fone.parsed.ok) break;
       }
     }
+    }
+    if (stage === "fast") { best.fastChev = fastChev; return best; }
     src = mrzPadSource(src);
     if (onStatus) onStatus(alreadyUpright ? "Reading the code lines…" : "Turning photo…");
     for (a = 0; a < angles.length; a++) {
@@ -7170,6 +7355,7 @@ function mapEidNationality(raw) {
       best = considerMrz(best, rec, parsed);
       if (mrzIsPass(parsed)) return best;
     }
+    if (stage === "turn") return best;
     orientations.sort(function (x, y) { return y.score - x.score; });
     var picked = orientations[0];
     if (onStatus) onStatus("Finding the code lines…");
@@ -7694,6 +7880,7 @@ function mapEidNationality(raw) {
     "mrz": "the code lines (MRZ)",
     "eid-front": "the Emirates ID front",
     "sa-front": "the SA ID front",
+    "saudi-front": "the Saudi ID front",
     "general": "the card front",
     "general-ara": "the card front (with Arabic)"
   };
@@ -7807,6 +7994,12 @@ function mapEidNationality(raw) {
           kept.push(k);
         }
       });
+    }
+    // Saudi cards: the 10-digit national number on the front is the ID people use, not the card number in the code lines.
+    if (front && front.kind === "saudi-front" && /^[12]\d{9}$/.test(front.parsed.eid || "") && sources.docNumber === "mrz" &&
+        (!mrz.parsed.issuingState || mrz.parsed.issuingState === "SAU")) {
+      out.docNumber = front.parsed.eid;
+      sources.docNumber = front.kind;
     }
     if (out.docNumber) out.eid = out.docNumber;
     if (mrz) {
@@ -7939,6 +8132,81 @@ function mapEidNationality(raw) {
     return { parsed: best, text: mergeOcrTexts(bestText) };
   }
 
+  // Read the block the quick finder found with the English reader (plain letters and "<" only).
+  // Some cards print code lines the code-line reader struggles with; the English reader often still gets them.
+  async function readMrzBlockWithEng(engW, src, hit) {
+    if (!hit || !hit.loc || !engW) return null;
+    var longSide = Math.max(src.width || 0, src.height || 0);
+    var k = longSide > 1600 ? longSide / 1600 : 1;
+    var base = hit.angle ? mrzDrawRotated(src, hit.angle) : src;
+    var L = hit.loc, ch = (L.charH || 12) * k;
+    var crop = mrzCropCanvas(base, L.x * k - ch * 1.2, L.y * k - ch * 0.8, L.w * k + ch * 2.4, L.h * k + ch * 1.6);
+    var f = 30 / Math.max(4, ch);
+    if (f < 0.6) f = 0.6;
+    if (f > 3) f = 3;
+    var scaled = mrzScaleCanvas(crop, Math.max(1, Math.round(crop.width * f)));
+    var best = null;
+    try {
+      await engW.setParameters({ tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<" });
+      var rec = await recognizeCanvasPsm(engW, scaled, 6);
+      var text = String(rec.text || "").replace(/ /g, "");
+      var parsed = MrzTd1.parseMrz(text);
+      if (parsed && parsed.ok) best = { text: text, confidence: rec.confidence, parsed: parsed };
+    } finally {
+      try { await engW.setParameters({ tessedit_char_whitelist: "" }); } catch (eP) {}
+    }
+    return best;
+  }
+
+  // How unlikely a name read from code lines looks: runs of 3+ consonants ("AHDVWAD", "ARFHHRAHUVBAN").
+  function mrzNameOddness(p) {
+    var n = String((p && (p.surname + " " + p.name)) || "").toUpperCase();
+    var runs = n.match(/[BCDFGHJKLMNPQRSTVWXZ]{3,}/g) || [];
+    var odd = 0;
+    runs.forEach(function (r) { if (!/^(SCH|STR|NGH|CHR|THR|SHR|NDR|MPS|NTH|RST)/.test(r) || r.length > 3) odd += r.length - 2; });
+    return odd;
+  }
+
+  var ID_READ_MAX_SIDE = 2400;
+  var ID_WORKER_IDLE_MS = 5 * 60 * 1000;
+  // Readers stay loaded between reads (closed after a few idle minutes), so the next read starts at once.
+  var idWorkerCache = { mrz: null, eng: null, ara: null };
+  var idWorkerIdleTimer = null;
+  function getIdWorker(workers, kind, Tesseract, say) {
+    if (workers[kind]) return Promise.resolve(workers[kind]);
+    var pk = kind + "Pending";
+    if (!workers[pk]) {
+      var make = kind === "mrz" ? createMrzOcrWorker : (kind === "ara" ? createAraOcrWorker : createEidOcrWorker);
+      workers[pk] = Promise.resolve(make(Tesseract, say)).then(function (w) {
+        workers[kind] = w; workers[pk] = null; return w;
+      }, function (err) {
+        workers[pk] = null; throw err;
+      });
+    }
+    return workers[pk];
+  }
+  // Start loading the readers in the background while the crop screen is open.
+  function prewarmIdWorkers(workers) {
+    if (idWorkerIdleTimer) { clearTimeout(idWorkerIdleTimer); idWorkerIdleTimer = null; }
+    var quiet = function () {};
+    loadTesseractLibrary(quiet).then(function (T) {
+      getIdWorker(workers, "mrz", T, quiet).catch(function () {});
+      getIdWorker(workers, "eng", T, quiet).catch(function () {});
+    }).catch(function () {});
+  }
+  async function closeIdWorkers(workers) {
+    var keys = ["mrz", "eng", "ara"];
+    for (var i = 0; i < keys.length; i++) {
+      var w = workers[keys[i]];
+      workers[keys[i]] = null;
+      if (w && w.terminate) { try { await w.terminate(); } catch (eT) {} }
+    }
+  }
+  function scheduleIdWorkerClose(workers) {
+    if (idWorkerIdleTimer) clearTimeout(idWorkerIdleTimer);
+    idWorkerIdleTimer = setTimeout(function () { idWorkerIdleTimer = null; closeIdWorkers(workers); }, ID_WORKER_IDLE_MS);
+  }
+
   // True when an MRZ read is trustworthy enough to skip reading the card front.
   function mrzReadLooksReal(p) {
     if (!p || !p.ok) return false;
@@ -7959,52 +8227,100 @@ function mapEidNationality(raw) {
     var Tesseract = o.Tesseract;
     var rawParts = o.rawParts || [];
     var notes = o.notes || [];
-    // 1) Fast code-line finder (no OCR). Code lines are the most accurate, so try them first.
+    // Big phone photos make every step slow; this size still gives sharp letters.
+    if (src && !o.pdfFile) src = downscaleCanvasTo(src, ID_READ_MAX_SIDE);
+    // 1) Fast code-line finder (no OCR). Code lines are the most accurate, so try them first,
+    //    but only the quick cut-out reads; the slow full search runs later and only if the front gives nothing.
     say("Looking for the code lines (MRZ)…");
     var hit = findMrzLinesQuick(src);
     var res = null;
     var weakMrz = null;
+    function tryMrz(one) {
+      if (!(one && one.parsed && one.parsed.ok)) return null;
+      if (mrzReadLooksReal(one.parsed)) {
+        rawParts.push(one.parsed.rawText || one.text || "");
+        return { kind: "mrz", parsed: one.parsed };
+      }
+      // Printed lines on a card front (e.g. Emirates ID) can look like code lines to the quick finder.
+      // A read with failed check digits and no "<<" fillers is not real code lines, so read the front instead
+      // and only fall back to this weak read if the front gives nothing.
+      if (!weakMrz || mrzParseRank(one.parsed) > mrzParseRank(weakMrz.parsed)) weakMrz = { kind: "mrz", parsed: one.parsed, raw: one.parsed.rawText || one.text || "" };
+      return null;
+    }
+    var slowDone = false;
     if (hit) {
-      if (!workers.mrz) workers.mrz = await createMrzOcrWorker(Tesseract, say);
-      var one = o.pdfFile
-        ? await recognizeMrzPdf(workers.mrz, o.pdfFile, say)
-        : await recognizeMrzSource(workers.mrz, src, say, !!o.isPdf);
-      if (one && one.parsed && one.parsed.ok) {
-        if (mrzReadLooksReal(one.parsed)) {
-          res = { kind: "mrz", parsed: one.parsed };
-          rawParts.push(one.parsed.rawText || one.text || "");
-          return res;
-        }
-        // Printed lines on a card front (e.g. Emirates ID) can look like code lines to the quick finder.
-        // A read with failed check digits and no "<<" fillers is not real code lines, so read the front instead
-        // and only fall back to this weak read if the front gives nothing.
-        weakMrz = { kind: "mrz", parsed: one.parsed, raw: one.parsed.rawText || one.text || "" };
+      var mrzW = await getIdWorker(workers, "mrz", Tesseract, say);
+      var fastOne = o.pdfFile
+        ? await recognizeMrzPdf(mrzW, o.pdfFile, say)
+        : await recognizeMrzSource(mrzW, src, say, !!o.isPdf, "fast");
+      res = tryMrz(fastOne);
+      if (res && res.parsed.confidence !== "pass" && !o.pdfFile) {
+        // Not every check digit passed: a second opinion from the English reader is cheap. Use it if it is
+        // better, or equally good with a more believable name (blurry code lines turn M into "DVW", "HH"…).
+        try {
+          var second = await readMrzBlockWithEng(await getIdWorker(workers, "eng", Tesseract, say), src, hit);
+          if (second && second.parsed && mrzReadLooksReal(second.parsed)) {
+            var r1 = mrzParseRank(res.parsed), r2 = mrzParseRank(second.parsed);
+            var sameNums = second.parsed.dob === res.parsed.dob;
+            var w1 = mrzNameOddness(res.parsed), w2 = mrzNameOddness(second.parsed);
+            if (r2 > r1 || (r2 === r1 && sameNums && w2 < w1)) {
+              rawParts[rawParts.length - 1] = second.parsed.rawText || second.text || "";
+              res = { kind: "mrz", parsed: second.parsed };
+            }
+          }
+        } catch (eSecond) {}
+      }
+      if (res) return res;
+      if (o.debug) o.debug("fastChev=" + (fastOne && fastOne.fastChev));
+      // A turned or tilted photo: try the photo at each quarter turn (a few quick reads) before the card front.
+      // Only when the block found really looks like code lines (printed card text scores lower).
+      if (!o.pdfFile && hit.loc && hit.loc.like >= 0.8) {
+        res = tryMrz(await recognizeMrzSource(mrzW, src, say, false, "turn"));
+        if (res) return res;
+      }
+      // The quick read saw plenty of "<" fillers: these are code lines, just hard to read. Search properly now.
+      if (!o.pdfFile && fastOne && (fastOne.fastChev || 0) >= 8) {
+        say("Looking harder for the code lines…");
+        var engTry = await readMrzBlockWithEng(await getIdWorker(workers, "eng", Tesseract, say), src, hit);
+        res = tryMrz(engTry);
+        if (res) return res;
+        slowDone = true;
+        res = tryMrz(await recognizeMrzSource(mrzW, src, say, false, "slow"));
+        if (res) return res;
       }
     }
     // 2) Card front: Emirates ID / SA ID parsers, else the general reader.
     say(hit ? "Couldn't read the code lines. Reading the card front…" : "No code lines found. Reading the card front…");
-    if (!workers.eng) workers.eng = await createEidOcrWorker(Tesseract, say);
-    var best = await recognizePhotoBest(workers.eng, src, say, 0, 1);
+    var engW = await getIdWorker(workers, "eng", Tesseract, say);
+    var best = await recognizePhotoBest(engW, src, say, 0, 1);
     var parsed = best.parsed || parseCardFrontText(best.text || "");
     var text = best.text || "";
     if (typeof MrzTd1 !== "undefined" && MrzTd1.looksLikeMrz(text)) {
       var mp = MrzTd1.parseMrz(text);
       // Only trust code lines seen by the front reader when they really are code lines.
       var chevrons = (text.match(/<</g) || []).length;
-      if (mp && mp.ok && chevrons >= 2 && (mp.confidence === "pass" || mp.confidence === "mixed")) {
+      if (mp && mp.ok && chevrons >= 2 && mrzReadLooksReal(mp)) {
         rawParts.push(mp.rawText || text);
         return { kind: "mrz", parsed: mp };
       }
     }
-    var kind = parsed.cardKind === "sa-front" ? "sa-front" : (parsed.cardKind === "eid-front" ? "eid-front" : "general");
+    // 3) Front gave little: run the slow, thorough code-line search (only when code lines may be there).
+    var knownFront = parsed.cardKind === "eid-front" || parsed.cardKind === "sa-front" || parsed.cardKind === "saudi-front";
+    if (!slowDone && !o.pdfFile && !knownFront && countParsedFields(parsed) < 3 && (hit || (text.match(/</g) || []).length >= 4)) {
+      say("Looking harder for the code lines…");
+      var mrzW2 = await getIdWorker(workers, "mrz", Tesseract, say);
+      res = tryMrz(await recognizeMrzSource(mrzW2, src, say, false, "slow"));
+      if (res) return res;
+    }
+    var kind = (parsed.cardKind === "sa-front" || parsed.cardKind === "eid-front" || parsed.cardKind === "saudi-front") ? parsed.cardKind : "general";
     if (weakMrz && kind === "general" && countParsedFields(parsed) < 2 && countParsedFields(weakMrz.parsed) > countParsedFields(parsed)) {
       rawParts.push(weakMrz.raw);
       return { kind: "mrz", parsed: weakMrz.parsed };
     }
     if (kind === "general" && typeof GeneralCard !== "undefined" && GeneralCard.needsArabic(parsed, text, o.forceArabic)) {
       try {
-        if (!workers.ara) workers.ara = await createAraOcrWorker(Tesseract, say);
-        var ara = await readArabicPass(workers.ara, src, best.angle, say);
+        var araW = await getIdWorker(workers, "ara", Tesseract, say);
+        var ara = await readArabicPass(araW, src, best.angle, say);
         if (ara && ara.parsed) {
           parsed = GeneralCard.mergeReads(parsed, ara.parsed);
           if (parsed.usedArabic) kind = "general-ara";
@@ -8027,7 +8343,8 @@ function mapEidNationality(raw) {
     var btn = el("readId");
     var prev = btn ? btn.textContent : "";
     if (btn) { btn.disabled = true; btn.textContent = "Choose area…"; }
-    var workers = { mrz: null, eng: null, ara: null };
+    var workers = idWorkerCache;
+    prewarmIdWorkers(workers);
     var forceArabic = !!(el("cardHasArabic") && el("cardHasArabic").checked);
     var notes = [];
     try {
@@ -8064,15 +8381,14 @@ function mapEidNationality(raw) {
     } catch (err) {
       closeMrzCropUI();
       if (mrzCropWait) { var leftover = mrzCropWait; mrzCropWait = null; leftover({ action: "cancel", canvas: null, src: null, box: null }); }
+      // A reader that timed out may be stuck; start fresh next time.
+      await closeIdWorkers(workers);
       if (isCspOrReaderLoadError(err)) showEidOcrStatus(READER_PASTE_FALLBACK);
       else showEidOcrStatus(err && err.message ? err.message : "Could not read the ID.");
       return null;
     } finally {
       closeMrzCropUI();
-      var ws = [workers.mrz, workers.eng, workers.ara];
-      for (var w = 0; w < ws.length; w++) {
-        if (ws[w] && ws[w].terminate) { try { await ws[w].terminate(); } catch (eT) {} }
-      }
+      scheduleIdWorkerClose(workers);
       if (btn) { btn.disabled = false; btn.textContent = prev || "Read ID (front or back)"; }
     }
   }
@@ -8348,6 +8664,10 @@ function mapEidNationality(raw) {
     readMrz: readMrz,
     readId: readId,
     readIdSource: readIdSource,
+    recognizePhotoBest: recognizePhotoBest,
+    recognizeMrzSource: recognizeMrzSource,
+    mrzReadStrip: mrzReadStrip,
+    frontReadComplete: frontReadComplete,
     mergeIdReads: mergeIdReads,
     formatIdReadStatus: formatIdReadStatus,
     applyIdMerged: applyIdMerged,
