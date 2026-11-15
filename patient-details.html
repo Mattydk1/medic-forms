@@ -3023,6 +3023,91 @@ function mapEidNationality(raw) {
     return { value: numeric ? toDigitsField(field) : field, check: checkDigit, ok: false, corrected: false };
   }
 
+  // Document numbers are usually a short letter prefix followed by digits (e.g. NT0000000, D23145890).
+  // When the printed value fails its check digit, several O/0-style substitutions can pass by chance,
+  // so collect every passing candidate and prefer the one with that shape and the fewest letters.
+  function docShapeScore(v) {
+    var s = String(v || "").replace(/<+$/g, "");
+    var score = 0;
+    if (/^[A-Z]{0,5}[0-9]+$/.test(s)) score += 100;
+    score -= (s.match(/[OQILBSZGD]/g) || []).length * 3;
+    score -= (s.match(/[A-Z]/g) || []).length;
+    return score;
+  }
+  function correctDocNumber(field, checkDigit) {
+    field = String(field || "");
+    checkDigit = String(checkDigit || "");
+    if (checkOk(field, checkDigit)) return { value: field, check: checkDigit, ok: true, corrected: false };
+    var seen = {}, cands = [], i, k, alt, v;
+    function add(val) { if (!seen[val]) { seen[val] = 1; cands.push(val); } }
+    var pre;
+    for (k = 0; k <= Math.min(5, field.length); k++) {
+      pre = toAlphaField(field.slice(0, k));
+      if (/^[A-Z]*$/.test(pre)) add(pre + toDigitsField(field.slice(k)));
+      add(field.slice(0, k) + toDigitsField(field.slice(k)));
+    }
+    add(toAlphaField(field));
+    for (i = 0; i < field.length; i++) {
+      alt = NUM_SUBS[field.charAt(i)];
+      if (alt) add(field.slice(0, i) + alt + field.slice(i + 1));
+    }
+    function docCandScore(c) {
+      // turning a printed digit into a letter is a big step; prefer candidates that avoid it
+      var pen = 0, q;
+      for (q = 0; q < c.length; q++) if (/[0-9]/.test(field.charAt(q)) && /[A-Z]/.test(c.charAt(q))) pen += 20;
+      return docShapeScore(c) - pen;
+    }
+    var best = null;
+    for (i = 0; i < cands.length; i++) {
+      v = cands[i];
+      if (!checkOk(v, checkDigit)) continue;
+      if (!best || docCandScore(v) > docCandScore(best)) best = v;
+    }
+    if (best) return { value: best, check: checkDigit, ok: true, corrected: best !== field };
+    return correctWithCheck(field, checkDigit, false);
+  }
+
+  // OCR on angled photos can swap similar digits (1/7, 0/8, 5/6 ...). For a date that fails its
+  // check digit, list valid dates within two such swaps that pass; the composite check then picks one.
+  var DIGIT_CONFUSE = { "0": "86", "1": "74", "2": "7", "3": "8", "4": "1", "5": "6", "6": "58", "7": "12", "8": "036", "9": "0" };
+  function dateConfusionCandidates(field, checkDigit, isDob) {
+    field = String(field || "");
+    var out = [], seen = {}, i, j, a, b, x, y, v;
+    if (!/^\d{6}$/.test(field) || !/^\d$/.test(String(checkDigit))) return out;
+    function tryV(val) {
+      if (seen[val]) return; seen[val] = 1;
+      if (checkOk(val, checkDigit) && validYymmdd(val, isDob)) out.push(val);
+    }
+    for (i = 0; i < 6; i++) {
+      a = DIGIT_CONFUSE[field.charAt(i)] || "";
+      for (x = 0; x < a.length; x++) {
+        v = field.slice(0, i) + a.charAt(x) + field.slice(i + 1);
+        tryV(v);
+        for (j = i + 1; j < 6; j++) {
+          b = DIGIT_CONFUSE[field.charAt(j)] || "";
+          for (y = 0; y < b.length; y++) tryV(v.slice(0, j) + b.charAt(y) + v.slice(j + 1));
+        }
+      }
+    }
+    return out;
+  }
+
+  function dateSwapCost(a, b) {
+    var c = 0, i, x, y;
+    for (i = 0; i < a.length; i++) { x = a.charAt(i); y = b.charAt(i); if (x !== y) c += ((x + y === "17" || x + y === "71") ? 1 : 2); }
+    return c;
+  }
+  // Several date pairs fit every check: pick the one needing the most likely OCR swaps, if unique.
+  function bestDateGuess(hits, dobFrom, expFrom) {
+    var best = null, tie = false, i, c;
+    for (i = 0; i < hits.length; i++) {
+      c = dateSwapCost(dobFrom, hits[i][0]) + dateSwapCost(expFrom, hits[i][1]);
+      if (!best || c < best.c) { best = { c: c, h: hits[i] }; tie = false; }
+      else if (c === best.c) tie = true;
+    }
+    return best && !tie ? best.h : null;
+  }
+
   function expandYear(yy) {
     var n = Number(yy);
     if (!isFinite(n) || n < 0 || n > 99) return null;
@@ -3365,7 +3450,7 @@ function mapEidNationality(raw) {
       result.checks.document = !!longDoc.ok;
       result.docNumber = longDoc.full;
     } else {
-      doc = correctWithCheck(docNum, toDigitsField(docCheck).charAt(0), false);
+      doc = correctDocNumber(docNum, toDigitsField(docCheck).charAt(0));
       // document number is alphanumeric; try numeric-leaning corrections too
       if (!doc.ok) {
         var docNumeric = correctWithCheck(toDigitsField(docNum), toDigitsField(docCheck).charAt(0), true);
@@ -3436,6 +3521,28 @@ function mapEidNationality(raw) {
     var l1recon = longDoc ? (l1.slice(0, 5) + l1doc + l1.slice(14)) : (l1.slice(0, 5) + l1doc + (doc.ok ? doc.check : docCheck) + l1.slice(15));
     compositeSrc = l1recon.slice(5, 30) + (dob.value || dobField) + (dob.check || dobChk) + (exp.value || expField) + (exp.check || expChk) + optional2;
     result.checks.composite = checkOk(compositeSrc, l2.charAt(29));
+    if (!result.checks.composite && (!result.checks.dob || !result.checks.expiry)) {
+      var dobOpts = result.checks.dob ? [dob.value] : dateConfusionCandidates(dob.value || dobField, dobChk, true);
+      var expOpts = result.checks.expiry ? [exp.value] : dateConfusionCandidates(exp.value || expField, expChk, false);
+      var hits = [], di, ei;
+      for (di = 0; di < dobOpts.length; di++) for (ei = 0; ei < expOpts.length; ei++) {
+        if (checkOk(l1recon.slice(5, 30) + dobOpts[di] + dobChk + expOpts[ei] + expChk + optional2, l2.charAt(29))) hits.push([dobOpts[di], expOpts[ei]]);
+      }
+      if (hits.length === 1) {
+        if (!result.checks.dob) { dob = { value: hits[0][0], check: dobChk, ok: true, corrected: true }; result.checks.dob = true; result.dob = formatDobYymmdd(dob.value); result.corrected.push("date of birth"); }
+        if (!result.checks.expiry) {
+          exp = { value: hits[0][1], check: expChk, ok: true, corrected: true }; result.checks.expiry = true; result.corrected.push("expiry");
+          var ey2 = expandYear(exp.value.slice(0, 2));
+          if (ey2 < 2010) { var alt2 = 2000 + Number(exp.value.slice(0, 2)); if (alt2 >= 2010 && alt2 <= new Date().getFullYear() + 20) ey2 = alt2; }
+          result.expiry = exp.value.slice(4, 6) + "/" + exp.value.slice(2, 4) + "/" + ey2;
+        }
+        result.checks.composite = true;
+      } else if (hits.length > 1) {
+        // Fill the most likely date but leave it unconfirmed so the box is highlighted for checking.
+        var g1 = bestDateGuess(hits, dob.value || dobField, exp.value || expField);
+        if (g1 && !result.checks.dob && formatDobYymmdd(g1[0])) { dob = { value: g1[0], check: dobChk, ok: false, corrected: true }; result.dob = formatDobYymmdd(g1[0]); result.corrected.push("date of birth (best guess)"); }
+      }
+    }
 
     var passCount = 0;
     if (result.checks.document) passCount += 1;
@@ -3597,7 +3704,7 @@ function mapEidNationality(raw) {
 
     var docNum = l2.slice(0, 9);
     var docCheck = l2.charAt(9);
-    var doc = correctWithCheck(docNum, docCheck, false);
+    var doc = correctDocNumber(docNum, toDigitsField(docCheck).charAt(0) || docCheck);
     if (!doc.ok) doc = correctWithCheck(toDigitsField(docNum), toDigitsField(docCheck).charAt(0) || docCheck, true);
     result.checks.document = !!doc.ok;
     result.docNumber = (doc.value || docNum).replace(/<+$/g, "");
@@ -3668,6 +3775,22 @@ function mapEidNationality(raw) {
       compositeDigit = l2.charAt(35);
     }
     result.checks.composite = checkOk(compositeSrc, compositeDigit);
+    if (!result.checks.composite && (!result.checks.dob || !result.checks.expiry)) {
+      var dobOpts2 = result.checks.dob ? [dob.value] : dateConfusionCandidates(dob.value || dobField, dobChk, true);
+      var expOpts2 = result.checks.expiry ? [exp.value] : dateConfusionCandidates(exp.value || expField, expChk, false);
+      var pre = compositeSrc.slice(0, 10), post = compositeSrc.slice(24), hits2 = [], dj, ej;
+      for (dj = 0; dj < dobOpts2.length; dj++) for (ej = 0; ej < expOpts2.length; ej++) {
+        if (checkOk(pre + dobOpts2[dj] + dobChk + expOpts2[ej] + expChk + post, compositeDigit)) hits2.push([dobOpts2[dj], expOpts2[ej]]);
+      }
+      if (hits2.length === 1) {
+        if (!result.checks.dob) { dob = { value: hits2[0][0], check: dobChk, ok: true, corrected: true }; result.checks.dob = true; result.dob = formatDobYymmdd(dob.value); result.corrected.push("date of birth"); }
+        if (!result.checks.expiry) { exp = { value: hits2[0][1], check: expChk, ok: true, corrected: true }; result.checks.expiry = true; result.expiry = formatExpiryYymmdd(exp.value); result.corrected.push("expiry"); }
+        result.checks.composite = true;
+      } else if (hits2.length > 1) {
+        var g2 = bestDateGuess(hits2, dob.value || dobField, exp.value || expField);
+        if (g2 && !result.checks.dob && formatDobYymmdd(g2[0])) { dob = { value: g2[0], check: dobChk, ok: false, corrected: true }; result.dob = formatDobYymmdd(g2[0]); result.corrected.push("date of birth (best guess)"); }
+      }
+    }
 
     var passCount = 0;
     var total = width === 44 ? 5 : 4;
