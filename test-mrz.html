@@ -5347,17 +5347,630 @@ function mapEidNationality(raw) {
     return canvas;
   }
 
+  // ---- Real-photo MRZ reader: scale the code lines to a fixed letter height, clean grain and
+  // uneven light, then read the whole block and each line separately and keep the read whose
+  // check digits pass. Runs first on cropped strips and on every code-line band that is found.
+  var MRZ_CHAR_TARGET = 32;
+  var MRZ_STRIP_BUDGET_MS = 7000;
+  var MRZ_STRIP_MAX_W = 2600;
+  var MRZ_TOTAL_BUDGET_MS = 30000;
+
+  function mrzGrayArray(canvas) {
+    var w = canvas.width, h = canvas.height;
+    var d = canvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+    var g = new Float32Array(w * h);
+    var i, j, m, x, y, row, last, holes = 0;
+    for (i = 0, j = 0; j < g.length; i += 4, j++) {
+      // Brightest channel: coloured security tint turns white, black ink stays dark.
+      m = d[i] > d[i + 1] ? d[i] : d[i + 1];
+      if (d[i + 2] > m) m = d[i + 2];
+      if (d[i + 3] < 250) { m = -1; holes++; }
+      g[j] = m;
+    }
+    if (holes) {
+      // Transparent corners (left by straightening) copy the nearest real paper, so they make no fake edges.
+      for (y = 0; y < h; y++) {
+        row = y * w; last = -1;
+        for (x = 0; x < w; x++) { if (g[row + x] >= 0) last = g[row + x]; else if (last >= 0) g[row + x] = last; }
+        last = -1;
+        for (x = w - 1; x >= 0; x--) { if (g[row + x] >= 0) last = g[row + x]; else if (last >= 0) g[row + x] = last; }
+      }
+      for (x = 0; x < w; x++) {
+        last = -1;
+        for (y = 0; y < h; y++) { if (g[y * w + x] >= 0) last = g[y * w + x]; else if (last >= 0) g[y * w + x] = last; }
+        last = -1;
+        for (y = h - 1; y >= 0; y--) { if (g[y * w + x] >= 0) last = g[y * w + x]; else if (last >= 0) g[y * w + x] = last; }
+      }
+      for (j = 0; j < g.length; j++) if (g[j] < 0) g[j] = 255;
+    }
+    return { g: g, w: w, h: h };
+  }
+
+  function mrzBoxBlur(g, w, h, r) {
+    r = Math.round(r);
+    if (r < 1) return g;
+    var t = new Float32Array(g.length), o = new Float32Array(g.length);
+    var x, y, s, n = 2 * r + 1, row;
+    for (y = 0; y < h; y++) {
+      row = y * w; s = 0;
+      for (x = -r; x <= r; x++) s += g[row + (x < 0 ? 0 : x >= w ? w - 1 : x)];
+      for (x = 0; x < w; x++) {
+        t[row + x] = s / n;
+        s += g[row + (x + r + 1 >= w ? w - 1 : x + r + 1)] - g[row + (x - r < 0 ? 0 : x - r)];
+      }
+    }
+    for (x = 0; x < w; x++) {
+      s = 0;
+      for (y = -r; y <= r; y++) s += t[(y < 0 ? 0 : y >= h ? h - 1 : y) * w + x];
+      for (y = 0; y < h; y++) {
+        o[y * w + x] = s / n;
+        s += t[(y + r + 1 >= h ? h - 1 : y + r + 1) * w + x] - t[(y - r < 0 ? 0 : y - r) * w + x];
+      }
+    }
+    return o;
+  }
+
+  // 1-D running max (or min) over a (2r+1) window, constant time per pixel (van Herk / Gil-Werman).
+  function mrzRank1D(gb, out, n, r, useMin, fw, bw) {
+    var k = 2 * r + 1, i, j, e, v, a, lo, hi, bl, bh, x, y;
+    for (i = 0; i < n; i += k) {
+      e = i + k < n ? i + k : n;
+      a = gb[i]; fw[i] = a;
+      for (j = i + 1; j < e; j++) { v = gb[j]; if (useMin ? v < a : v > a) a = v; fw[j] = a; }
+      a = gb[e - 1]; bw[e - 1] = a;
+      for (j = e - 2; j >= i; j--) { v = gb[j]; if (useMin ? v < a : v > a) a = v; bw[j] = a; }
+    }
+    for (i = 0; i < n; i++) {
+      lo = i - r < 0 ? 0 : i - r; hi = i + r >= n ? n - 1 : i + r;
+      bl = (lo / k) | 0; bh = (hi / k) | 0;
+      if (bl === bh) { out[i] = lo === bl * k ? fw[hi] : bw[lo]; continue; }
+      x = bw[lo]; y = fw[hi];
+      out[i] = useMin ? (x < y ? x : y) : (x > y ? x : y);
+    }
+  }
+
+  // Separable 2-D max (or min) filter over a (2r+1) square window.
+  function mrzRankFilter(g, w, h, r, useMin) {
+    r = Math.round(r);
+    if (r < 1) return g;
+    var t = new Float32Array(g.length), o = new Float32Array(g.length);
+    var n = Math.max(w, h), gb = new Float32Array(n), ob = new Float32Array(n), fw = new Float32Array(n), bw = new Float32Array(n);
+    var x, y, i, row;
+    for (y = 0; y < h; y++) {
+      row = y * w;
+      for (i = 0; i < w; i++) gb[i] = g[row + i];
+      mrzRank1D(gb, ob, w, r, useMin, fw, bw);
+      for (i = 0; i < w; i++) t[row + i] = ob[i];
+    }
+    for (x = 0; x < w; x++) {
+      for (i = 0; i < h; i++) gb[i] = t[i * w + x];
+      mrzRank1D(gb, ob, h, r, useMin, fw, bw);
+      for (i = 0; i < h; i++) o[i * w + x] = ob[i];
+    }
+    return o;
+  }
+
+  // Divide by the local paper brightness, so shadows, glare gradients, dark edges and grey paper
+  // all become white. Paper level = closing (max then min) that wipes out the letters but keeps
+  // the exact edges of shadows, so a dark border never melts into the first letters.
+  function mrzFlatten(g, w, h, charH) {
+    var r = Math.max(1, Math.round(charH * 0.45));
+    var bg = mrzRankFilter(mrzRankFilter(g, w, h, r, false), w, h, r, true);
+    bg = mrzBoxBlur(bg, w, h, Math.max(1, Math.round(charH * 0.25)));
+    var o = new Float32Array(g.length), i, v;
+    for (i = 0; i < g.length; i++) {
+      v = bg[i] > 8 ? (g[i] / bg[i]) * 230 : 255;
+      o[i] = v > 255 ? 255 : v;
+    }
+    return o;
+  }
+
+  function mrzOtsuLevel(g, lo, hi) {
+    var hist = new Float64Array(256), i, v, tot = 0, sum = 0;
+    lo = lo || 0; hi = hi || g.length;
+    for (i = lo; i < hi; i++) { v = g[i] | 0; if (v < 0) v = 0; if (v > 255) v = 255; hist[v]++; }
+    for (i = 0; i < 256; i++) { tot += hist[i]; sum += i * hist[i]; }
+    var sB = 0, wB = 0, best = 0, th = 128, wF, mB, mF, between;
+    for (i = 0; i < 256; i++) {
+      wB += hist[i]; if (!wB) continue;
+      wF = tot - wB; if (!wF) break;
+      sB += i * hist[i];
+      mB = sB / wB; mF = (sum - sB) / wF;
+      between = wB * wF * (mB - mF) * (mB - mF);
+      if (between > best) { best = between; th = i; }
+    }
+    return th;
+  }
+
+  function mrzBinarize(g, th) {
+    var b = new Uint8Array(g.length), i;
+    for (i = 0; i < g.length; i++) b[i] = g[i] < th ? 1 : 0;
+    return b;
+  }
+
+  // Label dark blobs. Returns boxes [{x0,y0,x1,y1,n,border}] and the label map.
+  function mrzComponents(b, w, h) {
+    var lab = new Int32Array(b.length), stack = new Int32Array(b.length);
+    var comps = [], i, sp, p, x, y, c, id = 0;
+    for (i = 0; i < b.length; i++) {
+      if (!b[i] || lab[i]) continue;
+      id++;
+      c = { id: id, x0: w, y0: h, x1: -1, y1: -1, n: 0, border: false };
+      sp = 0; stack[sp++] = i; lab[i] = id;
+      while (sp) {
+        p = stack[--sp]; x = p % w; y = (p - x) / w;
+        c.n++;
+        if (x < c.x0) c.x0 = x; if (x > c.x1) c.x1 = x;
+        if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y;
+        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) c.border = true;
+        if (x > 0 && b[p - 1] && !lab[p - 1]) { lab[p - 1] = id; stack[sp++] = p - 1; }
+        if (x < w - 1 && b[p + 1] && !lab[p + 1]) { lab[p + 1] = id; stack[sp++] = p + 1; }
+        if (y > 0 && b[p - w] && !lab[p - w]) { lab[p - w] = id; stack[sp++] = p - w; }
+        if (y < h - 1 && b[p + w] && !lab[p + w]) { lab[p + w] = id; stack[sp++] = p + w; }
+      }
+      c.x1++; c.y1++;
+      comps.push(c);
+    }
+    return { comps: comps, lab: lab };
+  }
+
+  // Clear blobs that are not letters: page edges / shadows touching the border, big smudges, grain specks.
+  function mrzCleanBinary(b, w, h, charH) {
+    var cc = mrzComponents(b, w, h);
+    var kill = new Uint8Array(cc.comps.length + 1);
+    var speck = Math.max(3, Math.round(charH * charH * 0.012));
+    cc.comps.forEach(function (c) {
+      var ch = c.y1 - c.y0, cw = c.x1 - c.x0;
+      if (c.n < speck) kill[c.id] = 1;
+      else if (ch > charH * 1.9) kill[c.id] = 1;
+      else if (c.border && (ch > charH * 1.35 || cw > charH * 2.5 || ch < charH * 0.3)) kill[c.id] = 1;
+      else if (cw > charH * 4) kill[c.id] = 1;
+    });
+    var o = new Uint8Array(b.length), i;
+    for (i = 0; i < b.length; i++) o[i] = b[i] && !kill[cc.lab[i]] ? 1 : 0;
+    return o;
+  }
+
+  function mrzBinaryCanvas(b, w, h, rect, pad) {
+    rect = rect || { x0: 0, y0: 0, x1: w, y1: h };
+    var x0 = Math.max(0, Math.floor(rect.x0)), y0 = Math.max(0, Math.floor(rect.y0));
+    var x1 = Math.min(w, Math.ceil(rect.x1)), y1 = Math.min(h, Math.ceil(rect.y1));
+    var cw = Math.max(1, x1 - x0), ch = Math.max(1, y1 - y0);
+    pad = Math.round(pad || 0);
+    var made = mrzNewCanvas(cw + pad * 2, ch + pad * 2);
+    var img = made.ctx.createImageData(made.canvas.width, made.canvas.height);
+    var d = img.data, W = made.canvas.width, x, y, k, v;
+    for (k = 0; k < d.length; k += 4) { d[k] = d[k + 1] = d[k + 2] = 255; d[k + 3] = 255; }
+    for (y = 0; y < ch; y++) {
+      for (x = 0; x < cw; x++) {
+        v = b[(y + y0) * w + x + x0] ? 0 : 255;
+        k = ((y + pad) * W + x + pad) * 4;
+        d[k] = d[k + 1] = d[k + 2] = v;
+      }
+    }
+    made.ctx.putImageData(img, 0, 0);
+    return made.canvas;
+  }
+
+  // Link letter-sized blobs into text rows: neighbours of similar height, close together on one line.
+  // Works on slightly tilted or keystoned photos because each link is local.
+  function mrzLinkRows(comps, w, h, minN) {
+    var cand = comps.filter(function (c) {
+      var ch = c.y1 - c.y0, cw = c.x1 - c.x0;
+      return ch >= 6 && ch < h * 0.6 && cw >= 1 && cw < ch * 2.4 && c.n >= 6;
+    });
+    var n = cand.length, i, j, a, b, ha, hb, dy, gap;
+    if (n < 8) return [];
+    cand.forEach(function (c) { c.cy = (c.y0 + c.y1) / 2; c.cx = (c.x0 + c.x1) / 2; c.hh = c.y1 - c.y0; });
+    cand.sort(function (p, q) { return p.cy - q.cy; });
+    var parent = new Int32Array(n);
+    for (i = 0; i < n; i++) parent[i] = i;
+    function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+    for (i = 0; i < n; i++) {
+      a = cand[i]; ha = a.hh;
+      for (j = i + 1; j < n; j++) {
+        b = cand[j];
+        dy = b.cy - a.cy;
+        if (dy > ha * 0.5) break;
+        hb = b.hh;
+        if (hb > ha * 1.45 || ha > hb * 1.45) continue;
+        gap = b.x0 > a.x1 ? b.x0 - a.x1 : (a.x0 > b.x1 ? a.x0 - b.x1 : 0);
+        if (gap > Math.max(ha, hb) * 2.2) continue;
+        parent[find(i)] = find(j);
+      }
+    }
+    var groups = {}, r;
+    for (i = 0; i < n; i++) { r = find(i); (groups[r] = groups[r] || []).push(cand[i]); }
+    var rows = [];
+    Object.keys(groups).forEach(function (k) {
+      var items = groups[k];
+      if (items.length < (minN || 8)) return;
+      var x0 = w, y0 = h, x1 = 0, y1 = 0, hh = [], sx = 0, sy = 0, sxx = 0, sxy = 0, m = items.length;
+      items.forEach(function (c) {
+        if (c.x0 < x0) x0 = c.x0; if (c.x1 > x1) x1 = c.x1;
+        if (c.y0 < y0) y0 = c.y0; if (c.y1 > y1) y1 = c.y1;
+        hh.push(c.hh); sx += c.cx; sy += c.cy; sxx += c.cx * c.cx; sxy += c.cx * c.cy;
+      });
+      hh.sort(function (p, q) { return p - q; });
+      var den = m * sxx - sx * sx;
+      var slope = den > 1e-6 ? (m * sxy - sx * sy) / den : 0;
+      if (!isFinite(slope) || Math.abs(slope) > 0.25) slope = 0;
+      var icpt = (sy - slope * sx) / m;
+      // How much the row looks like machine-readable code: capitals of one height on an even pitch.
+      var med = hh[Math.floor(m / 2)], same = 0, xs = [], gaps = [], even = 0, q;
+      items.forEach(function (c) { if (Math.abs(c.hh - med) <= med * 0.16) same++; xs.push(c.cx); });
+      xs.sort(function (p, q2) { return p - q2; });
+      for (q = 1; q < xs.length; q++) gaps.push(xs[q] - xs[q - 1]);
+      var sg = gaps.slice().sort(function (p, q2) { return p - q2; });
+      var pitch = sg[Math.floor(sg.length / 2)] || 1;
+      gaps.forEach(function (g) { if (Math.abs(g - pitch) <= pitch * 0.22) even++; });
+      var mrzLike = (same / m) * 0.5 + (gaps.length ? even / gaps.length : 0) * 0.5;
+      rows.push({ x0: x0, y0: y0, x1: x1, y1: y1, n: m, charH: med, slope: slope, icpt: icpt,
+        cy: icpt + slope * (x0 + x1) / 2, mrzLike: mrzLike, pitch: pitch });
+    });
+    rows.sort(function (p, q) { return p.cy - q.cy; });
+    return rows;
+  }
+
+  // Pick the 2–3 rows that form the code block: long rows of evenly spaced capitals, same letter size,
+  // evenly spaced lines of about the same length. Ordinary printed text scores much lower.
+  function mrzPickCodeRows(rows, imgH) {
+    var long = rows.filter(function (r) { return r.n >= 14; });
+    if (!long.length) return null;
+    var cands = [], i, k, set, ok, sc, a, b, sp, j;
+    for (i = 0; i < long.length; i++) {
+      for (k = 3; k >= 1; k--) {
+        if (i + k > long.length) continue;
+        set = long.slice(i, i + k); ok = true;
+        for (j = 1; j < set.length && ok; j++) {
+          a = set[j - 1]; b = set[j];
+          sp = b.cy - a.cy;
+          if (b.charH > a.charH * 1.3 || a.charH > b.charH * 1.3) ok = false;
+          else if (sp < a.charH * 1.05 || sp > a.charH * 3.2) ok = false;
+          else if (Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) < 0.5 * Math.min(a.x1 - a.x0, b.x1 - b.x0)) ok = false;
+        }
+        if (!ok) continue;
+        sc = 0;
+        set.forEach(function (r) { sc += Math.min(r.n, 46) * (0.25 + r.mrzLike); });
+        if (set.length >= 2) {
+          sc += 20 * set.length;
+          // Code lines start together and are (nearly) the same length.
+          var w0 = set[0].x1 - set[0].x0, same = true;
+          for (j = 1; j < set.length; j++) {
+            if (Math.abs(set[j].x0 - set[0].x0) > set[0].charH * 1.5 || Math.abs((set[j].x1 - set[j].x0) - w0) > w0 * 0.12) same = false;
+          }
+          if (same) sc += 15 * set.length;
+        }
+        if (imgH && set[set.length - 1].cy > imgH * 0.5) sc += 5;
+        cands.push({ rows: set, score: sc });
+      }
+    }
+    if (!cands.length) return null;
+    cands.sort(function (p, q) { return q.score - p.score; });
+    var best = cands[0];
+    // Keep a different block as a second choice (in case the best one is ordinary text).
+    best.alt = null;
+    for (i = 1; i < cands.length; i++) {
+      var ov = false;
+      cands[i].rows.forEach(function (r) { if (best.rows.indexOf(r) !== -1) ov = true; });
+      if (!ov && cands[i].rows.length >= 2) { best.alt = cands[i]; break; }
+    }
+    return best;
+  }
+
+  function mrzRowsOn(G, charGuess) {
+    var f = mrzFlatten(mrzBoxBlur(G.g, G.w, G.h, Math.max(1, Math.round(charGuess / 24))), G.w, G.h, charGuess);
+    var b = mrzBinarize(f, mrzOtsuLevel(f));
+    return mrzLinkRows(mrzComponents(b, G.w, G.h).comps, G.w, G.h, 8);
+  }
+
+  function mrzLocFromPick(pick, ws, src) {
+    var rows = pick.rows, charH = 0, slopes = [], like = 0, x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    rows.forEach(function (r) {
+      charH += r.charH / rows.length; like += r.mrzLike / rows.length; slopes.push(r.slope);
+      x0 = Math.min(x0, r.x0); x1 = Math.max(x1, r.x1); y0 = Math.min(y0, r.y0); y1 = Math.max(y1, r.y1);
+    });
+    slopes.sort(function (p, q) { return p - q; });
+    var slope = slopes[Math.floor(slopes.length / 2)];
+    var padX = charH * 1.6, padY = charH * 1.3;
+    if (rows.length < 3) padY += charH * 0.9 * (3 - rows.length);
+    var X0 = Math.max(0, (x0 - padX) / ws), Y0 = Math.max(0, (y0 - padY) / ws);
+    return {
+      charH: charH / ws, angle: Math.atan(slope) * 180 / Math.PI, rows: rows.length, score: pick.score, like: like,
+      x: X0, y: Y0, w: Math.min(src.width, (x1 + padX) / ws) - X0, h: Math.min(src.height, (y1 + padY) / ws) - Y0
+    };
+  }
+
+  // Find the code lines on any photo without OCR. Returns letter height, tilt and box in source pixels
+  // (plus a second-choice block in .alt).
+  function mrzLocate(src) {
+    if (!src.getContext) src = mrzCropCanvas(src, 0, 0, src.width, src.height);
+    var ws = Math.min(1, 1300 / Math.max(1, src.width), 1300 / Math.max(1, src.height));
+    var work = ws < 1 ? mrzScaleCanvas(src, Math.max(1, Math.round(src.width * ws))) : src;
+    var G = mrzGrayArray(work);
+    var guesses = [20];
+    if (G.h < G.w * 0.55) guesses.push(Math.max(8, G.h / 9));
+    guesses.push(11, 36);
+    var best = null, k, pick;
+    for (k = 0; k < guesses.length; k++) {
+      pick = mrzPickCodeRows(mrzRowsOn(G, guesses[k]), G.h);
+      if (pick && (!best || pick.score > best.score)) best = pick;
+      if (best && best.rows.length >= 2 && best.score >= 140) break;
+    }
+    if (!best) return null;
+    var loc = mrzLocFromPick(best, ws, src);
+    loc.alt = best.alt ? mrzLocFromPick(best.alt, ws, src) : null;
+    return loc;
+  }
+
+  // Cut out the code block, straighten it and scale it so letters are MRZ_CHAR_TARGET pixels tall.
+  function mrzCutCodeBlock(src, loc) {
+    var scale = MRZ_CHAR_TARGET / Math.max(4, loc.charH);
+    var rad = (loc.angle || 0) * Math.PI / 180;
+    var outW = loc.w, outH = loc.h;
+    if (outW * scale > MRZ_STRIP_MAX_W) scale = MRZ_STRIP_MAX_W / outW;
+    if (outH * scale > 1600) scale = 1600 / outH;
+    var made = mrzNewCanvas(Math.max(1, Math.round(outW * scale)), Math.max(1, Math.round(outH * scale)));
+    var ctx = made.ctx;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    // No background fill: uncovered corners stay transparent and are filled from nearby paper later.
+    ctx.clearRect(0, 0, made.canvas.width, made.canvas.height);
+    ctx.save();
+    ctx.translate(made.canvas.width / 2, made.canvas.height / 2);
+    ctx.scale(scale, scale);
+    ctx.rotate(-rad);
+    ctx.drawImage(src, -(loc.x + loc.w / 2), -(loc.y + loc.h / 2));
+    ctx.restore();
+    return { canvas: made.canvas, charH: loc.charH * scale };
+  }
+
+  // Keep only ink that sits on one of the code lines (drops card edges, corners and stray marks).
+  function mrzKeepRows(b, w, h, rows, charH) {
+    var cc = mrzComponents(b, w, h);
+    var keep = new Uint8Array(cc.comps.length + 1);
+    cc.comps.forEach(function (c) {
+      var cx = (c.x0 + c.x1) / 2, cy = (c.y0 + c.y1) / 2, i, r, line;
+      for (i = 0; i < rows.length; i++) {
+        r = rows[i];
+        line = r.icpt + r.slope * cx;
+        if (Math.abs(cy - line) <= charH * 0.6 && cx >= r.x0 - charH * 0.45 && cx <= r.x1 + charH * 0.45) { keep[c.id] = 1; break; }
+      }
+    });
+    var o = new Uint8Array(b.length), j, kept = 0;
+    for (j = 1; j < keep.length; j++) kept += keep[j];
+    for (j = 0; j < b.length; j++) o[j] = b[j] && keep[cc.lab[j]] ? 1 : 0;
+    o.kept = kept;
+    return o;
+  }
+
+  // One code line, straightened along its own fitted baseline (handles keystone / bent cards).
+  function mrzRowCanvas(b, w, h, row, charH, pad, nextRow, prevRow) {
+    var x0 = Math.max(0, Math.floor(row.x0 - charH)), x1 = Math.min(w, Math.ceil(row.x1 + charH));
+    var half = charH * 0.5 + Math.max(2, charH * 0.12);
+    var up = half + charH * 0.15, dn = half + charH * 0.15;
+    if (prevRow) up = Math.min(up, Math.max(charH * 0.55, (row.cy - prevRow.cy) / 2));
+    if (nextRow) dn = Math.min(dn, Math.max(charH * 0.55, (nextRow.cy - row.cy) / 2));
+    var outH = Math.round(up + dn), outW = x1 - x0;
+    var made = mrzNewCanvas(outW + pad * 2, outH + pad * 2);
+    var img = made.ctx.createImageData(made.canvas.width, made.canvas.height);
+    var d = img.data, W = made.canvas.width, x, y, sy, k, v, base;
+    for (k = 0; k < d.length; k += 4) { d[k] = d[k + 1] = d[k + 2] = 255; d[k + 3] = 255; }
+    for (x = x0; x < x1; x++) {
+      base = row.icpt + row.slope * x - up;
+      for (y = 0; y < outH; y++) {
+        sy = Math.round(base + y);
+        v = (sy >= 0 && sy < h && b[sy * w + x]) ? 0 : 255;
+        k = ((y + pad) * W + (x - x0) + pad) * 4;
+        d[k] = d[k + 1] = d[k + 2] = v;
+      }
+    }
+    made.ctx.putImageData(img, 0, 0);
+    return made.canvas;
+  }
+
+  function mrzCleanLine(t) {
+    return String(t || "").toUpperCase().replace(/[«»‹›]/g, "<").replace(/[^A-Z0-9<]/g, "");
+  }
+
+  function mrzLineSetQuality(lines) {
+    // Fields without a check digit (names, issuing state, sex, nationality) must at least look right.
+    var q = 0, i, l;
+    for (i = 0; i < lines.length; i++) {
+      l = lines[i];
+      if (l.length === 30 || l.length === 36 || l.length === 44) q += 1;
+    }
+    var nameLine = lines.length >= 3 ? (lines[2] || "") : String(lines[0] || "").slice(5);
+    if (/^[A-Z]+(<[A-Z]+)*(<<[A-Z]+(<[A-Z]+)*)?<*$/.test(nameLine)) q += 2;
+    var l1 = lines[0] || "", l2 = lines[1] || "";
+    if (/^[A-Z<]{3}$/.test(l1.slice(2, 5))) q += 1;
+    if (lines.length === 3 && l2.length === 30) {
+      if (/^[MFX<]$/.test(l2.charAt(7))) q += 1;
+      if (/^[A-Z<]{3}$/.test(l2.slice(15, 18))) q += 1;
+    } else if (lines.length === 2 && (l2.length === 44 || l2.length === 36)) {
+      if (/^[MFX<]$/.test(l2.charAt(20))) q += 1;
+      if (/^[A-Z<]{3}$/.test(l2.slice(10, 13))) q += 1;
+    }
+    return q;
+  }
+
+  async function mrzReadStrip(worker, src, onStatus, label, budgetMs, loc) {
+    var t0 = Date.now();
+    var budget = budgetMs != null ? budgetMs : MRZ_STRIP_BUDGET_MS;
+    var out = { text: "", parsed: null, score: -1, confidence: -1, lines: [], ms: 0 };
+    loc = loc || mrzLocate(src);
+    if (!loc || !loc.charH || loc.charH < 4) { out.ms = Date.now() - t0; return out; }
+    var cut = mrzCutCodeBlock(src, loc);
+    var G = mrzGrayArray(cut.canvas), w = G.w, h = G.h;
+    var charH = Math.max(8, cut.charH);
+    var variants = [
+      { blur: 1, k: 1 }, { blur: 2, k: 1 }, { blur: 1, k: 0.92 }, { blur: 2, k: 1.07 },
+      { blur: 3, k: 1 }, { blur: 1, k: 1.1 }, { blur: 3, k: 0.9 }, { blur: 0, k: 1 }
+    ];
+    var rowsBase = null, perLine = [], votes = {}, tries = 0, pad = Math.round(charH * 0.9);
+    var voted = {};
+    function voteKey(i, l, n) {
+      // O and 0 look alike and the parser already swaps them in number fields, so they vote together.
+      var nameRow = n >= 3 ? 2 : 0;
+      return i + ":" + (i === nameRow ? l : l.replace(/O/g, "0"));
+    }
+    function vote(i, l) {
+      // One vote per clean-up variant, so two independent reads have to agree.
+      var key = voteKey(i, l, rowsBase && rowsBase.length ? rowsBase.length : 3);
+      if (voted[key] === v) return;
+      voted[key] = v;
+      votes[key] = (votes[key] || 0) + 1;
+    }
+    function addOne(i, l) { perLine[i] = perLine[i] || []; vote(i, l); if (perLine[i].indexOf(l) === -1) perLine[i].push(l); }
+    function addLine(i, l) {
+      addOne(i, l);
+      // One or two extra marks at a line end (card edge, shadow, dirt): also try the line trimmed to size.
+      var n = rowsBase && rowsBase.length ? rowsBase.length : 3;
+      var want = n >= 3 ? 30 : (Math.abs(l.length - 36) < Math.abs(l.length - 44) ? 36 : 44);
+      var extra = l.length - want;
+      if (extra >= 1 && extra <= 3) {
+        addOne(i, l.slice(extra));
+        addOne(i, l.slice(0, want));
+      }
+    }
+    function full(lines) { return mrzLineSetQuality(lines) >= lines.length + 5; }
+    function consider(lines, conf) {
+      var text = lines.join("\n");
+      var parsed = MrzTd1.parseMrz(text);
+      var ps = mrzParseScore(parsed);
+      if (ps < 0) return;
+      var nameIdx = lines.length >= 3 ? 2 : 0, agree = 0, minVotes = 99, i, nv;
+      for (i = 0; i < lines.length; i++) {
+        nv = votes[voteKey(i, lines[i], lines.length)] || 0;
+        agree += Math.min(3, nv);
+        if (nv < minVotes) minVotes = nv;
+      }
+      var nameVotes = votes[voteKey(nameIdx, lines[nameIdx] || "", lines.length)] || 0;
+      var sc = ps * 1000 + mrzLineSetQuality(lines) * 50 + agree * 5 + nameVotes;
+      if (sc > out.score || (sc === out.score && conf > out.confidence)) {
+        out = { text: text, parsed: parsed, score: sc, confidence: conf, lines: lines.slice(), nameVotes: nameVotes, minVotes: minVotes };
+      }
+    }
+    function combos() {
+      if (!rowsBase || rowsBase.length < 2) return;
+      var n = rowsBase.length, idx = [], i, guard = 0;
+      for (i = 0; i < n; i++) { if (!perLine[i] || !perLine[i].length) return; idx.push(0); }
+      while (guard++ < 600) {
+        var lines = [];
+        for (i = 0; i < n; i++) lines.push(perLine[i][idx[i]]);
+        consider(lines, 0);
+        for (i = n - 1; i >= 0; i--) { idx[i]++; if (idx[i] < perLine[i].length) break; idx[i] = 0; }
+        if (i < 0) break;
+      }
+    }
+    function done() {
+      // Check digits pass, the other fields look right, and the name line was read the same way twice.
+      // A check digit that only passes after the parser "corrected" the number needs every line confirmed.
+      if (!(mrzIsPass(out.parsed) && full(out.lines) && (out.nameVotes || 0) >= 2)) return false;
+      var fixedUp = out.parsed.corrected && out.parsed.corrected.length;
+      return !fixedUp || (out.minVotes || 0) >= 2;
+    }
+    var v, f, b, rec, cleaned;
+    for (v = 0; v < variants.length; v++) {
+      if (v > 0 && Date.now() - t0 > budget) break;
+      tries++;
+      if (onStatus) onStatus((label || "Reading the code lines") + "… (step " + tries + " of " + variants.length + ")");
+      f = mrzFlatten(mrzBoxBlur(G.g, w, h, variants[v].blur * charH / 32), w, h, charH);
+      b = mrzBinarize(f, mrzOtsuLevel(f) * variants[v].k);
+      cleaned = mrzCleanBinary(b, w, h, charH);
+      if (!rowsBase) {
+        var pick = mrzPickCodeRows(mrzLinkRows(mrzComponents(cleaned, w, h).comps, w, h, 8));
+        rowsBase = pick ? pick.rows : [];
+        if (rowsBase.length) {
+          var hh = rowsBase.map(function (r) { return r.charH; }).sort(function (p, q) { return p - q; });
+          charH = Math.max(8, hh[Math.floor(hh.length / 2)]);
+        }
+      }
+      if (rowsBase.length) {
+        cleaned = mrzKeepRows(cleaned, w, h, rowsBase, charH);
+        // Far more blobs than letters means grain survived: OCR would be slow and wrong, skip this one.
+        if (cleaned.kept > rowsBase.length * 70) continue;
+      }
+      // Whole block in one pass.
+      rec = await recognizeMrzCanvas(worker, mrzBinaryCanvas(cleaned, w, h, null, pad), "6");
+      var blockLines = String(rec.text || "").split(/\n/).map(mrzCleanLine).filter(function (l) { return l.length >= 12; });
+      if (blockLines.length) {
+        if (rowsBase.length && blockLines.length === rowsBase.length) blockLines.forEach(function (l, i) { addLine(i, l); });
+        consider(blockLines, rec.confidence);
+      }
+      if (done()) break;
+      // Each code line on its own, straightened along its baseline (skipped when this clean-up is clearly poor).
+      if (rowsBase.length >= 2 && !(rec.confidence < 55 && out.score >= 0)) {
+        var r, lr;
+        for (r = 0; r < rowsBase.length; r++) {
+          lr = await recognizeMrzCanvas(worker, mrzRowCanvas(cleaned, w, h, rowsBase[r], charH, pad, rowsBase[r + 1], rowsBase[r - 1]), "7");
+          var lt = mrzCleanLine(lr.text);
+          if (lt.length >= 12) addLine(r, lt);
+        }
+        combos();
+        if (done()) break;
+      }
+      // Nothing that even looks like a code after two tries: wrong way up or not a code.
+      if (v >= 1 && out.score < 0) break;
+    }
+    out.ms = Date.now() - t0;
+    out.charHeight = loc.charH;
+    out.tries = tries;
+    return out;
+  }
+
+  function mrzCoarseCanvas(rotated) {
+    // Fit inside 1000 x 1400 so a sideways strip does not turn into a huge tall picture.
+    var k = Math.min(MRZ_COARSE_WIDTH / Math.max(1, rotated.width), 1400 / Math.max(1, rotated.height));
+    return mrzScaleCanvas(rotated, Math.max(1, Math.round(rotated.width * k)));
+  }
+
   async function recognizeMrzSource(worker, src, onStatus, alreadyUpright) {
     var best = { text: "", parsed: null, score: -1, confidence: -1 };
     var orientations = [];
     var a, angle, rotated, coarse, rec, parsed, score;
     var angles = alreadyUpright ? [0, 90, 270, 180] : MRZ_ORIENT_ANGLES;
+    var tStart = Date.now();
+    function stripBudget() { return Math.max(1500, MRZ_STRIP_BUDGET_MS - (Date.now() - tStart)); }
+    function overTime() { return Date.now() - tStart > MRZ_TOTAL_BUDGET_MS * (best.score >= 0 ? 1 : 1.5); }
+    // Fast path: find the code lines without OCR (upright or sideways), cut them out at the ideal
+    // letter size and read them. Most photos finish here in a second or two.
+    if (onStatus) onStatus("Finding the code lines…");
+    var base0 = src.getContext ? src : mrzDrawRotated(src, 0);
+    var found = [], fr, floc;
+    floc = mrzLocate(base0);
+    if (floc) found.push({ canvas: base0, loc: floc });
+    if (!floc || floc.rows < 2 || floc.like < 0.8) {
+      // No clear code block upright: try the photo turned sideways.
+      fr = mrzDrawRotated(base0, 90);
+      floc = mrzLocate(fr);
+      if (floc) found.push({ canvas: fr, loc: floc });
+    }
+    found.sort(function (p, q) { return q.loc.score - p.loc.score; });
+    if (found[0] && found[0].loc.alt && found[0].loc.alt.score > found[0].loc.score * 0.6) {
+      found.splice(1, 0, { canvas: found[0].canvas, loc: found[0].loc.alt });
+    }
+    var fi, flip, fcan, fl, fone;
+    for (fi = 0; fi < found.length && fi < 3; fi++) {
+      if (fi > 0 && Date.now() - tStart > MRZ_STRIP_BUDGET_MS) break;
+      for (flip = 0; flip < 2; flip++) {
+        fcan = flip ? mrzDrawRotated(found[fi].canvas, 180) : found[fi].canvas;
+        fl = found[fi].loc;
+        if (flip) fl = { charH: fl.charH, angle: fl.angle, rows: fl.rows, score: fl.score, w: fl.w, h: fl.h,
+          x: fcan.width - fl.x - fl.w, y: fcan.height - fl.y - fl.h };
+        fone = await mrzReadStrip(worker, fcan, onStatus, "Reading the code lines", stripBudget(), fl);
+        best = considerMrz(best, { text: fone.text, confidence: fone.confidence }, fone.parsed);
+        if (mrzIsPass(fone.parsed)) return best;
+        if (fone.parsed && fone.parsed.ok) break;
+      }
+    }
     src = mrzPadSource(src);
     if (onStatus) onStatus(alreadyUpright ? "Reading the code lines…" : "Turning photo…");
     for (a = 0; a < angles.length; a++) {
       angle = angles[a];
       rotated = mrzDrawRotated(src, angle);
-      coarse = mrzPreparePixels(mrzScaleCanvas(rotated, MRZ_COARSE_WIDTH), "contrast");
+      if (a > 0 && overTime()) break;
+      coarse = mrzPreparePixels(mrzCoarseCanvas(rotated), "contrast");
       rec = await recognizeMrzCanvas(worker, coarse, "11");
       parsed = MrzTd1.parseMrz(rec.text);
       if (!(parsed && parsed.ok) && rotated.width >= rotated.height * 2.2) {
@@ -5383,6 +5996,12 @@ function mapEidNationality(raw) {
     var sy = full.height / picked.coarse.height;
     var band = findMrzBandFromLines(picked.rec.lines, picked.coarse.width, picked.coarse.height);
     if (band) {
+      // Read the found code lines from the full-size photo, scaled to the ideal letter height.
+      var rx = picked.rotated.width / picked.coarse.width, ry = picked.rotated.height / picked.coarse.height;
+      var hiCrop = mrzCropCanvas(picked.rotated, band.x * rx, band.y * ry, band.w * rx, band.h * ry);
+      var fromStrip = await mrzReadStrip(worker, hiCrop, onStatus, "Reading the code lines", stripBudget());
+      best = considerMrz(best, { text: fromStrip.text, confidence: fromStrip.confidence }, fromStrip.parsed);
+      if (mrzIsPass(fromStrip.parsed)) return best;
       var scaled = { x: band.x * sx, y: band.y * sy, w: band.w * sx, h: band.h * sy, hits: band.hits };
       var fromBox = await ocrMrzBand(worker, full, scaled, onStatus, "Reading the code lines…", band.hits);
       best = considerMrz(best, { text: fromBox.text, confidence: fromBox.confidence }, fromBox.parsed);
@@ -5392,6 +6011,7 @@ function mapEidNationality(raw) {
     if (full.width >= full.height * 2.2) bands.unshift({ name: "whole", x: 0, y: 0, w: full.width, h: full.height });
     var b;
     for (b = 0; b < bands.length; b++) {
+      if (overTime()) break;
       var fromBand = await ocrMrzBand(worker, full, bands[b], onStatus, "Trying another part of the photo…", []);
       best = considerMrz(best, { text: fromBand.text, confidence: fromBand.confidence }, fromBand.parsed);
       if (mrzIsPass(fromBand.parsed)) break;
