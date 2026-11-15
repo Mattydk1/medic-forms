@@ -308,7 +308,12 @@ button.clear-form-btn {
       <div class="hint" style="margin-top:6px">On a computer, Take photo may just open the file picker.</div>
       <div id="attachmentList"></div>
       <div class="hint" style="margin-top:8px">Attached files are sent with Share, not with Copy. They stay on this device until you share or remove them.</div>
-      <div style="margin-top:10px"><button type="button" id="readCard">Read card</button></div>
+      <div class="photo-btns" style="margin-top:10px">
+        <button type="button" id="readCard">Read card</button>
+        <button type="button" id="readMrz">Read back of card (MRZ)</button>
+      </div>
+      <div class="hint" style="margin-top:6px">For MRZ, take or attach a photo of the <strong>whole back</strong> of the Emirates ID. You don't need to crop or rotate first — just keep the three code lines visible. Photos stay on this device.</div>
+      <div class="hint" style="margin-top:6px"><strong>After reading, check every detail is right.</strong></div>
       <div id="eidFillNote" class="hint hidden" style="margin-top:8px"></div>
       <label class="field" style="margin-top:10px">
         <span>Paste card text</span>
@@ -2084,6 +2089,31 @@ function mapEidNationality(raw) {
     return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
   }
 
+  function canvasFromOrientedImage(img, orientation) {
+    var w = img.naturalWidth || img.width;
+    var h = img.naturalHeight || img.height;
+    var o = orientation || 1;
+    var canvas = document.createElement("canvas");
+    if (o >= 5 && o <= 8) { canvas.width = h; canvas.height = w; }
+    else { canvas.width = w; canvas.height = h; }
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return img;
+    ctx.save();
+    switch (o) {
+      case 2: ctx.translate(w, 0); ctx.scale(-1, 1); break;
+      case 3: ctx.translate(w, h); ctx.rotate(Math.PI); break;
+      case 4: ctx.translate(0, h); ctx.scale(1, -1); break;
+      case 5: ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1); break;
+      case 6: ctx.rotate(0.5 * Math.PI); ctx.translate(0, -h); break;
+      case 7: ctx.rotate(0.5 * Math.PI); ctx.translate(w, -h); ctx.scale(-1, 1); break;
+      case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-w, 0); break;
+      default: break;
+    }
+    ctx.drawImage(img, 0, 0, w, h);
+    ctx.restore();
+    return canvas;
+  }
+
   async function bitmapFromFile(file) {
     var bytes = null;
     try { bytes = await readFileBytes(file); } catch (e) { bytes = null; }
@@ -2110,7 +2140,28 @@ function mapEidNationality(raw) {
       var url = URL.createObjectURL(file);
       img.onload = function () {
         URL.revokeObjectURL(url);
-        resolve(img);
+        try {
+          var orientation = (size && size.orientation) ? size.orientation : 1;
+          var oriented = (orientation && orientation !== 1) ? canvasFromOrientedImage(img, orientation) : img;
+          var ow = oriented.width || oriented.naturalWidth;
+          var oh = oriented.height || oriented.naturalHeight;
+          if (resized && resized.width && resized.height && (ow !== resized.width || oh !== resized.height)) {
+            var canvas = document.createElement("canvas");
+            canvas.width = resized.width;
+            canvas.height = resized.height;
+            var ctx = canvas.getContext("2d");
+            if (ctx) {
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = "high";
+              ctx.drawImage(oriented, 0, 0, ow, oh, 0, 0, resized.width, resized.height);
+              resolve(canvas);
+              return;
+            }
+          }
+          resolve(oriented);
+        } catch (e) {
+          resolve(img);
+        }
       };
       img.onerror = function () {
         URL.revokeObjectURL(url);
@@ -2407,6 +2458,15 @@ function mapEidNationality(raw) {
       showEidOcrStatus("Paste the card text first, then tap Fill from card text.");
       return null;
     }
+    if (typeof MrzTd1 !== "undefined" && MrzTd1.looksLikeMrz(text)) {
+      var mrzParsed = MrzTd1.parseTd1Mrz(text);
+      if (mrzParsed && mrzParsed.ok) {
+        if (mrzParsed.rawText) writeEidPasteBox(mrzParsed.rawText);
+        applyMrzToForm(mrzParsed);
+        showEidOcrStatus(formatMrzStatus(mrzParsed));
+        return mrzParsed;
+      }
+    }
     var parsed = parseEidText(text);
     var applied = applyParsed(parsed);
     showEidOcrStatus(formatReadCardDone(applied, parsed));
@@ -2474,6 +2534,930 @@ function mapEidNationality(raw) {
       }
     }
   }
+
+
+
+/* TD1 MRZ parser (Emirates ID / ICAO 9303). Works in the browser and in Node. */
+(function (root) {
+  var ISO3_TO_FORM = {ARE:"Emirati (UAE)",ARG:"Argentinian",BGD:"Bangladeshi",BRA:"Brazilian",CAN:"Canadian",CHN:"Chinese",COL:"Colombian",DEU:"German",EGY:"Egyptian",ESP:"Spanish",FRA:"French",GBR:"UK",IND:"Indian",IRL:"Irish",IRN:"Iranian",ITA:"Italian",JPN:"Japanese",KOR:"Korean",LBN:"Lebanese",LKA:"Sri Lankan",MEX:"Mexican",NLD:"Dutch",NPL:"Nepali",PAK:"Pakistani",PHL:"Filipino",POL:"Polish",PRK:"Korean",RUS:"Russian",SAU:"Saudi Arabian",THA:"Thai",TUR:"Turkish",UKR:"Ukrainian",USA:"USA",VNM:"Vietnamese",ZAF:"South African",ZWE:"Zimbabwean"};
+  var ISO3_OTHER_NAMES = {ABW:"Aruban",AFG:"Afghan",AGO:"Angolan",AIA:"Anguillan",ALA:"Åland Islander",ALB:"Albanian",AND:"Andorran",ARM:"Armenian",ASM:"American Samoan",ATA:"Antarctican",ATG:"Antiguan",AUS:"Australian",AUT:"Austrian",AZE:"Azerbaijani",BDI:"Burundian",BEL:"Belgian",BEN:"Beninese",BFA:"Burkinabe",BGR:"Bulgarian",BHR:"Bahraini",BHS:"Bahamian",BIH:"Bosnian",BLM:"Barthélemois",BLR:"Belarusian",BLZ:"Belizean",BMU:"Bermudian",BOL:"Bolivian",BRB:"Barbadian",BRN:"Bruneian",BTN:"Bhutanese",BVT:"Bouvet",BWA:"Botswanan",CAF:"Central African",CHE:"Swiss",CHL:"Chilean",CIV:"Ivorian",CMR:"Cameroonian",COD:"Congolese",COG:"Congolese",COK:"Cook Islander",COM:"Comoran",CPV:"Cape Verdean",CRI:"Costa Rican",CUB:"Cuban",CUW:"Curaçaoan",CYM:"Caymanian",CYP:"Cypriot",CZE:"Czech",DJI:"Djiboutian",DMA:"Dominican",DNK:"Danish",DOM:"Dominican",DZA:"Algerian",ECU:"Ecuadorian",ERI:"Eritrean",ESH:"Sahrawi",EST:"Estonian",ETH:"Ethiopian",FIN:"Finnish",FJI:"Fijian",FLK:"Falkland Islander",FRO:"Faroese",FSM:"Micronesian",GAB:"Gabonese",GBD:"UK",GBN:"UK",GBO:"UK",GBP:"UK",GBS:"UK",GEO:"Georgian",GGY:"Guernsey",GHA:"Ghanaian",GIB:"Gibraltarian",GIN:"Guinean",GLP:"Guadeloupean",GMB:"Gambian",GNB:"Bissau-Guinean",GNQ:"Equatorial Guinean",GRC:"Greek",GRD:"Grenadian",GRL:"Greenlander",GTM:"Guatemalan",GUM:"Guamanian",GUY:"Guyanese",HKG:"Hong Konger",HMD:"Heard Islander",HND:"Honduran",HRV:"Croatian",HTI:"Haitian",HUN:"Hungarian",IDN:"Indonesian",IMN:"Manx",IOT:"British Indian Ocean Territory",IRQ:"Iraqi",ISL:"Icelander",ISR:"Israeli",JAM:"Jamaican",JEY:"Jersey",JOR:"Jordanian",KAZ:"Kazakh",KEN:"Kenyan",KGZ:"Kyrgyz",KHM:"Cambodian",KIR:"I-Kiribati",KNA:"Kittitian",KOS:"Kosovar",KWT:"Kuwaiti",LAO:"Lao",LBR:"Liberian",LBY:"Libyan",LCA:"Saint Lucian",LIE:"Liechtensteiner",LSO:"Basotho",LTU:"Lithuanian",LUX:"Luxembourger",LVA:"Latvian",MAC:"Macanese",MAF:"Saint-Martinois",MAR:"Moroccan",MCO:"Monégasque",MDA:"Moldovan",MDG:"Malagasy",MDV:"Maldivian",MHL:"Marshallese",MKD:"Macedonian",MLI:"Malian",MLT:"Maltese",MMR:"Myanmar",MNE:"Montenegrin",MNG:"Mongolian",MNP:"Northern Mariana Islander",MOZ:"Mozambican",MRT:"Mauritanian",MTQ:"Martinican",MUS:"Mauritian",MWI:"Malawian",MYS:"Malaysian",MYT:"Mahoran",NAM:"Namibian",NCL:"New Caledonian",NER:"Nigerien",NGA:"Nigerian",NIC:"Nicaraguan",NIU:"Niuean",NOR:"Norwegian",NRU:"Nauruan",NZL:"New Zealander",OMN:"Omani",PAN:"Panamanian",PCN:"Pitcairn Islander",PER:"Peruvian",PLW:"Palauan",PNG:"Papua New Guinean",PRI:"Puerto Rican",PRT:"Portuguese",PRY:"Paraguayan",PSE:"Palestinian",PYF:"French Polynesian",QAT:"Qatari",REU:"Reunionese",ROU:"Romanian",RWA:"Rwandan",SDN:"Sudanese",SEN:"Senegalese",SGP:"Singaporean",SGS:"South Georgian",SHN:"Saint Helenian",SJM:"Svalbard",SLB:"Solomon Islander",SLE:"Sierra Leonean",SLV:"Salvadoran",SMR:"Sammarinese",SOM:"Somali",SPM:"Saint-Pierrais",SRB:"Serbian",SSD:"South Sudanese",STP:"Sao Tomean",SUR:"Surinamese",SVK:"Slovak",SVN:"Slovenian",SWE:"Swedish",SWZ:"Eswatini",SXM:"Sint Maarten",SYC:"Seychellois",SYR:"Syrian",TCA:"Turks and Caicos Islander",TCD:"Chadian",TGO:"Togolese",TJK:"Tajik",TKL:"Tokelauan",TKM:"Turkmen",TLS:"Timorese",TON:"Tongan",TTO:"Trinidadian",TUN:"Tunisian",TUV:"Tuvaluan",TWN:"Taiwanese",TZA:"Tanzanian",UGA:"Ugandan",UMI:"US Minor Outlying Islands",URY:"Uruguayan",UZB:"Uzbek",VAT:"Vatican",VCT:"Vincentian",VEN:"Venezuelan",VGB:"British Virgin Islander",VIR:"US Virgin Islander",VUT:"Ni-Vanuatu",WLF:"Wallisian",WSM:"Samoan",XKX:"Kosovar",YEM:"Yemeni",ZMB:"Zambian"};
+
+  function mrzCharValue(ch) {
+    if (ch === "<") return 0;
+    if (ch >= "0" && ch <= "9") return ch.charCodeAt(0) - 48;
+    if (ch >= "A" && ch <= "Z") return ch.charCodeAt(0) - 65 + 10;
+    return -1;
+  }
+  function mrzCheckDigit(str) {
+    var weights = [7, 3, 1];
+    var sum = 0;
+    var i, v;
+    str = String(str || "");
+    for (i = 0; i < str.length; i++) {
+      v = mrzCharValue(str.charAt(i));
+      if (v < 0) return null;
+      sum += v * weights[i % 3];
+    }
+    return String(sum % 10);
+  }
+  function checkOk(str, digit) {
+    var expect = mrzCheckDigit(str);
+    return expect != null && String(digit) === expect;
+  }
+
+  function normalizeMrzLine(raw) {
+    var s = String(raw || "").toUpperCase();
+    s = s.replace(/[\u00AB\u00BB\u2039\u203A\u2329\u232A\u3008\u3009]/g, "<");
+    s = s.replace(/[\uFF1C]/g, "<");
+    s = s.replace(/[\s\-_.:,;|'"`]/g, "");
+    s = s.replace(/[«»]/g, "<");
+    return s;
+  }
+
+  function fixFillers(line) {
+    // Only clustered K/X are treated as < fillers. A single K can be a real letter (e.g. PAK).
+    return line.replace(/K{2,}/g, function (m) { return new Array(m.length + 1).join("<"); })
+               .replace(/X{3,}/g, function (m) { return new Array(m.length + 1).join("<"); });
+  }
+
+  function toDigitsField(s) {
+    return String(s || "")
+      .replace(/[OQ]/g, "0")
+      .replace(/[IL|!]/g, "1")
+      .replace(/B/g, "8")
+      .replace(/S/g, "5")
+      .replace(/Z/g, "2")
+      .replace(/G/g, "6")
+      .replace(/[A-Z]/g, function (ch) {
+        // leftover letters in a numeric field
+        if (ch === "D") return "0";
+        if (ch === "T") return "1";
+        return ch;
+      });
+  }
+  function toAlphaField(s) {
+    return String(s || "")
+      .replace(/0/g, "O")
+      .replace(/1/g, "I")
+      .replace(/5/g, "S")
+      .replace(/8/g, "B")
+      .replace(/2/g, "Z")
+      .replace(/6/g, "G");
+  }
+  function toNameField(s) {
+    return toAlphaField(String(s || "")).replace(/[^A-Z<]/g, "<");
+  }
+  function pad30(s) {
+    s = String(s || "");
+    if (s.length < 28) return s;
+    if (s.length < 30) s = s + new Array(31 - s.length).join("<");
+    if (s.length > 32) return s;
+    if (s.length > 30) s = s.slice(0, 30);
+    return s;
+  }
+
+  var NUM_SUBS = { "0": "O", "O": "0", "Q": "0", "1": "I", "I": "1", "L": "1", "8": "B", "B": "8", "5": "S", "S": "5", "2": "Z", "Z": "2", "6": "G", "G": "6" };
+
+  function correctWithCheck(field, checkDigit, numeric) {
+    field = String(field || "");
+    checkDigit = String(checkDigit || "");
+    if (checkOk(field, checkDigit)) return { value: field, check: checkDigit, ok: true, corrected: false };
+    var i, ch, alt, next, best = null;
+    function tryVal(val) {
+      if (checkOk(val, checkDigit)) return { value: val, check: checkDigit, ok: true, corrected: val !== field };
+      return null;
+    }
+    var first = tryVal(numeric ? toDigitsField(field) : toAlphaField(field));
+    if (first && first.ok) return first;
+    // Single-character substitutions
+    for (i = 0; i < field.length; i++) {
+      ch = field.charAt(i);
+      alt = NUM_SUBS[ch];
+      if (!alt) continue;
+      next = field.slice(0, i) + alt + field.slice(i + 1);
+      if (numeric) next = toDigitsField(next);
+      first = tryVal(next);
+      if (first) return first;
+    }
+    // If the check digit itself is the error, recompute it when field looks valid
+    var recomputed = mrzCheckDigit(numeric ? toDigitsField(field) : field);
+    if (recomputed != null) {
+      var cleaned = numeric ? toDigitsField(field) : field;
+      // only accept recomputed check if the field charset is already legal
+      if (/^[A-Z0-9<]+$/.test(cleaned)) {
+        return { value: cleaned, check: recomputed, ok: true, corrected: recomputed !== checkDigit || cleaned !== field, checkCorrected: recomputed !== checkDigit };
+      }
+    }
+    return { value: numeric ? toDigitsField(field) : field, check: checkDigit, ok: false, corrected: false };
+  }
+
+  function expandYear(yy) {
+    var n = Number(yy);
+    if (!isFinite(n) || n < 0 || n > 99) return null;
+    // ICAO: dates are YYMMDD; pick century that makes a plausible DOB (not in the future, not > 120 years)
+    var now = new Date();
+    var century2000 = 2000 + n;
+    var century1900 = 1900 + n;
+    var y = century2000;
+    if (century2000 > now.getFullYear()) y = century1900;
+    else if (now.getFullYear() - century2000 > 120) y = century2000; // infants in 2000s already handled
+    // If 2000+n is in the future, use 1900+n
+    return y;
+  }
+
+  function validYymmdd(s, asDob) {
+    if (!/^\d{6}$/.test(s)) return false;
+    var yy = s.slice(0, 2), mm = Number(s.slice(2, 4)), dd = Number(s.slice(4, 6));
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return false;
+    var year = expandYear(yy);
+    if (year == null) return false;
+    var dt = new Date(year, mm - 1, dd);
+    if (dt.getFullYear() !== year || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return false;
+    if (asDob) {
+      var now = new Date();
+      if (dt.getTime() > now.getTime()) return false;
+      if (now.getFullYear() - year > 120) return false;
+    }
+    return true;
+  }
+
+  function formatDobYymmdd(s) {
+    if (!validYymmdd(s, true)) return "";
+    var year = expandYear(s.slice(0, 2));
+    var mm = s.slice(2, 4);
+    var dd = s.slice(4, 6);
+    return dd + "/" + mm + "/" + year;
+  }
+
+  function extractEidFromLine1(line1) {
+    var s = String(line1 || "");
+    function fifteen(chunk) {
+      var d = toDigitsField(String(chunk || "")).replace(/[^\d]/g, "");
+      var m = d.match(/784\d{12}/);
+      return m ? m[0] : "";
+    }
+    // Prefer the official optional-data field (1-based 16-30) and the
+    // 15-29 pack used on many UAE cards, then doc-number + optional
+    // (skipping the MRZ check digit at position 15 so it is not pulled
+    // into the 15-digit EID).
+    var hit = fifteen(s.slice(15, 30)) || fifteen(s.slice(14, 29));
+    if (hit) return hit;
+    hit = fifteen(s.slice(5, 14) + s.slice(15));
+    if (hit) return hit;
+    hit = fifteen(s.slice(5, 20));
+    if (hit) return hit;
+    return fifteen(s);
+  }
+
+  function formatEid15(digits) {
+    var d = String(digits || "").replace(/\D/g, "");
+    if (!/^784\d{12}$/.test(d)) return "";
+    return d.slice(0, 3) + "-" + d.slice(3, 7) + "-" + d.slice(7, 14) + "-" + d.slice(14);
+  }
+
+  function mapIso3ToForm(code) {
+    code = toAlphaField(String(code || "").toUpperCase().replace(/</g, ""));
+    if (code.length === 3 && ISO3_TO_FORM[code]) return { nationality: ISO3_TO_FORM[code], nationalityOther: "", iso3: code };
+    if (code.length === 3 && ISO3_OTHER_NAMES[code]) return { nationality: "Other", nationalityOther: ISO3_OTHER_NAMES[code], iso3: code };
+    if (code && code.length === 3 && code !== "XXX") return { nationality: "Other", nationalityOther: code, iso3: code };
+    return { nationality: "", nationalityOther: "", iso3: code || "" };
+  }
+
+  function parseNameLine(line3) {
+    var s = toNameField(fixFillers(String(line3 || "")));
+    s = s.replace(/<+$/g, "");
+    var parts = s.split("<<");
+    var surname = (parts[0] || "").replace(/</g, " ").replace(/\s+/g, " ").trim();
+    var given = (parts.slice(1).join(" ") || "").replace(/</g, " ").replace(/\s+/g, " ").trim();
+    return { surname: surname, name: given };
+  }
+
+  function scoreTd1Triple(l1, l2, l3) {
+    var score = 0;
+    if (l1.length === 30) score += 2; else score -= 4;
+    if (l2.length === 30) score += 2; else score -= 4;
+    if (l3.length === 30) score += 2; else score -= 4;
+    if (/^I[A-Z<]ARE/.test(l1) || /^(IL|ID|I<)ARE/.test(l1)) score += 8;
+    else if (/^[IACPV]/.test(l1)) score += 2;
+    else score -= 6;
+    if (/ARE/.test(l1.slice(2, 5))) score += 2;
+    if (/784/.test(l1)) score += 4;
+    var dobDigits = toDigitsField(l2.slice(0, 6));
+    var dobMonth = Number(dobDigits.slice(2, 4));
+    var dobDay = Number(dobDigits.slice(4, 6));
+    if (/^\d{6}$/.test(dobDigits) && dobMonth >= 1 && dobMonth <= 12 && dobDay >= 1 && dobDay <= 31) score += 6;
+    else score -= 5;
+    if (/[MF<]/.test((l2.charAt(7) || "").replace("N", "M").replace("P", "F"))) score += 2;
+    if (/<</.test(l3)) score += 4;
+    if (/[A-Z]{2}/.test(l3)) score += 1;
+    return score;
+  }
+
+  function candidateLinesFromText(raw) {
+    var text = String(raw || "").replace(/\r/g, "\n");
+    var rawLines = text.split(/\n+/);
+    var lines = [];
+    var i, n, parts, p;
+    for (i = 0; i < rawLines.length; i++) {
+      n = fixFillers(normalizeMrzLine(rawLines[i]));
+      if (!n) continue;
+      if (n.length >= 50) {
+        // maybe two MRZ lines stuck together or spaces already stripped from a paragraph
+        parts = n.match(/.{28,32}/g) || [n];
+        for (p = 0; p < parts.length; p++) lines.push(parts[p]);
+      } else {
+        lines.push(n);
+      }
+    }
+    // also scan a compacted form for 90-char windows
+    var compact = fixFillers(normalizeMrzLine(text));
+    return { lines: lines, compact: compact };
+  }
+
+  function findTd1Lines(raw) {
+    var got = candidateLinesFromText(raw);
+    var lines = got.lines;
+    var best = null;
+    var i, a, b, c, l1, l2, l3, score;
+    for (i = 0; i < lines.length - 2; i++) {
+      l1 = pad30(lines[i]);
+      l2 = pad30(lines[i + 1]);
+      l3 = pad30(lines[i + 2]);
+      if (l1.length !== 30 || l2.length !== 30 || l3.length !== 30) continue;
+      score = scoreTd1Triple(l1, l2, l3);
+      if (!best || score > best.score) best = { lines: [l1, l2, l3], score: score };
+    }
+    // Prefer a known UAE / TD1 start, then a scored sliding window.
+    var compact = got.compact;
+    function consider(a, b, c, bonus) {
+      l1 = pad30(a); l2 = pad30(b); l3 = pad30(c);
+      if (l1.length !== 30 || l2.length !== 30 || l3.length !== 30) return;
+      score = scoreTd1Triple(l1, l2, l3) + (bonus || 0);
+      if (!best || score > best.score) best = { lines: [l1, l2, l3], score: score };
+    }
+    if (compact.length >= 84) {
+      var start = 0, idx;
+      while (start < compact.length) {
+        idx = compact.slice(start).search(/I[A-Z<]ARE/);
+        if (idx < 0) break;
+        idx += start;
+        consider(compact.slice(idx, idx + 30), compact.slice(idx + 30, idx + 60), compact.slice(idx + 60, idx + 90), 4);
+        start = idx + 1;
+      }
+      for (i = 0; i <= compact.length - 90; i++) {
+        consider(compact.slice(i, i + 30), compact.slice(i + 30, i + 60), compact.slice(i + 60, i + 90), 0);
+      }
+    }
+    if (best && best.score >= 10) return best.lines;
+    return null;
+  }
+
+  function parseTd1Mrz(raw, now) {
+    now = now || new Date();
+    var found = findTd1Lines(raw);
+    var result = {
+      ok: false,
+      rawLines: found,
+      rawText: found ? found.join("\n") : "",
+      name: "",
+      surname: "",
+      eid: "",
+      docNumber: "",
+      gender: "",
+      dob: "",
+      expiry: "",
+      nationality: "",
+      nationalityOther: "",
+      iso3: "",
+      checks: { document: false, dob: false, expiry: false, composite: false },
+      corrected: [],
+      confidence: "fail"
+    };
+    if (!found) return result;
+    var l1 = found[0], l2 = found[1], l3 = found[2];
+
+    var docNum = l1.slice(5, 14);
+    var docCheck = l1.charAt(14);
+    var doc = correctWithCheck(docNum, toDigitsField(docCheck).charAt(0), false);
+    // document number is alphanumeric; try numeric-leaning corrections too
+    if (!doc.ok) doc = correctWithCheck(toDigitsField(docNum), toDigitsField(docCheck).charAt(0), true);
+    result.checks.document = !!doc.ok;
+    result.docNumber = (doc.value || docNum).replace(/<+$/g, "");
+    if (doc.corrected) result.corrected.push("document number");
+
+    var eidDigits = extractEidFromLine1(l1);
+    if (!eidDigits && doc.value) eidDigits = extractEidFromLine1(l1.slice(0, 5) + doc.value + l1.slice(14));
+    result.eid = formatEid15(eidDigits);
+
+    var dobField = toDigitsField(l2.slice(0, 6));
+    var dobChk = toDigitsField(l2.charAt(6)).charAt(0);
+    var dob = correctWithCheck(dobField, dobChk, true);
+    if (dob.ok && !validYymmdd(dob.value, true)) {
+      // check passed but invalid date — treat as fail
+      dob.ok = false;
+    }
+    if (!dob.ok) {
+      // brute a few substitutions already tried; keep cleaned digits if valid date
+      if (validYymmdd(dobField, true)) dob = { value: dobField, check: dobChk, ok: false, corrected: false };
+    }
+    result.checks.dob = !!(dob.ok && validYymmdd(dob.value, true));
+    result.dob = formatDobYymmdd(dob.value) || formatDobYymmdd(dobField);
+    if (dob.corrected) result.corrected.push("date of birth");
+
+    var sexCh = l2.charAt(7).toUpperCase();
+    if (sexCh === "N") sexCh = "M"; // rare OCR
+    if (sexCh === "P") sexCh = "F";
+    if (sexCh === "H") sexCh = "M";
+    if (sexCh === "E") sexCh = "F";
+    if (sexCh === "M" || sexCh === "F") result.gender = sexCh === "M" ? "Male" : "Female";
+
+    var expField = toDigitsField(l2.slice(8, 14));
+    var expChk = toDigitsField(l2.charAt(14)).charAt(0);
+    var exp = correctWithCheck(expField, expChk, true);
+    result.checks.expiry = !!exp.ok;
+    if (validYymmdd(exp.value, false)) {
+      var ey = expandYear(exp.value.slice(0, 2));
+      // expiry in the past 20y or next 20y: if year came out 19xx and that's before 2010, try 20xx
+      if (ey < 2010) {
+        var alt = 2000 + Number(exp.value.slice(0, 2));
+        if (alt >= 2010 && alt <= new Date().getFullYear() + 20) ey = alt;
+      }
+      result.expiry = exp.value.slice(4, 6) + "/" + exp.value.slice(2, 4) + "/" + ey;
+    }
+    if (exp.corrected) result.corrected.push("expiry");
+
+    var nat = mapIso3ToForm(l2.slice(15, 18));
+    result.nationality = nat.nationality;
+    result.nationalityOther = nat.nationalityOther;
+    result.iso3 = nat.iso3;
+
+    var names = parseNameLine(l3);
+    result.name = names.name;
+    result.surname = names.surname;
+
+    var optional2 = l2.slice(18, 29);
+    var compositeSrc = l1.slice(5, 30) + (dob.value || dobField) + (dob.ok ? dob.check : dobChk) + (exp.value || expField) + (exp.ok ? exp.check : expChk) + optional2;
+    // Official formula uses original characters; use reconstructed line pieces when we corrected
+    var l1doc = (doc.value || docNum);
+    if (l1doc.length < 9) l1doc = (l1doc + "<<<<<<<<<").slice(0, 9);
+    var l1recon = l1.slice(0, 5) + l1doc + (doc.ok ? doc.check : docCheck) + l1.slice(15);
+    compositeSrc = l1recon.slice(5, 30) + (dob.value || dobField) + (dob.check || dobChk) + (exp.value || expField) + (exp.check || expChk) + optional2;
+    result.checks.composite = checkOk(compositeSrc, l2.charAt(29));
+
+    var passCount = 0;
+    if (result.checks.document) passCount += 1;
+    if (result.checks.dob) passCount += 1;
+    if (result.checks.expiry) passCount += 1;
+    if (result.checks.composite) passCount += 1;
+    if (passCount === 4) result.confidence = "pass";
+    else if (passCount >= 2 || result.checks.dob || result.eid) result.confidence = "mixed";
+    else result.confidence = "fail";
+    result.ok = !!(result.eid || result.dob || result.surname || result.name);
+    result.rawText = found.join("\n");
+    result.checkSummary = "Document " + (result.checks.document ? "pass" : "fail") +
+      ", DOB " + (result.checks.dob ? "pass" : "fail") +
+      ", expiry " + (result.checks.expiry ? "pass" : "fail") +
+      ", composite " + (result.checks.composite ? "pass" : "fail");
+    return result;
+  }
+
+  function looksLikeMrz(raw) {
+    return !!findTd1Lines(raw);
+  }
+
+  var api = {
+    mrzCheckDigit: mrzCheckDigit,
+    checkOk: checkOk,
+    normalizeMrzLine: normalizeMrzLine,
+    findTd1Lines: findTd1Lines,
+    parseTd1Mrz: parseTd1Mrz,
+    looksLikeMrz: looksLikeMrz,
+    mapIso3ToForm: mapIso3ToForm,
+    formatEid15: formatEid15,
+    formatDobYymmdd: formatDobYymmdd,
+    ISO3_TO_FORM: ISO3_TO_FORM,
+    ISO3_OTHER_NAMES: ISO3_OTHER_NAMES
+  };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  root.MrzTd1 = api;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+
+  var MRZ_OCRB_LANG_PATHS = [
+    "https://cdn.jsdelivr.net/gh/uwolfer/tesseract-mrz@master/lang",
+    "https://cdn.jsdelivr.net/gh/uwolfer/tesseract-mrz@HEAD/lang"
+  ];
+  var MRZ_WHITELIST = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<";
+  var MRZ_TARGET_WIDTH = 1600;
+  var MRZ_COARSE_WIDTH = 1000;
+  var MRZ_BAND_WIDTH = 2000;
+  var MRZ_BAND_WIDTH_MAX = 2400;
+  var MRZ_ORIENT_ANGLES = [0, 90, 270, 180];
+
+  function formatMrzStatus(parsed) {
+    if (!parsed || !parsed.ok) {
+      return "MRZ: couldn't find three TD1 lines. A photo of the whole back is fine — you don't need to crop first. Try more light and keep the three code lines in the frame, or paste those lines in the box below and tap Fill from card text.";
+    }
+    var bits = [];
+    if (parsed.eid) bits.push("EID " + parsed.eid);
+    if (parsed.surname || parsed.name) bits.push("name " + [parsed.surname, parsed.name].filter(Boolean).join(", "));
+    if (parsed.dob) bits.push("DOB " + parsed.dob);
+    if (parsed.gender) bits.push(parsed.gender);
+    if (parsed.nationality) {
+      bits.push(parsed.nationality === "Other" && parsed.nationalityOther ? parsed.nationalityOther : parsed.nationality);
+    }
+    var conf = "Check digits: fail (" + (parsed.checkSummary || "none") + ")";
+    if (parsed.confidence === "pass") conf = "Check digits: pass";
+    else if (parsed.confidence === "mixed") conf = "Check digits: mixed (" + parsed.checkSummary + ")";
+    var msg = "MRZ: read " + (bits.length ? bits.join("; ") : "partial data") + ". " + conf + ".";
+    if (parsed.corrected && parsed.corrected.length) msg += " Corrected " + parsed.corrected.join(", ") + ".";
+    msg += " Raw MRZ is in the paste box. Check every field by hand.";
+    return msg;
+  }
+
+  function applyMrzToForm(parsed) {
+    var filled = [];
+    function put(label, key, id, val) {
+      if (!val) return;
+      state[key] = val;
+      if (id && el(id)) el(id).value = val;
+      filled.push(label);
+    }
+    put("Name", "patientName", "patientName", parsed.name);
+    put("Surname", "patientSurname", "patientSurname", parsed.surname);
+    put("EID / ID / Passport", "eid", "eid", parsed.eid);
+    if (parsed.nationality) {
+      state.nationality = parsed.nationality;
+      if (el("nationality")) el("nationality").value = parsed.nationality;
+      state.nationalityOther = parsed.nationality === "Other" ? (parsed.nationalityOther || "") : "";
+      if (el("nationalityOther")) el("nationalityOther").value = state.nationalityOther;
+      filled.push("Nationality");
+    }
+    if (parsed.gender) {
+      state.gender = parsed.gender;
+      if (el("gender")) el("gender").value = parsed.gender;
+      filled.push("Gender");
+    }
+    if (parsed.dob) {
+      state.dateOfBirth = parsed.dob;
+      state.dobBlurred = true;
+      if (el("dateOfBirth")) el("dateOfBirth").value = parsed.dob;
+      filled.push("Date of birth");
+      var sel = ageFromDobSelection(parsed.dob);
+      if (sel && sel.mode) {
+        state.ageMode = sel.mode;
+        state.ageMonths = sel.months || "";
+        if (el("ageMode")) el("ageMode").value = sel.mode;
+        if (el("ageMonths")) el("ageMonths").value = state.ageMonths;
+        filled.push("Age");
+      }
+    }
+    if (typeof syncGenderButtons === "function") syncGenderButtons();
+    if (typeof touchForm === "function") touchForm();
+    if (typeof refresh === "function") refresh();
+    return { filledNames: filled, skipped: [] };
+  }
+
+  function mrzNewCanvas(w, h) {
+    var canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(w));
+    canvas.height = Math.max(1, Math.round(h));
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("This photo couldn't be prepared for reading.");
+    return { canvas: canvas, ctx: ctx };
+  }
+
+  function mrzDrawRotated(src, angle) {
+    var sw = src.width;
+    var sh = src.height;
+    angle = ((angle || 0) % 360 + 360) % 360;
+    var outW = (angle === 90 || angle === 270) ? sh : sw;
+    var outH = (angle === 90 || angle === 270) ? sw : sh;
+    var made = mrzNewCanvas(outW, outH);
+    var ctx = made.ctx;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, outW, outH);
+    ctx.save();
+    if (angle === 90) {
+      ctx.translate(outW, 0);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(src, 0, 0, sw, sh, 0, 0, outH, outW);
+    } else if (angle === 180) {
+      ctx.translate(outW, outH);
+      ctx.rotate(Math.PI);
+      ctx.drawImage(src, 0, 0, sw, sh, 0, 0, outW, outH);
+    } else if (angle === 270) {
+      ctx.translate(0, outH);
+      ctx.rotate(-Math.PI / 2);
+      ctx.drawImage(src, 0, 0, sw, sh, 0, 0, outH, outW);
+    } else {
+      ctx.drawImage(src, 0, 0, sw, sh, 0, 0, outW, outH);
+    }
+    ctx.restore();
+    return made.canvas;
+  }
+
+  function mrzScaleCanvas(src, targetW) {
+    var scale = targetW / Math.max(1, src.width);
+    var w = Math.max(1, Math.round(src.width * scale));
+    var h = Math.max(1, Math.round(src.height * scale));
+    var made = mrzNewCanvas(w, h);
+    made.ctx.imageSmoothingEnabled = true;
+    made.ctx.imageSmoothingQuality = "high";
+    made.ctx.fillStyle = "#fff";
+    made.ctx.fillRect(0, 0, w, h);
+    made.ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, w, h);
+    return made.canvas;
+  }
+
+  function mrzCropCanvas(src, x, y, w, h) {
+    x = Math.max(0, Math.floor(x));
+    y = Math.max(0, Math.floor(y));
+    w = Math.max(1, Math.min(src.width - x, Math.ceil(w)));
+    h = Math.max(1, Math.min(src.height - y, Math.ceil(h)));
+    var made = mrzNewCanvas(w, h);
+    made.ctx.drawImage(src, x, y, w, h, 0, 0, w, h);
+    return made.canvas;
+  }
+
+  function mrzPreparePixels(canvas, mode) {
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return canvas;
+    if (mode === "threshold") {
+      contrastStretchGrayscale(ctx, canvas.width, canvas.height);
+      otsuThresholdGrayscale(ctx, canvas.width, canvas.height);
+    } else {
+      contrastStretchGrayscale(ctx, canvas.width, canvas.height);
+    }
+    return canvas;
+  }
+
+  function mrzFitBandWidth(canvas) {
+    if (canvas.width < MRZ_BAND_WIDTH) return mrzScaleCanvas(canvas, MRZ_BAND_WIDTH);
+    if (canvas.width > MRZ_BAND_WIDTH_MAX) return mrzScaleCanvas(canvas, MRZ_BAND_WIDTH_MAX);
+    return canvas;
+  }
+
+  async function loadMrzSource(file) {
+    var src = await bitmapFromFile(file);
+    if (!src || !src.width || !src.height) {
+      throw new Error("This photo couldn't be opened. Try taking it again, or attach a JPEG or PNG.");
+    }
+    return src;
+  }
+
+  function scoreOrientationText(text) {
+    var s = String(text || "").toUpperCase();
+    var compact = s.replace(/[\s\-]/g, "").replace(/[«»]/g, "<");
+    var lt = (compact.match(/</g) || []).length;
+    var score = lt;
+    var lines = s.split(/\n/);
+    var i, n, good = 0;
+    for (i = 0; i < lines.length; i++) {
+      n = lines[i].toUpperCase().replace(/[\s\-]/g, "").replace(/[«»]/g, "<");
+      if (!n) continue;
+      if (n.length >= 25 && n.length <= 36) good += 1;
+      if (n.indexOf("<<") !== -1) good += 2;
+    }
+    score += good * 8;
+    if (/I[A-Z<]ARE/.test(compact)) score += 15;
+    if (/784/.test(compact)) score += 8;
+    return score;
+  }
+
+  function lineLooksMrz(text) {
+    var n = String(text || "").toUpperCase().replace(/[\s\-]/g, "").replace(/[«»]/g, "<");
+    if (!n) return false;
+    if (n.indexOf("<<") !== -1) return true;
+    if (/I[A-Z<]ARE/.test(n) || /784\d{4,}/.test(n)) return true;
+    var lt = (n.match(/</g) || []).length;
+    if (lt >= 6 && n.length >= 18) return true;
+    if (/^[A-Z0-9<]{25,36}$/.test(n) && lt >= 2) return true;
+    return false;
+  }
+
+  function mrzLineBbox(line) {
+    if (!line) return null;
+    var b = line.bbox || null;
+    if (b && (b.x0 != null || b.x != null)) {
+      var x0 = b.x0 != null ? b.x0 : b.x;
+      var y0 = b.y0 != null ? b.y0 : b.y;
+      var x1 = b.x1 != null ? b.x1 : (x0 + (b.w || b.width || 0));
+      var y1 = b.y1 != null ? b.y1 : (y0 + (b.h || b.height || 0));
+      if (x1 > x0 && y1 > y0) return { x0: x0, y0: y0, x1: x1, y1: y1 };
+    }
+    return null;
+  }
+
+  function mrzLineText(line) {
+    if (!line) return "";
+    if (line.text) return String(line.text);
+    if (line.words && line.words.length) {
+      return line.words.map(function (w) { return w && w.text ? w.text : ""; }).join("");
+    }
+    return "";
+  }
+
+  function findMrzBandFromLines(lines, imgW, imgH) {
+    var hits = [];
+    (lines || []).forEach(function (line) {
+      var text = mrzLineText(line);
+      var bb = mrzLineBbox(line);
+      if (!bb || !lineLooksMrz(text)) return;
+      hits.push({ bb: bb, text: text, baseline: line.baseline || null });
+    });
+    if (!hits.length) return null;
+    hits.sort(function (a, b) { return a.bb.y0 - b.bb.y0; });
+    var heights = hits.map(function (h) { return h.bb.y1 - h.bb.y0; }).sort(function (a, b) { return a - b; });
+    var midH = heights[Math.floor(heights.length / 2)] || 16;
+    var cluster = [hits[0]];
+    var best = cluster.slice();
+    var i;
+    for (i = 1; i < hits.length; i++) {
+      var gap = hits[i].bb.y0 - cluster[cluster.length - 1].bb.y1;
+      if (gap <= midH * 2.8) {
+        cluster.push(hits[i]);
+      } else {
+        if (cluster.length > best.length) best = cluster.slice();
+        cluster = [hits[i]];
+      }
+    }
+    if (cluster.length > best.length) best = cluster;
+    var x0 = best[0].bb.x0, y0 = best[0].bb.y0, x1 = best[0].bb.x1, y1 = best[0].bb.y1;
+    for (i = 1; i < best.length; i++) {
+      x0 = Math.min(x0, best[i].bb.x0);
+      y0 = Math.min(y0, best[i].bb.y0);
+      x1 = Math.max(x1, best[i].bb.x1);
+      y1 = Math.max(y1, best[i].bb.y1);
+    }
+    var bandH = y1 - y0;
+    if (best.length < 3) {
+      var missing = 3 - best.length;
+      y0 -= midH * 0.45;
+      y1 += midH * 1.5 * missing;
+    }
+    var padY = Math.max(18, midH * 0.7, (y1 - y0) * 0.22);
+    var padYBottom = Math.max(padY, midH * 0.9);
+    var padX = Math.max(10, (x1 - x0) * 0.08);
+    x0 = Math.max(0, x0 - padX);
+    y0 = Math.max(0, y0 - padY);
+    x1 = Math.min(imgW, x1 + padX);
+    y1 = Math.min(imgH, y1 + padYBottom);
+    if (x1 - x0 < 20 || y1 - y0 < 10) return null;
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, hits: best };
+  }
+
+  function mrzSkewDegrees(hits) {
+    var angs = [];
+    (hits || []).forEach(function (h) {
+      var b = h.baseline;
+      if (b && b.x1 != null && b.x0 != null && b.x1 !== b.x0) {
+        angs.push(Math.atan2(b.y1 - b.y0, b.x1 - b.x0) * 180 / Math.PI);
+      }
+    });
+    if (!angs.length) return 0;
+    angs.sort(function (a, b) { return a - b; });
+    return angs[Math.floor(angs.length / 2)];
+  }
+
+  function mrzDeskewCanvas(src, degrees) {
+    if (degrees == null || Math.abs(degrees) < 0.7 || Math.abs(degrees) > 12) return src;
+    var rad = degrees * Math.PI / 180;
+    var w = src.width;
+    var h = src.height;
+    var made = mrzNewCanvas(w, h);
+    var ctx = made.ctx;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(-rad);
+    ctx.drawImage(src, -w / 2, -h / 2);
+    return made.canvas;
+  }
+
+  function mrzFallbackBands(w, h) {
+    return [
+      { name: "bottom 30%", x: 0, y: h * 0.70, w: w, h: h * 0.30 },
+      { name: "bottom 40%", x: 0, y: h * 0.60, w: w, h: h * 0.40 },
+      { name: "bottom 55%", x: 0, y: h * 0.45, w: w, h: h * 0.55 },
+      { name: "middle", x: 0, y: h * 0.30, w: w, h: h * 0.40 }
+    ];
+  }
+
+  async function createMrzOcrWorker(Tesseract, onStatus) {
+    function optsFor(langPath, blobUrl) {
+      var opts = {
+        workerPath: TESS_WORKER_PATH,
+        corePath: TESS_CORE_PATH,
+        workerBlobURL: blobUrl,
+        cacheMethod: "none",
+        logger: function (m) {
+          if (!onStatus || !m || !m.status) return;
+          var status = String(m.status);
+          if (status.indexOf("loading") !== -1 || status.indexOf("initializing") !== -1 || status.indexOf("loaded") !== -1) {
+            onStatus("Loading MRZ reader...");
+          }
+        }
+      };
+      if (langPath) opts.langPath = langPath;
+      return opts;
+    }
+    async function tryLang(lang, langPath) {
+      var worker = await withTimeout(
+        Tesseract.createWorker(lang, 1, optsFor(langPath, true)),
+        EID_OCR_WORKER_MS,
+        "Loading the MRZ reader timed out."
+      );
+      return worker;
+    }
+    var lastErr = null;
+    var i;
+    if (onStatus) onStatus("Loading MRZ reader...");
+    for (i = 0; i < MRZ_OCRB_LANG_PATHS.length; i++) {
+      try {
+        return await tryLang("OCRB", MRZ_OCRB_LANG_PATHS[i]);
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    if (onStatus) onStatus("Using English reader for MRZ...");
+    try {
+      return await createEidOcrWorker(Tesseract, onStatus);
+    } catch (err2) {
+      throw lastErr || err2;
+    }
+  }
+
+  async function recognizeMrzCanvas(worker, canvas, psm) {
+    psm = psm || "6";
+    if (worker.setParameters) {
+      await worker.setParameters({
+        tessedit_char_whitelist: MRZ_WHITELIST,
+        tessedit_pageseg_mode: String(psm)
+      });
+    }
+    var result = await withTimeout(
+      worker.recognize(canvas),
+      EID_OCR_RECOGNIZE_MS,
+      "Reading the MRZ is taking too long. Try more light and keep the three code lines in the frame."
+    );
+    var data = result && result.data ? result.data : {};
+    return {
+      text: data.text || "",
+      confidence: Number(data.confidence) || 0,
+      lines: data.lines || [],
+      data: data
+    };
+  }
+
+  function mrzParseScore(parsed) {
+    if (!parsed || !parsed.ok) return -1;
+    var n = 0;
+    if (parsed.eid) n += 5;
+    if (parsed.dob) n += 3;
+    if (parsed.gender) n += 2;
+    if (parsed.nationality) n += 2;
+    if (parsed.surname) n += 2;
+    if (parsed.name) n += 2;
+    if (parsed.checks.document) n += 1;
+    if (parsed.checks.dob) n += 2;
+    if (parsed.checks.expiry) n += 1;
+    if (parsed.checks.composite) n += 2;
+    if (parsed.confidence === "pass") n += 4;
+    else if (parsed.confidence === "mixed") n += 1;
+    return n;
+  }
+
+  function mrzIsPass(parsed) {
+    return !!(parsed && parsed.ok && parsed.confidence === "pass");
+  }
+
+  function considerMrz(best, rec, parsed) {
+    var score = mrzParseScore(parsed);
+    if (score > best.score || (score === best.score && rec && rec.confidence > best.confidence)) {
+      best.text = rec && rec.text ? rec.text : (parsed && parsed.rawText) || best.text;
+      best.parsed = parsed;
+      best.score = score;
+      best.confidence = rec && rec.confidence != null ? rec.confidence : best.confidence;
+    }
+    return best;
+  }
+
+  async function ocrMrzBand(worker, src, rect, onStatus, label, hits) {
+    if (onStatus) onStatus(label || "Reading the code lines…");
+    var crop = mrzCropCanvas(src, rect.x, rect.y, rect.w, rect.h);
+    var skew = mrzSkewDegrees(hits || rect.hits || []);
+    if (skew) crop = mrzDeskewCanvas(crop, skew);
+    var fitted = mrzFitBandWidth(crop);
+    var modes = ["threshold", "contrast"];
+    var i, rec, parsed, local = { text: "", parsed: null, score: -1, confidence: -1 };
+    for (i = 0; i < modes.length; i++) {
+      var canvas = mrzPreparePixels(mrzScaleCanvas(fitted, fitted.width), modes[i]);
+      rec = await recognizeMrzCanvas(worker, canvas, "6");
+      parsed = MrzTd1.parseTd1Mrz(rec.text);
+      local = considerMrz(local, rec, parsed);
+      if (mrzIsPass(parsed)) return local;
+    }
+    return local;
+  }
+
+  async function recognizeMrzPhoto(worker, file, onStatus) {
+    if (onStatus) onStatus("Opening photo…");
+    var src = await loadMrzSource(file);
+    var best = { text: "", parsed: null, score: -1, confidence: -1 };
+    var orientations = [];
+    var a, angle, rotated, coarse, rec, parsed, score;
+    if (onStatus) onStatus("Turning photo…");
+    for (a = 0; a < MRZ_ORIENT_ANGLES.length; a++) {
+      angle = MRZ_ORIENT_ANGLES[a];
+      rotated = mrzDrawRotated(src, angle);
+      coarse = mrzPreparePixels(mrzScaleCanvas(rotated, MRZ_COARSE_WIDTH), "contrast");
+      rec = await recognizeMrzCanvas(worker, coarse, "11");
+      parsed = MrzTd1.parseTd1Mrz(rec.text);
+      score = scoreOrientationText(rec.text);
+      if (parsed && parsed.ok) score += 20;
+      if (mrzIsPass(parsed)) score += 40;
+      orientations.push({ angle: angle, rotated: rotated, coarse: coarse, rec: rec, parsed: parsed, score: score });
+      best = considerMrz(best, rec, parsed);
+      if (mrzIsPass(parsed)) {
+        if (src.close) try { src.close(); } catch (e1) {}
+        return best;
+      }
+    }
+    orientations.sort(function (x, y) { return y.score - x.score; });
+    var picked = orientations[0];
+    if (onStatus) onStatus("Finding the code lines…");
+    var full = picked.rotated;
+    if (full.width > MRZ_BAND_WIDTH_MAX) full = mrzScaleCanvas(full, MRZ_BAND_WIDTH_MAX);
+    var sx = full.width / picked.coarse.width;
+    var sy = full.height / picked.coarse.height;
+    var band = findMrzBandFromLines(picked.rec.lines, picked.coarse.width, picked.coarse.height);
+    if (band) {
+      var scaled = { x: band.x * sx, y: band.y * sy, w: band.w * sx, h: band.h * sy, hits: band.hits };
+      var fromBox = await ocrMrzBand(worker, full, scaled, onStatus, "Reading the code lines…", band.hits);
+      best = considerMrz(best, { text: fromBox.text, confidence: fromBox.confidence }, fromBox.parsed);
+      if (mrzIsPass(fromBox.parsed)) {
+        if (src.close) try { src.close(); } catch (e2) {}
+        return best;
+      }
+    }
+    var bands = mrzFallbackBands(full.width, full.height);
+    var b;
+    for (b = 0; b < bands.length; b++) {
+      var fromBand = await ocrMrzBand(worker, full, bands[b], onStatus, "Trying another part of the photo…", []);
+      best = considerMrz(best, { text: fromBand.text, confidence: fromBand.confidence }, fromBand.parsed);
+      if (mrzIsPass(fromBand.parsed)) break;
+    }
+    if (src.close) try { src.close(); } catch (e3) {}
+    return best;
+  }
+
+  async function readMrz() {
+    showEidOcrStatus("Loading MRZ reader...");
+    var images = collectImageItems(state.attachments || []);
+    if (!images.length) {
+      showEidOcrStatus("Take or attach a photo of the back of the Emirates ID first. A photo of the whole back is fine — you don't need to crop to the three lines.");
+      return;
+    }
+    var btn = el("readMrz");
+    var other = el("readCard");
+    var prev = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "Reading MRZ…"; }
+    if (other) other.disabled = true;
+    var worker = null;
+    try {
+      var Tesseract = await loadTesseractLibrary(showEidOcrStatus);
+      worker = await createMrzOcrWorker(Tesseract, showEidOcrStatus);
+      var best = { text: "", parsed: null, score: -1 };
+      var i;
+      for (i = 0; i < images.length; i++) {
+        var file = images[i].file || images[i];
+        if (images.length > 1) showEidOcrStatus("Reading photo " + (i + 1) + " of " + images.length + "...");
+        var one = await recognizeMrzPhoto(worker, file, showEidOcrStatus);
+        if (one.score > best.score) best = one;
+        if (mrzIsPass(one.parsed)) break;
+      }
+      if (worker && worker.terminate) await worker.terminate();
+      worker = null;
+      var parsed = best.parsed || MrzTd1.parseTd1Mrz(best.text || "");
+      var raw = (parsed && parsed.rawText) ? parsed.rawText : (best.text || "");
+      if (raw) writeEidPasteBox(raw);
+      else if (best.text) writeEidPasteBox(best.text);
+      if (parsed && parsed.ok) applyMrzToForm(parsed);
+      showEidOcrStatus(formatMrzStatus(parsed));
+      return parsed;
+    } catch (err) {
+      if (worker && worker.terminate) try { await worker.terminate(); } catch (e) {}
+      if (isCspOrReaderLoadError(err)) showEidOcrStatus(READER_PASTE_FALLBACK);
+      else showEidOcrStatus(err && err.message ? err.message : "Could not read the MRZ.");
+      return null;
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = prev || "Read back of card (MRZ)"; }
+      if (other) other.disabled = false;
+    }
+  }
+
+  function onStatusBusy() { return true; }
 
 
   async function readCard() {
@@ -2627,6 +3611,7 @@ function mapEidNationality(raw) {
     maybeAdvanceEid();
   });
   el("readCard").addEventListener("click", function () { readCard(); });
+  el("readMrz").addEventListener("click", function () { readMrz(); });
   el("fillFromCardText").addEventListener("click", function () {
     applyCardText(el("eidPaste").value, function (parsed) {
       var applied = applyParsedToEmptyFields(parsed);
@@ -2738,6 +3723,8 @@ function mapEidNationality(raw) {
     parseHHMM: parseHHMM,
     clearForm: clearForm,
     refresh: refresh,
+    parseTd1Mrz: (typeof MrzTd1 !== "undefined" ? MrzTd1.parseTd1Mrz : null),
+    readMrz: readMrz,
   };
   refresh();
 })();
