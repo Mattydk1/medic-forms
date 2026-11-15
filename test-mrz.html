@@ -148,6 +148,27 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
   
 .field > span { color: var(--muted); }
+.field.needs-check input,
+.field.needs-check select,
+.field.needs-check textarea {
+  outline: 2px solid #d97706;
+  outline-offset: 2px;
+  background: #fff7ed;
+}
+#genderField.needs-check .gender-toggle {
+  outline: 2px solid #d97706;
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+[data-theme="dark"] .field.needs-check input,
+[data-theme="dark"] .field.needs-check select,
+[data-theme="dark"] .field.needs-check textarea {
+  background: #3b2a14;
+  outline-color: #fbbf24;
+}
+[data-theme="dark"] #genderField.needs-check .gender-toggle {
+  outline-color: #fbbf24;
+}
 .gender-toggle {
   display: flex;
   gap: 8px;
@@ -1383,6 +1404,7 @@ function mapEidNationality(raw) {
       buttons[i].addEventListener("click", function (e) {
         var btn = e.currentTarget;
         state.gender = btn.getAttribute("data-gender") || "";
+        if (typeof markFieldCheck === "function") markFieldCheck("gender", false);
         if (typeof touchForm === "function") touchForm();
         syncGenderButtons();
         refresh();
@@ -1486,6 +1508,7 @@ function mapEidNationality(raw) {
   function bind(id, key) {
     el(id).addEventListener("input", function () {
       state[key] = el(id).value;
+      if (typeof markFieldCheck === "function") markFieldCheck(id, false);
       touchForm();
       refresh();
     });
@@ -1817,6 +1840,7 @@ function mapEidNationality(raw) {
     el("copyMessage").textContent = "Copy message";
     clearAttachments();
     showShareNote("");
+    clearAllFieldChecks();
     renderExtraVitals();
     refresh();
   }
@@ -1828,64 +1852,109 @@ function mapEidNationality(raw) {
     if (emptyValues && emptyValues.indexOf(x) !== -1) return true;
     return false;
   }
-  function applyParsedToEmptyFields(parsed) {
+  function fieldCheckNode(id) {
+    var node = el(id);
+    if (!node) return null;
+    if (id === "gender") return el("genderField") || node;
+    if (id === "ageMode") return (node.closest && node.closest(".field")) || node.parentNode || node;
+    return (node.closest && node.closest(".field")) || node;
+  }
+  function markFieldCheck(id, on) {
+    var node = fieldCheckNode(id);
+    if (node && node.classList) node.classList.toggle("needs-check", !!on);
+  }
+  function clearAllFieldChecks() {
+    ["patientName", "patientSurname", "eid", "nationality", "gender", "dateOfBirth", "ageMode"].forEach(function (id) {
+      markFieldCheck(id, false);
+    });
+  }
+  function applyParsedCardFields(parsed) {
+    parsed = parsed || {};
     const filledNames = [];
+    const unread = [];
     const skipped = [];
+    clearAllFieldChecks();
     function take(label, key, elId, val) {
-      if (!val) return;
-      if (!fieldIsEmpty(state[key])) { skipped.push(label); return; }
-      state[key] = val;
-      if (elId && el(elId)) el(elId).value = val;
-      filledNames.push(label);
+      if (val) {
+        state[key] = val;
+        if (elId && el(elId)) el(elId).value = val;
+        filledNames.push(label);
+        markFieldCheck(elId, false);
+        return true;
+      }
+      unread.push(label);
+      if (elId) markFieldCheck(elId, true);
+      return false;
     }
     take("Name", "patientName", "patientName", parsed.name);
     take("Surname", "patientSurname", "patientSurname", parsed.surname);
-    take("EID / ID / Passport", "eid", "eid", parsed.eid);
+    take("EID / ID / Passport", "eid", "eid", parsed.eid || parsed.docNumber || parsed.idNumber || "");
     if (parsed.nationality) {
-      if (fieldIsEmpty(state.nationality)) {
-        state.nationality = parsed.nationality;
-        el("nationality").value = parsed.nationality;
-        state.nationalityOther = parsed.nationality === "Other" ? parsed.nationalityOther : "";
-        el("nationalityOther").value = state.nationalityOther;
-        filledNames.push("Nationality");
-      } else skipped.push("Nationality");
+      state.nationality = parsed.nationality;
+      if (el("nationality")) el("nationality").value = parsed.nationality;
+      state.nationalityOther = parsed.nationality === "Other" ? (parsed.nationalityOther || "") : "";
+      if (el("nationalityOther")) el("nationalityOther").value = state.nationalityOther;
+      filledNames.push("Nationality");
+      markFieldCheck("nationality", false);
+    } else {
+      unread.push("Nationality");
+      markFieldCheck("nationality", true);
     }
-    take("Gender", "gender", "gender", parsed.gender);
-    if (parsed.dob) {
-      if (fieldIsEmpty(state.dateOfBirth) || !isDobValid(state.dateOfBirth)) {
-        state.dateOfBirth = parsed.dob;
-        state.dobBlurred = true;
-        el("dateOfBirth").value = parsed.dob;
-        filledNames.push("Date of birth");
-        if (fieldIsEmpty(state.ageMode)) {
-          const sel = ageFromDobSelection(parsed.dob);
-          state.ageMode = sel.mode;
-          state.ageMonths = sel.months;
-          el("ageMode").value = sel.mode;
-          el("ageMonths").value = sel.months;
-          if (sel.mode) filledNames.push("Age");
-        }
-      } else skipped.push("Date of birth");
+    if (parsed.gender) {
+      state.gender = parsed.gender;
+      if (el("gender")) el("gender").value = parsed.gender;
+      filledNames.push("Gender");
+      markFieldCheck("gender", false);
+    } else {
+      unread.push("Gender");
+      markFieldCheck("gender", true);
     }
-    if ((parsed.age || parsed.eid) && fieldIsEmpty(state.ageMode)) {
-      if (parsed.dob && isDobValid(parsed.dob)) {
-        /* already handled */
-      } else {
-        const year = birthYearFromEid(parsed.eid || state.eid);
+    if (typeof syncGenderButtons === "function") syncGenderButtons();
+    var dob = parsed.dob || "";
+    if (dob) {
+      state.dateOfBirth = dob;
+      state.dobBlurred = true;
+      if (el("dateOfBirth")) el("dateOfBirth").value = dob;
+      filledNames.push("Date of birth");
+      markFieldCheck("dateOfBirth", false);
+      const sel = ageFromDobSelection(dob);
+      if (sel && sel.mode) {
+        state.ageMode = sel.mode;
+        state.ageMonths = sel.months || "";
+        if (el("ageMode")) el("ageMode").value = sel.mode;
+        if (el("ageMonths")) el("ageMonths").value = state.ageMonths;
+        if (!parsed.age) parsed.age = sel.mode === "infant" ? "infant" : sel.mode;
+        filledNames.push("Age");
+        markFieldCheck("ageMode", false);
+      }
+    } else {
+      unread.push("Date of birth");
+      markFieldCheck("dateOfBirth", true);
+      if ((parsed.age || parsed.eid) && !state.ageMode) {
+        const year = birthYearFromEid(parsed.eid || "");
         const a = year ? ageFromBirthYear(year) : "";
         const n = Number(a);
         if (a && isFinite(n) && n >= 1) {
           state.ageMode = String(Math.min(n, 110));
           state.ageMonths = "";
-          el("ageMode").value = state.ageMode;
-          el("ageMonths").value = "";
+          if (el("ageMode")) el("ageMode").value = state.ageMode;
+          if (el("ageMonths")) el("ageMonths").value = "";
+          if (!parsed.age) parsed.age = state.ageMode;
           filledNames.push("Age");
+          markFieldCheck("ageMode", false);
+        } else {
+          unread.push("Age");
+          markFieldCheck("ageMode", true);
         }
+      } else if (!parsed.age) {
+        unread.push("Age");
+        markFieldCheck("ageMode", true);
       }
-    } else if (parsed.age && !fieldIsEmpty(state.ageMode) && filledNames.indexOf("Age") === -1) {
-      skipped.push("Age");
     }
-    return { filledNames: filledNames, skipped: skipped };
+    return { filledNames: filledNames, skipped: skipped, unread: unread };
+  }
+  function applyParsedToEmptyFields(parsed) {
+    return applyParsedCardFields(parsed);
   }
   var TESS_JS_VERSION = "5.1.1";
   var TESS_CORE_VERSION = "5.1.0";
@@ -2269,7 +2338,67 @@ function mapEidNationality(raw) {
     ctx.putImageData(imageData, 0, 0);
   }
 
-  async function prepareEidImage(file, rotation, mode) {
+  function sharpenGrayscale(ctx, w, h) {
+    var imageData = ctx.getImageData(0, 0, w, h);
+    var src = new Uint8ClampedArray(imageData.data);
+    var d = imageData.data;
+    var x, y, i, c;
+    for (y = 1; y < h - 1; y++) {
+      for (x = 1; x < w - 1; x++) {
+        i = (y * w + x) * 4;
+        c = src[i] * 5 - src[i - 4] - src[i + 4] - src[i - w * 4] - src[i + w * 4];
+        if (c < 0) c = 0;
+        if (c > 255) c = 255;
+        d[i] = d[i + 1] = d[i + 2] = c;
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  function scaleCanvasToWidth(src, targetW) {
+    if (!src || !targetW) return src;
+    var sw = src.width || 0;
+    var sh = src.height || 0;
+    if (!sw || !sh) return src;
+    if (Math.abs(sw - targetW) < 40) return src;
+    var scale = targetW / sw;
+    var w = Math.max(1, Math.round(sw * scale));
+    var h = Math.max(1, Math.round(sh * scale));
+    var canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return src;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(src, 0, 0, sw, sh, 0, 0, w, h);
+    return canvas;
+  }
+
+  function cropFrontLeftColumn(src) {
+    if (!src) return src;
+    var sw = src.width || 0;
+    var sh = src.height || 0;
+    if (!sw || !sh) return src;
+    var x = 0;
+    var y = Math.round(sh * 0.14);
+    var cw = Math.max(1, Math.round(sw * 0.60));
+    var ch = Math.max(1, Math.round(sh * 0.72));
+    if (y + ch > sh) ch = Math.max(1, sh - y);
+    var canvas = document.createElement("canvas");
+    canvas.width = cw;
+    canvas.height = ch;
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return src;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImage(src, x, y, cw, ch, 0, 0, cw, ch);
+    return canvas;
+  }
+
+    async function prepareEidImage(file, rotation, mode) {
     var src = await bitmapFromFile(file);
     var sw = src.width;
     var sh = src.height;
@@ -2307,9 +2436,17 @@ function mapEidNationality(raw) {
     ctx.drawImage(src, 0, 0, dw, dh);
     ctx.restore();
     if (src.close) try { src.close(); } catch (e) {}
+    if (canvas.width >= canvas.height && (canvas.width < 1900 || canvas.width > 2400)) {
+      canvas = scaleCanvasToWidth(canvas, EID_OCR_TARGET_SIDE);
+      ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return canvas;
+    }
     if (mode === "threshold") {
       contrastStretchGrayscale(ctx, canvas.width, canvas.height);
       otsuThresholdGrayscale(ctx, canvas.width, canvas.height);
+    } else if (mode === "sharpen") {
+      contrastStretchGrayscale(ctx, canvas.width, canvas.height);
+      sharpenGrayscale(ctx, canvas.width, canvas.height);
     } else if (mode === "plain") {
       /* scaled original, no contrast boost */
     } else {
@@ -2464,59 +2601,93 @@ function mapEidNationality(raw) {
     return best;
   }
 
+  function scoreParsedCardCandidate(parsed, confidence) {
+    var n = countParsedFields(parsed);
+    var score = n * 100 + (Number(confidence) || 0);
+    if (parsed && parsed.name) score += 40;
+    if (parsed && parsed.surname) score += 40;
+    if (parsed && parsed.name && parsed.surname) score += 20;
+    if (parsed && parsed.luhnOk) score += 15;
+    return score;
+  }
+
   async function recognizePhotoBest(worker, file, onStatus, index, total) {
     var label = "photo " + (index + 1) + " of " + total;
     var orient = await pickFrontOrientation(worker, file, onStatus, index, total);
     var angle = orient && isFinite(orient.angle) ? orient.angle : 0;
     if (onStatus) onStatus("Reading " + label + "…");
-    var modes = ["plain", "contrast", "threshold"];
-    var psms = [6, 11];
+    var modes = ["contrast", "sharpen", "threshold"];
+    var psms = [6, 4, 11];
     var allParts = [];
-    var m, p, canvas, rec;
+    var m, p, canvas, rec, left, lp;
+    var leftModes = ["contrast", "sharpen"];
+    var leftPsms = [6, 4];
     for (m = 0; m < modes.length; m++) {
       canvas = await prepareEidImage(file, angle, modes[m]);
       for (p = 0; p < psms.length; p++) {
         rec = await recognizeCanvasPsm(worker, canvas, psms[p]);
         allParts.push(rec);
       }
+      if (modes[m] === "contrast" || modes[m] === "sharpen") {
+        left = cropFrontLeftColumn(canvas);
+        if (left && left !== canvas) {
+          if (onStatus) onStatus("Reading the name area on " + label + "…");
+          for (lp = 0; lp < leftPsms.length; lp++) {
+            rec = await recognizeCanvasPsm(worker, left, leftPsms[lp]);
+            allParts.push(rec);
+          }
+        }
+      }
     }
     var merged = mergeOcrTexts(allParts);
     if (orient && orient.text) merged = mergeOcrTexts([{ text: orient.text }, { text: merged }]);
-    var parsed = parseCardFrontText(merged);
     var confSum = 0;
     var c;
     for (c = 0; c < allParts.length; c++) confSum += allParts[c].confidence || 0;
     var confidence = allParts.length ? confSum / allParts.length : (orient && orient.confidence) || 0;
-    var score = countParsedFields(parsed) * 100 + confidence;
-    if (!parsedLooksUseful(parsed) && orient && orient.text) {
-      var fallback = parseCardFrontText(orient.text);
-      if (countParsedFields(fallback) > countParsedFields(parsed)) {
-        parsed = fallback;
-        if (!merged) merged = orient.text;
-        score = countParsedFields(parsed) * 100 + confidence;
+    var parsed = parseCardFrontText(merged);
+    var score = scoreParsedCardCandidate(parsed, confidence);
+    var candidates = allParts.slice();
+    if (orient && orient.text) candidates.push({ text: orient.text, confidence: orient.confidence || 0 });
+    candidates.push({ text: merged, confidence: confidence });
+    for (c = 0; c < candidates.length; c++) {
+      var one = parseCardFrontText((candidates[c] && candidates[c].text) || "");
+      var oneScore = scoreParsedCardCandidate(one, (candidates[c] && candidates[c].confidence) || 0);
+      if (oneScore > score) {
+        parsed = one;
+        score = oneScore;
       }
     }
     return { text: merged, confidence: confidence, angle: angle, parsed: parsed, score: score };
   }
 
+  function unreadNameStatus(parsed) {
+    parsed = parsed || {};
+    if (typeof SaId !== "undefined" && typeof SaId.unreadNameStatus === "function") {
+      return SaId.unreadNameStatus(parsed);
+    }
+    if (!parsed.name && !parsed.surname) return "couldn't read name, please type it";
+    if (!parsed.name) return "couldn't read name, please type it";
+    if (!parsed.surname) return "couldn't read surname, please type it";
+    return "";
+  }
   function formatReadCardDone(applied, parsed) {
+    parsed = parsed || {};
     var filled = applied && applied.filledNames ? applied.filledNames : [];
     var missing = [];
-    if (!parsed.name) missing.push("Name");
-    if (!parsed.surname) missing.push("Surname");
-    if (!parsed.eid) missing.push("EID / ID / Passport");
+    var nameMsg = unreadNameStatus(parsed);
+    if (!parsed.eid && !parsed.idNumber && !parsed.docNumber) missing.push("EID / ID / Passport");
     if (!parsed.nationality) missing.push("Nationality");
     if (!parsed.gender) missing.push("Gender");
     if (!parsed.dob) missing.push("Date of birth");
-    if (!parsed.age) missing.push("Age");
-    var foundAny = !!(parsed.eid || parsed.name || parsed.surname || parsed.dob || parsed.gender || parsed.nationality);
+    var ageKnown = !!(parsed.age || (filled.indexOf("Age") !== -1) || (parsed.dob && ageFromDobSelection(parsed.dob).mode));
+    if (!ageKnown) missing.push("Age");
+    var foundAny = !!(parsed.eid || parsed.idNumber || parsed.docNumber || parsed.name || parsed.surname || parsed.dob || parsed.gender || parsed.nationality);
     if (!filled.length && !foundAny) {
       return "Done: couldn't read the card. Try a sharper picture of the front and back, and check every field by hand.";
     }
-    var msg = "Done: " + (filled.length ? ("filled " + filled.join(", ")) : "no empty fields were filled");
-    if (applied && applied.skipped && applied.skipped.length) {
-      msg += ". Already had " + applied.skipped.join(", ") + " (left as they were)";
-    }
+    var msg = "Done: " + (filled.length ? ("filled " + filled.join(", ")) : "no new fields were filled");
+    if (nameMsg) msg += ". " + nameMsg;
     if (missing.length) msg += ", couldn't read " + missing.join(", ");
     if (parsed.idNumber && parsed.luhnOk === false) msg += ". " + ((typeof SaId !== "undefined" && SaId.LUHN_FAIL) ? SaId.LUHN_FAIL : "ID number check failed, please check it");
     if (parsed.notes && parsed.notes.length) msg += ". " + parsed.notes.join(" ");
@@ -2583,9 +2754,16 @@ function mapEidNationality(raw) {
   function parseCardFrontText(text, now) {
     var raw = String(text || "").trim();
     if (!raw) return parseEidText(raw, now);
-    if (typeof SaId !== "undefined" && SaId.looksLikeSaIdFront && SaId.looksLikeSaIdFront(raw)) {
-      var saFront = SaId.parseSaIdFrontText(raw, now);
-      if (saFront && (saFront.eid || saFront.idNumber || saFront.surname || saFront.name || saFront.dob)) return saFront;
+    if (typeof SaId !== "undefined" && SaId.parseSaIdFrontText) {
+      var useSa = SaId.looksLikeSaIdFront && SaId.looksLikeSaIdFront(raw);
+      if (!useSa && SaId.parseSaIdText) {
+        var idOnly = SaId.parseSaIdText(raw, now);
+        if (idOnly && idOnly.ok && !/^784/.test(idOnly.idNumber || "")) useSa = true;
+      }
+      if (useSa) {
+        var saFront = SaId.parseSaIdFrontText(raw, now);
+        if (saFront && (saFront.eid || saFront.idNumber || saFront.surname || saFront.name || saFront.dob)) return saFront;
+      }
     }
     return parseEidText(raw, now);
   }
@@ -3634,18 +3812,21 @@ function mapEidNationality(raw) {
     var s = String(text || "").toUpperCase();
     if (/REPUBLIC\s+OF\s+SOUTH\s+AFRICA/.test(s)) return true;
     if (/NATIONAL\s+IDENTITY\s+CARD/.test(s)) return true;
-    var hasSurname = /\bSURNAME\b/.test(s);
+    var hasSurname = /\bSURNAME\b/.test(s) || /\bSUMAME\b/.test(s) || /\bSURNARNE\b/.test(s);
     var hasIdentity = /\bIDENTITY\s+NUMBER\b/.test(s);
     var hits = 0;
     if (hasSurname) hits += 1;
-    if (/\bNAMES\b/.test(s)) hits += 1;
+    if (/\bNAMES\b/.test(s) || /\bNARNES\b/.test(s)) hits += 1;
     if (hasIdentity) hits += 1;
     if (/\bDATE\s+OF\s+BIRTH\b/.test(s)) hits += 1;
     if (/\bNATIONALITY\b/.test(s)) hits += 1;
     if (/\bSEX\b/.test(s)) hits += 1;
     if (/\bCITIZEN\b/.test(s) && /\bSTATUS\b/.test(s)) hits += 1;
+    if (/\bDATE\s+OF\s+BIRTH\b/.test(s) && (/\bCITIZEN\b/.test(s) || /\bCOUNTRY\s+OF\s+BIRTH\b/.test(s))) return true;
     if (hasSurname && hits >= 2) return true;
     if (hasIdentity && hits >= 2) return true;
+    var idGuess = parseSaIdText(s);
+    if (idGuess && idGuess.ok && !/^784/.test(idGuess.idNumber || "") && (/\bCITIZEN\b/.test(s) || /\bDATE\s+OF\s+BIRTH\b/.test(s) || /\bRSA\b/.test(s) || /SOUTH\s+AFRICA/.test(s))) return true;
     return false;
   }
 
@@ -3661,20 +3842,135 @@ function mapEidNationality(raw) {
     };
   }
 
-  function matchSaFrontLabel(line) {
+  var SA_FRONT_LABEL_TARGETS = [
+    { key: "identityNumber", aliases: ["IDENTITYNUMBER", "IDENTITYNO", "IDNUMBER", "IDNO"] },
+    { key: "dateOfBirth", aliases: ["DATEOFBIRTH", "DOB"] },
+    { key: "countryOfBirth", aliases: ["COUNTRYOFBIRTH"] },
+    { key: "nationality", aliases: ["NATIONALITY"] },
+    { key: "surname", aliases: ["SURNAME", "SURNAMES"] },
+    { key: "names", aliases: ["NAMES", "GIVENNAMES", "GIVENNAME", "FIRSTNAMES", "FIRSTNAME", "FORENAMES", "FORENAME"] },
+    { key: "sex", aliases: ["SEX", "GENDER"] },
+    { key: "status", aliases: ["STATUS"] }
+  ];
+
+  function saLevenshtein(a, b) {
+    a = String(a || "");
+    b = String(b || "");
+    if (a === b) return 0;
+    var al = a.length, bl = b.length, i, j;
+    if (!al) return bl;
+    if (!bl) return al;
+    var prev = new Array(bl + 1);
+    for (j = 0; j <= bl; j++) prev[j] = j;
+    for (i = 1; i <= al; i++) {
+      var cur = [i];
+      for (j = 1; j <= bl; j++) {
+        var cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+        cur[j] = Math.min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+      }
+      prev = cur;
+    }
+    return prev[bl];
+  }
+
+  function compactSaLabel(s) {
+    return String(s || "").toUpperCase()
+      .replace(/0/g, "O")
+      .replace(/[1|]/g, "I")
+      .replace(/5/g, "S")
+      .replace(/[^A-Z]/g, "");
+  }
+
+  function saMaxTypo(alias) {
+    var n = (alias || "").length;
+    if (n <= 3) return 0;
+    if (n <= 4) return 1;
+    if (n <= 8) return 2;
+    if (n <= 12) return 2;
+    return 3;
+  }
+
+  function matchSaFrontLabelExact(line) {
     var s = String(line || "");
     var i, m;
     for (i = 0; i < SA_FRONT_LABEL_DEFS.length; i++) {
       m = s.match(SA_FRONT_LABEL_DEFS[i].re);
-      if (m) return { key: SA_FRONT_LABEL_DEFS[i].key, rest: s.slice(m[0].length).trim() };
+      if (m) return { key: SA_FRONT_LABEL_DEFS[i].key, rest: s.slice(m[0].length).trim(), exact: true };
     }
     return null;
+  }
+
+  function matchSaFrontLabel(line) {
+    var exact = matchSaFrontLabelExact(line);
+    if (exact) return exact;
+    var s = String(line || "").replace(/[:\-]/g, " ").replace(/\s+/g, " ").trim();
+    if (!s) return null;
+    var words = s.split(" ");
+    var best = null;
+    var w, t, a, compact, dist, maxT, rest;
+    for (w = 1; w <= Math.min(3, words.length); w++) {
+      compact = compactSaLabel(words.slice(0, w).join(" "));
+      if (compact.length < 3) continue;
+      for (t = 0; t < SA_FRONT_LABEL_TARGETS.length; t++) {
+        for (a = 0; a < SA_FRONT_LABEL_TARGETS[t].aliases.length; a++) {
+          var alias = SA_FRONT_LABEL_TARGETS[t].aliases[a];
+          maxT = saMaxTypo(alias);
+          if (Math.abs(compact.length - alias.length) > maxT + 1) continue;
+          dist = saLevenshtein(compact, alias);
+          if (dist > maxT) continue;
+          rest = words.slice(w).join(" ");
+          if (!best || dist < best.dist || (dist === best.dist && alias.length > best.aliasLen)) {
+            best = { key: SA_FRONT_LABEL_TARGETS[t].key, rest: rest, exact: false, dist: dist, aliasLen: alias.length };
+          }
+        }
+      }
+    }
+    if (!best && words.length) {
+      compact = compactSaLabel(s);
+      for (t = 0; t < SA_FRONT_LABEL_TARGETS.length; t++) {
+        for (a = 0; a < SA_FRONT_LABEL_TARGETS[t].aliases.length; a++) {
+          var alias2 = SA_FRONT_LABEL_TARGETS[t].aliases[a];
+          maxT = saMaxTypo(alias2);
+          var len;
+          for (len = alias2.length - maxT; len <= alias2.length + maxT && len <= compact.length; len++) {
+            if (len < 3) continue;
+            dist = saLevenshtein(compact.slice(0, len), alias2);
+            if (dist <= maxT) {
+              var used = 0, acc = "";
+              while (used < words.length && acc.length < len) {
+                acc += compactSaLabel(words[used]);
+                used += 1;
+              }
+              rest = words.slice(used).join(" ");
+              if (!best || dist < best.dist || (dist === best.dist && alias2.length > best.aliasLen)) {
+                best = { key: SA_FRONT_LABEL_TARGETS[t].key, rest: rest, exact: false, dist: dist, aliasLen: alias2.length };
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  function valueLooksUsefulForField(key, value) {
+    var v = String(value || "").replace(/\s+/g, " ").trim();
+    if (!v) return false;
+    if (key === "dateOfBirth") return !!parsePrintedSaDob(v);
+    if (key === "identityNumber") {
+      var digits = onlyDigitsMapped(v);
+      return digits.length >= 13;
+    }
+    if (key === "sex") return !!parseSaFrontSex(v);
+    if (key === "names" || key === "surname") return isSaNameValueLine(v);
+    return true;
   }
 
   function collectSaFrontFields(text) {
     var rawLines = String(text || "").split(/\r?\n/);
     var lines = [];
-    var i, t, parts, p;
+    var i, t;
     for (i = 0; i < rawLines.length; i++) {
       t = String(rawLines[i] || "").replace(/\s+/g, " ").trim();
       if (t) lines.push(t);
@@ -3693,14 +3989,18 @@ function mapEidNationality(raw) {
       while (pending) {
         var split = splitSaFrontAtNextLabel(rest);
         var value = split.value;
-        if (!value) {
+        if (!valueLooksUsefulForField(pending, value)) {
           var j = i + 1;
           while (j < lines.length) {
             if (isSaFrontHeaderLine(lines[j])) { j += 1; continue; }
-            if (matchSaFrontLabel(lines[j])) break;
-            value = lines[j];
-            i = j;
-            break;
+            var nextLab = matchSaFrontLabel(lines[j]);
+            if (nextLab && !nextLab.rest && (nextLab.key !== pending)) break;
+            if (valueLooksUsefulForField(pending, lines[j]) || (!nextLab && lines[j])) {
+              if (!value || valueLooksUsefulForField(pending, lines[j])) value = lines[j];
+              i = j;
+              break;
+            }
+            j += 1;
           }
         }
         if (value && !fields[pending]) fields[pending] = value.replace(/\s+/g, " ").trim();
@@ -3717,6 +4017,86 @@ function mapEidNationality(raw) {
       i += 1;
     }
     return fields;
+  }
+
+  function isSaNameValueLine(s) {
+    var x = String(s || "").trim();
+    if (!x) return false;
+    if (isSaFrontHeaderLine(x)) return false;
+    var lab = matchSaFrontLabel(x);
+    if (lab && !String(lab.rest || "").trim()) return false;
+    var cleaned = stripSaNameJunk(x);
+    if (cleaned.length < 2) return false;
+    if (/^(RSA|ZA|ZAF|SA|M|F|MALE|FEMALE|CITIZEN|PERMANENT RESIDENT|SOUTH AFRICA|SOUTH AFRICAN|SIGNATURE|DATE OF BIRTH|COUNTRY OF BIRTH)$/i.test(cleaned)) return false;
+    var letters = cleaned.replace(/[^A-Za-z]/g, "");
+    if (letters.length < 2) return false;
+    var compactOrig = x.replace(/\s/g, "");
+    if (!compactOrig) return false;
+    if (letters.length / compactOrig.length < 0.65) return false;
+    var upper = (letters.match(/[A-Z]/g) || []).length;
+    var title = /^[A-Z][a-z]+(?:[ -][A-Z][a-z]+)*$/.test(cleaned);
+    if (upper / letters.length < 0.55 && !title) return false;
+    return true;
+  }
+
+  function stripSaNameJunk(s) {
+    return String(s || "").replace(/[^A-Za-z' \-]/g, " ").replace(/\s+/g, " ").trim();
+  }
+
+  function extractSaFrontNames(text) {
+    var rawLines = String(text || "").split(/\r?\n/);
+    var lines = [];
+    var i, t, info, nxt, cleaned, j;
+    for (i = 0; i < rawLines.length; i++) {
+      t = String(rawLines[i] || "").replace(/\s+/g, " ").trim();
+      if (t) lines.push(t);
+    }
+    var fields = collectSaFrontFields(text);
+    var surname = fields.surname || "";
+    var names = fields.names || "";
+    function takeFollowing(start, already) {
+      if (already && isSaNameValueLine(already)) return already;
+      var k;
+      for (k = start; k < lines.length && k < start + 3; k++) {
+        if (isSaFrontHeaderLine(lines[k])) continue;
+        var lab = matchSaFrontLabel(lines[k]);
+        if (lab && !lab.rest) break;
+        if (isSaNameValueLine(lab && lab.rest ? lab.rest : lines[k])) return lab && lab.rest ? lab.rest : lines[k];
+      }
+      return already || "";
+    }
+    for (i = 0; i < lines.length; i++) {
+      info = matchSaFrontLabel(lines[i]);
+      if (!info) continue;
+      if (info.key === "surname") {
+        cleaned = info.rest && isSaNameValueLine(info.rest) ? info.rest : "";
+        if (!cleaned) cleaned = takeFollowing(i + 1, "");
+        if (cleaned && (!surname || (isSaNameValueLine(cleaned) && !isSaNameValueLine(surname)))) surname = cleaned;
+        else if (cleaned && !surname) surname = cleaned;
+      }
+      if (info.key === "names") {
+        cleaned = info.rest && isSaNameValueLine(info.rest) ? info.rest : "";
+        if (!cleaned) cleaned = takeFollowing(i + 1, "");
+        if (cleaned && (!names || (isSaNameValueLine(cleaned) && !isSaNameValueLine(names)))) names = cleaned;
+        else if (cleaned && !names) names = cleaned;
+      }
+    }
+    if (!surname || !names) {
+      for (i = 0; i < lines.length; i++) {
+        info = matchSaFrontLabel(lines[i]);
+        if (info && info.key === "surname" && !surname) {
+          for (j = i + 1; j < lines.length && j <= i + 3; j++) {
+            if (isSaNameValueLine(lines[j])) { surname = lines[j]; break; }
+          }
+        }
+        if (info && info.key === "names" && !names) {
+          for (j = i + 1; j < lines.length && j <= i + 3; j++) {
+            if (isSaNameValueLine(lines[j])) { names = lines[j]; break; }
+          }
+        }
+      }
+    }
+    return { surname: surname, names: names };
   }
 
   function parsePrintedSaDob(raw, now) {
@@ -3773,14 +4153,35 @@ function mapEidNationality(raw) {
   }
 
   function prettySaName(s) {
-    var x = String(s || "").replace(/[^A-Za-z' \-]/g, " ").replace(/\s+/g, " ").trim();
+    var x = stripSaNameJunk(s);
     if (!x) return "";
     if (/^REPUBLIC OF SOUTH AFRICA$/i.test(x) || /^NATIONAL IDENTITY CARD$/i.test(x) || /^SOUTH AFRICA$/i.test(x)) return "";
-    if (SA_FRONT_ANY_LABEL.test(x) && x.split(" ").length <= 3) return "";
+    if (SA_FRONT_ANY_LABEL.test(x) && x.split(" ").length <= 3 && !isSaNameValueLine(x)) return "";
     return x.split(/(\s+|-)/).map(function (w) {
       if (w === "-" || /^\s+$/.test(w)) return w;
       return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
     }).join("");
+  }
+
+  function ageFromSaDob(dob, now) {
+    now = now || new Date();
+    var m = String(dob || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return "";
+    var day = Number(m[1]), month = Number(m[2]), year = Number(m[3]);
+    if (!isValidYmd(year, month, day)) return "";
+    var years = now.getFullYear() - year;
+    if (now.getMonth() + 1 < month || (now.getMonth() + 1 === month && now.getDate() < day)) years -= 1;
+    if (years < 0 || years > 120) return "";
+    if (years >= 1) return String(Math.min(years, 110));
+    return "infant";
+  }
+
+  function unreadNameStatus(parsed) {
+    parsed = parsed || {};
+    if (!parsed.name && !parsed.surname) return "couldn't read name, please type it";
+    if (!parsed.name) return "couldn't read name, please type it";
+    if (!parsed.surname) return "couldn't read surname, please type it";
+    return "";
   }
 
   function parseSaIdFrontText(text, now) {
@@ -3797,8 +4198,11 @@ function mapEidNationality(raw) {
     result.rawText = raw;
     if (!raw) return result;
     var fields = collectSaFrontFields(raw);
-    result.surname = prettySaName(fields.surname);
-    result.name = prettySaName(fields.names);
+    var extracted = extractSaFrontNames(raw);
+    var surnameRaw = extracted.surname || fields.surname;
+    var namesRaw = extracted.names || fields.names;
+    result.surname = prettySaName(surnameRaw);
+    result.name = prettySaName(namesRaw);
     var sex = parseSaFrontSex(fields.sex);
     var printedNat = mapSaFrontNationality(fields.nationality);
     var printedDob = parsePrintedSaDob(fields.dateOfBirth, now);
@@ -3832,17 +4236,30 @@ function mapEidNationality(raw) {
     } else if (fromNumber.dateOk && fromNumber.dob) {
       result.dob = fromNumber.dob;
     }
-    result.gender = sex || (fromNumber.gender || "");
-    if (printedNat) result.nationality = printedNat;
-    else if (fromNumber.nationality) result.nationality = fromNumber.nationality;
-    else if (/\bCITIZEN\b/.test(status) && result.citizenship !== "permanent-resident") result.nationality = CITIZEN_NATIONALITY;
+    if (fromNumber.ok) {
+      if (fromNumber.gender) result.gender = fromNumber.gender;
+      if (fromNumber.nationality) result.nationality = fromNumber.nationality;
+      else if (fromNumber.citizenship === "permanent-resident") result.nationality = "";
+    } else {
+      result.gender = sex || (fromNumber.gender || "");
+      if (printedNat) result.nationality = printedNat;
+      else if (fromNumber.nationality) result.nationality = fromNumber.nationality;
+      else if (/\bCITIZEN\b/.test(status) && result.citizenship !== "permanent-resident") result.nationality = CITIZEN_NATIONALITY;
+    }
+    if (sex && fromNumber.ok && fromNumber.gender && sex !== fromNumber.gender) {
+      result.notes.push("The printed sex did not match the ID number; the gender from the ID number was used.");
+    }
+    if (printedNat && fromNumber.ok && fromNumber.nationality && printedNat !== fromNumber.nationality) {
+      result.notes.push("The printed nationality did not match the ID number; the nationality from the ID number was used.");
+    }
+    result.age = ageFromSaDob(result.dob, now);
     result.ok = !!(result.surname || result.name || result.idNumber);
     return result;
   }
 
   function formatSaIdFrontStatus(parsed, filledNames) {
     var bits = [];
-    if (!parsed || !(parsed.idNumber || parsed.surname || parsed.name)) {
+    if (!parsed || !(parsed.idNumber || parsed.surname || parsed.name || parsed.dob)) {
       return "Couldn't read the front of the SA smart ID. Try more light and keep the whole front in the frame, or type the details. " + CHECK_HINT;
     }
     if (filledNames && filledNames.length) bits.push("filled " + filledNames.join(", "));
@@ -3851,10 +4268,13 @@ function mapEidNationality(raw) {
       if (parsed.name) bits.push("names");
       if (parsed.idNumber) bits.push("ID " + parsed.idNumber);
       if (parsed.dob) bits.push("DOB " + parsed.dob);
+      if (parsed.age) bits.push("age " + parsed.age);
       if (parsed.gender) bits.push(parsed.gender);
       if (parsed.nationality) bits.push(parsed.nationality);
     }
     var msg = "SA ID front: " + (bits.length ? bits.join("; ") : "partial data") + ".";
+    var nameMsg = unreadNameStatus(parsed);
+    if (nameMsg) msg += " " + nameMsg + ".";
     if (parsed.idNumber && !parsed.luhnOk) msg += " " + LUHN_FAIL + ".";
     if (parsed.notes && parsed.notes.length) msg += " " + parsed.notes.join(" ");
     msg += " " + CHECK_HINT;
@@ -3897,7 +4317,13 @@ function mapEidNationality(raw) {
     formatSaIdStatus: formatSaIdStatus,
     formatSaIdFrontStatus: formatSaIdFrontStatus,
     scoreParsedSaId: scoreParsedSaId,
-    parsePrintedSaDob: parsePrintedSaDob
+    parsePrintedSaDob: parsePrintedSaDob,
+    saLevenshtein: saLevenshtein,
+    matchSaFrontLabel: matchSaFrontLabel,
+    extractSaFrontNames: extractSaFrontNames,
+    isSaNameValueLine: isSaNameValueLine,
+    ageFromSaDob: ageFromSaDob,
+    unreadNameStatus: unreadNameStatus
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.SaId = api;
@@ -3947,51 +4373,19 @@ function mapEidNationality(raw) {
     else conf = "Check digits: fail (" + (parsed.checkSummary || "none") + ")";
     var msg = "MRZ: read " + (bits.length ? bits.join("; ") : "partial data") + ". " + conf + ".";
     if (parsed.corrected && parsed.corrected.length) msg += " Corrected " + parsed.corrected.join(", ") + ".";
+    var nameMsg = unreadNameStatus(parsed);
+    if (nameMsg) msg += " " + nameMsg + ".";
     msg += " Raw MRZ is in the paste box. Check every field by hand.";
     return msg;
   }
 
   function applyMrzToForm(parsed) {
-    var filled = [];
-    function put(label, key, id, val) {
-      if (!val) return;
-      state[key] = val;
-      if (id && el(id)) el(id).value = val;
-      filled.push(label);
-    }
-    put("Name", "patientName", "patientName", parsed.name);
-    put("Surname", "patientSurname", "patientSurname", parsed.surname);
-    put("EID / ID / Passport", "eid", "eid", parsed.eid || parsed.docNumber || parsed.idNumber);
-    if (parsed.nationality) {
-      state.nationality = parsed.nationality;
-      if (el("nationality")) el("nationality").value = parsed.nationality;
-      state.nationalityOther = parsed.nationality === "Other" ? (parsed.nationalityOther || "") : "";
-      if (el("nationalityOther")) el("nationalityOther").value = state.nationalityOther;
-      filled.push("Nationality");
-    }
-    if (parsed.gender) {
-      state.gender = parsed.gender;
-      if (el("gender")) el("gender").value = parsed.gender;
-      filled.push("Gender");
-    }
-    if (parsed.dob) {
-      state.dateOfBirth = parsed.dob;
-      state.dobBlurred = true;
-      if (el("dateOfBirth")) el("dateOfBirth").value = parsed.dob;
-      filled.push("Date of birth");
-      var sel = ageFromDobSelection(parsed.dob);
-      if (sel && sel.mode) {
-        state.ageMode = sel.mode;
-        state.ageMonths = sel.months || "";
-        if (el("ageMode")) el("ageMode").value = sel.mode;
-        if (el("ageMonths")) el("ageMonths").value = state.ageMonths;
-        filled.push("Age");
-      }
-    }
-    if (typeof syncGenderButtons === "function") syncGenderButtons();
+    parsed = parsed || {};
+    if (!parsed.eid) parsed.eid = parsed.docNumber || parsed.idNumber || "";
+    var applied = applyParsedCardFields(parsed);
     if (typeof touchForm === "function") touchForm();
     if (typeof refresh === "function") refresh();
-    return { filledNames: filled, skipped: [] };
+    return applied;
   }
 
   function mrzNewCanvas(w, h) {
@@ -4635,6 +5029,7 @@ function mapEidNationality(raw) {
   el("dateOfBirth").addEventListener("input", function () {
     state.dateOfBirth = formatDateDigits(el("dateOfBirth").value);
     el("dateOfBirth").value = state.dateOfBirth;
+    if (typeof markFieldCheck === "function") markFieldCheck("dateOfBirth", false);
     if (isDobValid(state.dateOfBirth)) {
       const sel = ageFromDobSelection(state.dateOfBirth);
       state.ageMode = sel.mode;
@@ -4662,7 +5057,7 @@ function mapEidNationality(raw) {
   });
   bindGenderButtons();
   bindFastFill();
-  el("nationality").addEventListener("change", function () { state.nationality = el("nationality").value; touchForm(); refresh(); });
+  el("nationality").addEventListener("change", function () { state.nationality = el("nationality").value; if (typeof markFieldCheck === "function") markFieldCheck("nationality", false); touchForm(); refresh(); });
   bind("nationalityOther", "nationalityOther");
   el("eid").addEventListener("input", function () {
     state.eid = el("eid").value;
@@ -4810,6 +5205,9 @@ function mapEidNationality(raw) {
     looksLikeSaIdFront: (typeof SaId !== "undefined" ? SaId.looksLikeSaIdFront : null),
     parseCardFrontText: parseCardFrontText,
     scoreFrontOrientationText: scoreFrontOrientationText,
+    applyParsedCardFields: applyParsedCardFields,
+    formatReadCardDone: formatReadCardDone,
+    unreadNameStatus: unreadNameStatus,
   };
   refresh();
 })();
