@@ -272,12 +272,6 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     ["fuelLevel", "Fuel level"],
     ["note", "Note"]
   ];
-  var DEFAULTS = {
-    securityPass: "None",
-    airportPass: "None",
-    ngcGhqPass: "None"
-  };
-
   var draftReady = false;
   var saveTimer = null;
   var copiedTimer = null;
@@ -289,7 +283,7 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
       messageDirty: false,
       mulkiyaBlurred: false
     };
-    FIELD_KEYS.forEach(function (k) { s[k] = DEFAULTS[k] || ""; });
+    FIELD_KEYS.forEach(function (k) { s[k] = ""; });
     return s;
   }
 
@@ -598,7 +592,6 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     STORAGE_KEY: STORAGE_KEY,
     FIELD_KEYS: FIELD_KEYS,
     MESSAGE_LABELS: MESSAGE_LABELS,
-    DEFAULTS: DEFAULTS,
     LEVEL_CHIPS: LEVEL_CHIPS,
     buildMessage: buildMessage,
     generatedMessage: generatedMessage,
