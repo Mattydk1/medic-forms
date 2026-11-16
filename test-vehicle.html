@@ -207,6 +207,61 @@ html[data-theme="dark"] .status-note.is-alert {
   flex: 0 0 22px;
   accent-color: var(--accent);
 }
+.photo-btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.photo-btn { position: relative; font-weight: 700; }
+.photo-btn input[type="file"] {
+  position: absolute;
+  width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+.photo-btn.is-disabled,
+.photo-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: not-allowed;
+  background: var(--bg-subtle);
+}
+.no-camera-block {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--warning);
+  background: #fff7ed;
+  color: #9a6b00;
+  font-weight: 700;
+  line-height: 1.4;
+}
+html[data-theme="dark"] .no-camera-block {
+  background: #3b2a14;
+  color: #f0c36b;
+  border-color: #f0c36b;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .no-camera-block {
+    background: #3b2a14;
+    color: #f0c36b;
+    border-color: #f0c36b;
+  }
+}
+#attachmentList { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.attachment-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.attachment-item img,
+.attachment-icon {
+  width: 72px; height: 72px; object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.attachment-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+}
+.attachment-name { flex: 1 1 140px; color: var(--fg); font-size: 14px; line-height: 1.4; }
 .theme-toggle {
   margin: 8px 0 12px;
   font-weight: 600;
@@ -325,6 +380,21 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     <h2>Note</h2>
     <label class="field"><span>Note</span><textarea id="note" rows="4" placeholder="Anything else to add"></textarea></label>
 
+    <h2>Attach picture / document</h2>
+    <div class="photo-btns">
+      <label class="btn photo-btn" id="takePhotoLabel">
+        <input id="attachCamera" type="file" accept="image/*" capture="environment">
+        📷 Take photo
+      </label>
+      <label class="btn photo-btn" id="attachFileLabel">
+        <input id="attachFile" type="file" accept="image/*,application/pdf" multiple>
+        📎 Attach file
+      </label>
+    </div>
+    <div id="noCameraNote" class="no-camera-block hidden" role="status">No camera available – use Attach file instead</div>
+    <div id="attachmentList"></div>
+    <div class="hint" style="margin-top:8px">Attached files are sent with Share, not with Copy. They stay on this device until you share, remove them, or clear the form.</div>
+
     <h2>Message to copy</h2>
     <p>The message updates as you fill the form. You can also edit the text below before you copy it.</p>
     <textarea id="messagePreview" rows="18"></textarea>
@@ -374,7 +444,9 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
   var draftReady = false;
   var saveTimer = null;
   var copiedTimer = null;
+  var cameraReady = Promise.resolve(false);
   var state = emptyState();
+  state.attachments = [];
 
   function emptyState() {
     var s = {
@@ -698,20 +770,240 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     note.classList.remove("hidden");
   }
 
+  function formatFileSize(bytes) {
+    bytes = Number(bytes) || 0;
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function isImageFile(file) {
+    return !!(file && file.type && file.type.indexOf("image/") === 0);
+  }
+
+  function isPdfFile(file) {
+    if (!file) return false;
+    if (file.type === "application/pdf") return true;
+    return /\.pdf$/i.test(file.name || "");
+  }
+
+  function isAllowedAttachment(file) {
+    return isImageFile(file) || isPdfFile(file);
+  }
+
+  function resetFileInputs() {
+    var cam = el("attachCamera");
+    var file = el("attachFile");
+    if (cam) cam.value = "";
+    if (file) file.value = "";
+  }
+
+  function renderAttachments() {
+    var list = el("attachmentList");
+    if (!list) return;
+    list.innerHTML = "";
+    state.attachments.forEach(function (item) {
+      var row = document.createElement("div");
+      row.className = "attachment-item";
+      row.setAttribute("data-id", item.id);
+      if (isImageFile(item.file)) {
+        var img = document.createElement("img");
+        img.src = item.url;
+        img.alt = item.file.name || "Photo";
+        row.appendChild(img);
+      } else {
+        var icon = document.createElement("div");
+        icon.className = "attachment-icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.textContent = isPdfFile(item.file) ? "PDF" : "FILE";
+        row.appendChild(icon);
+      }
+      var name = document.createElement("div");
+      name.className = "attachment-name";
+      name.textContent = (item.file.name || "Attachment") + " (" + formatFileSize(item.file.size) + ")";
+      row.appendChild(name);
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "time-clear";
+      btn.setAttribute("aria-label", "Remove " + (item.file.name || "attachment"));
+      btn.textContent = "✕";
+      btn.addEventListener("click", function () { removeAttachment(item.id); });
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }
+
+  function clearAttachments() {
+    state.attachments.forEach(function (item) {
+      if (item.url) URL.revokeObjectURL(item.url);
+    });
+    state.attachments = [];
+    resetFileInputs();
+    renderAttachments();
+  }
+
+  function removeAttachment(id) {
+    var item = state.attachments.find(function (a) { return a.id === id; });
+    if (item && item.url) URL.revokeObjectURL(item.url);
+    state.attachments = state.attachments.filter(function (a) { return a.id !== id; });
+    renderAttachments();
+  }
+
+  function addFiles(list) {
+    var incoming = Array.prototype.slice.call(list || []).filter(isAllowedAttachment);
+    if (!incoming.length) return;
+    incoming.forEach(function (file) {
+      state.attachments.push({
+        id: Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+        file: file,
+        url: URL.createObjectURL(file)
+      });
+    });
+    resetFileInputs();
+    renderAttachments();
+  }
+
+  function isMobileLike() {
+    try {
+      var ua = String((navigator && (navigator.userAgent || navigator.vendor)) || "");
+      if (/Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true;
+    } catch (err) {}
+    return false;
+  }
+
+  function hasCamera() {
+    if (isMobileLike()) return Promise.resolve(true);
+    try {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== "function") {
+        return Promise.resolve(false);
+      }
+      return navigator.mediaDevices.enumerateDevices().then(function (devices) {
+        devices = devices || [];
+        for (var i = 0; i < devices.length; i++) {
+          if (devices[i] && devices[i].kind === "videoinput") return true;
+        }
+        return false;
+      }).catch(function () { return false; });
+    } catch (err) {
+      return Promise.resolve(false);
+    }
+  }
+
+  function applyCameraAvailability(ok) {
+    var label = el("takePhotoLabel");
+    var input = el("attachCamera");
+    var note = el("noCameraNote");
+    if (label) {
+      label.classList.toggle("is-disabled", !ok);
+      label.setAttribute("aria-disabled", ok ? "false" : "true");
+    }
+    if (input) input.disabled = !ok;
+    if (note) {
+      if (ok) note.classList.add("hidden");
+      else note.classList.remove("hidden");
+    }
+    return ok;
+  }
+
+  function detectAndApplyCamera() {
+    return hasCamera().then(applyCameraAvailability);
+  }
+
+  function canShareFiles(files) {
+    if (!files || !files.length) return false;
+    try {
+      return typeof navigator.canShare === "function" && navigator.canShare({ files: files });
+    } catch (err) {
+      return false;
+    }
+  }
+
+  var COMPRESS_MAX = 1600;
+  var COMPRESS_QUALITY = 0.8;
+  var COMPRESS_TIMEOUT = 4000;
+
+  function compressImageFile(file) {
+    return new Promise(function (resolve) {
+      var url = "";
+      var timer = null;
+      var settled = false;
+      function finish(out) {
+        if (settled) return;
+        settled = true;
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (url) { try { URL.revokeObjectURL(url); } catch (err) {} url = ""; }
+        resolve(out || file);
+      }
+      if (!isImageFile(file)) {
+        finish(file);
+        return;
+      }
+      try { url = URL.createObjectURL(file); } catch (err) { finish(file); return; }
+      var img = new Image();
+      timer = setTimeout(function () { finish(file); }, COMPRESS_TIMEOUT);
+      img.onload = function () {
+        var w = img.naturalWidth || img.width || 0;
+        var h = img.naturalHeight || img.height || 0;
+        var scale = (w > 0 && h > 0) ? Math.min(1, COMPRESS_MAX / Math.max(w, h)) : 1;
+        if (scale >= 1) {
+          finish(file);
+          return;
+        }
+        try {
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(w * scale));
+          canvas.height = Math.max(1, Math.round(h * scale));
+          var ctx = canvas.getContext("2d");
+          if (!ctx || typeof canvas.toBlob !== "function") { finish(file); return; }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          var name = String(file.name || "photo").replace(/\.[^.]+$/, "") + ".jpg";
+          canvas.toBlob(function (blob) {
+            if (!blob) { finish(file); return; }
+            try {
+              finish(new File([blob], name, { type: "image/jpeg", lastModified: Date.now() }));
+            } catch (err) {
+              finish(file);
+            }
+          }, "image/jpeg", COMPRESS_QUALITY);
+        } catch (err) {
+          finish(file);
+        }
+      };
+      img.onerror = function () { finish(file); };
+      img.src = url;
+    });
+  }
+
+  async function filesForShare() {
+    var out = [];
+    for (var i = 0; i < state.attachments.length; i++) {
+      out.push(await compressImageFile(state.attachments[i].file));
+    }
+    return out;
+  }
+
   async function shareMessage() {
     showShareNote("");
     var text = currentMessage();
+    var files = await filesForShare();
     var hasShare = typeof navigator.share === "function";
+    var PHOTO_NOTE = "Photos couldn't be added automatically – attach them in WhatsApp";
     try {
       if (hasShare) {
+        if (files.length && canShareFiles(files)) {
+          await navigator.share({ text: text, files: files });
+          return;
+        }
         await navigator.share({ text: text });
+        if (files.length) showShareNote(PHOTO_NOTE);
         return;
       }
     } catch (err) {
       if (err && err.name === "AbortError") return;
     }
     await copyMessage();
-    showShareNote("Sharing not supported here, message copied.");
+    if (files.length) showShareNote(PHOTO_NOTE);
+    else showShareNote("Sharing not supported here, message copied.");
   }
 
   function applyTheme(mode) {
@@ -811,6 +1103,7 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
   function clearForm() {
     if (!confirm("Clear this form? This also clears the saved draft.")) return;
     try { localStorage.removeItem(STORAGE_KEY); } catch (err) {}
+    clearAttachments();
     resetState();
     applyDefaultsToInputs();
     var contactEl = el("maintContact");
@@ -896,6 +1189,13 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     el("copyFallback").value = state.messageEdit;
   });
 
+  el("attachFile").addEventListener("change", function () {
+    if (el("attachFile").files && el("attachFile").files.length) addFiles(el("attachFile").files);
+  });
+  el("attachCamera").addEventListener("change", function () {
+    if (el("attachCamera").files && el("attachCamera").files.length) addFiles(el("attachCamera").files);
+  });
+
   el("copyMessage").addEventListener("click", function () { copyMessage(); });
   el("shareMessage").addEventListener("click", function () { shareMessage(); });
   el("clearForm").addEventListener("click", function () { clearForm(); });
@@ -909,6 +1209,12 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
   restoreMaint();
   restoreDraft();
   draftReady = true;
+  cameraReady = detectAndApplyCamera();
+  try {
+    if (navigator.mediaDevices && typeof navigator.mediaDevices.addEventListener === "function") {
+      navigator.mediaDevices.addEventListener("devicechange", function () { detectAndApplyCamera(); });
+    }
+  } catch (err) {}
 
   window.__vehicleCheck = {
     state: state,
@@ -938,7 +1244,26 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     refresh: refresh,
     emptyState: emptyState,
     applyDefaultsToInputs: applyDefaultsToInputs,
-    setNow: function (fn) { clockNow = typeof fn === "function" ? fn : function () { return new Date(); }; }
+    setNow: function (fn) { clockNow = typeof fn === "function" ? fn : function () { return new Date(); }; },
+    addFiles: addFiles,
+    removeAttachment: removeAttachment,
+    clearAttachments: clearAttachments,
+    renderAttachments: renderAttachments,
+    compressImageFile: compressImageFile,
+    filesForShare: filesForShare,
+    canShareFiles: canShareFiles,
+    shareMessage: shareMessage,
+    copyMessage: copyMessage,
+    formatFileSize: formatFileSize,
+    isMobileLike: isMobileLike,
+    hasCamera: hasCamera,
+    detectAndApplyCamera: detectAndApplyCamera,
+    applyCameraAvailability: applyCameraAvailability,
+    get cameraReady() { return cameraReady; },
+    PHOTO_SHARE_NOTE: "Photos couldn't be added automatically – attach them in WhatsApp",
+    COMPRESS_MAX: COMPRESS_MAX,
+    COMPRESS_QUALITY: COMPRESS_QUALITY,
+    setCompressTimeout: function (ms) { COMPRESS_TIMEOUT = Number(ms) || 4000; }
   };
   refresh();
 })();
