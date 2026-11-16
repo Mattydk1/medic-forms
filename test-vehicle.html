@@ -187,12 +187,17 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
       <label class="field"><span>Next service due</span><input id="nextServiceDue" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 50000 or 31/12/2026"></label>
     </div>
 
-    <h2>Crew and location</h2>
+    <h2>Crew</h2>
     <div class="grid grid-2">
       <label class="field"><span>Driver</span><input id="driver" type="text" autocomplete="off" placeholder="Driver name"></label>
       <label class="field"><span>Passenger</span><input id="passenger" type="text" autocomplete="off" placeholder="Passenger name"></label>
     </div>
-    <label class="field" style="margin-top:12px"><span>Location</span><input id="location" type="text" autocomplete="off" placeholder="e.g. Tarif base"></label>
+
+    <h2>Location</h2>
+    <div class="grid grid-2">
+      <label class="field"><span>From</span><input id="locationFrom" type="text" autocomplete="off" placeholder="e.g. Tarif base"></label>
+      <label class="field"><span>To</span><input id="locationTo" type="text" autocomplete="off" placeholder="e.g. Ruwais hospital"></label>
+    </div>
 
     <h2>Passes and licence</h2>
     <div class="grid grid-2">
@@ -250,7 +255,7 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
   var LEVEL_CHIPS = ["Empty", "1/4", "1/2", "3/4", "Full"];
   var FIELD_KEYS = [
     "project", "callSign", "plateNo", "mulkiyaExp", "currentKm", "nextServiceDue",
-    "driver", "passenger", "location", "securityPass", "airportPass", "ngcGhqPass",
+    "driver", "passenger", "locationFrom", "locationTo", "securityPass", "airportPass", "ngcGhqPass",
     "ngcBrownPass", "dohLicense", "adblueLevel", "fuelLevel", "note"
   ];
   var MESSAGE_LABELS = [
@@ -262,7 +267,9 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     ["nextServiceDue", "Next service due"],
     ["driver", "Driver"],
     ["passenger", "Passenger"],
-    ["location", "Location"],
+    ["", "Location"],
+    ["locationFrom", "From"],
+    ["locationTo", "To"],
     ["securityPass", "Security pass"],
     ["airportPass", "Airport pass"],
     ["ngcGhqPass", "NGC GHQ pass"],
@@ -347,6 +354,7 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     return MESSAGE_LABELS.map(function (pair) {
       var key = pair[0];
       var label = pair[1];
+      if (!key) return label + ":";
       var value = key === "mulkiyaExp" ? formatMulkiyaForMessage(opts[key]) : String(opts[key] || "").trim();
       return value ? (label + ": " + value) : (label + ":");
     }).join("\n");
@@ -515,6 +523,11 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
           if (n) n.value = d[k];
         }
       });
+      if (!filled(state.locationFrom) && typeof d.location === "string" && filled(d.location)) {
+        state.locationFrom = d.location;
+        var fromEl = el("locationFrom");
+        if (fromEl) fromEl.value = d.location;
+      }
     } catch (err) {}
   }
 
