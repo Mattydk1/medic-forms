@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#0b5fff">
-  <title>Vehicle check — test</title>
+  <title>Ambulance movement</title>
   <style>
 :root {
   --bg: #f4f5f7;
@@ -162,8 +162,8 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
   <div class="wrap">
     <div class="test-banner" role="status">TEST PAGE – vehicle check form</div>
     <header>
-      <h1>Vehicle check</h1>
-      <p class="lede">A short form for a vehicle check. Fill in what you know, edit anything before you copy, and send it the way you need to.</p>
+      <h1>Ambulance movement</h1>
+      <p class="lede">A short form for ambulance movement. Fill in what you know, edit anything before you copy, and send it the way you need to.</p>
     </header>
     <div class="callout">
       <div class="lead">Nothing is sent</div>
@@ -349,15 +349,19 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     return blurred || text.replace(/\D/g, "").length >= 8;
   }
 
+  var SHARE_TITLE = "Ambulance movement";
+
   function buildMessage(opts) {
     opts = opts || state;
-    return MESSAGE_LABELS.map(function (pair) {
+    var lines = MESSAGE_LABELS.map(function (pair) {
       var key = pair[0];
       var label = pair[1];
       if (!key) return label + ":";
       var value = key === "mulkiyaExp" ? formatMulkiyaForMessage(opts[key]) : String(opts[key] || "").trim();
       return value ? (label + ": " + value) : (label + ":");
-    }).join("\n");
+    });
+    lines.unshift(SHARE_TITLE);
+    return lines.join("\n");
   }
 
   function generatedMessage() { return buildMessage(state); }
@@ -605,6 +609,7 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     STORAGE_KEY: STORAGE_KEY,
     FIELD_KEYS: FIELD_KEYS,
     MESSAGE_LABELS: MESSAGE_LABELS,
+    SHARE_TITLE: SHARE_TITLE,
     LEVEL_CHIPS: LEVEL_CHIPS,
     buildMessage: buildMessage,
     generatedMessage: generatedMessage,

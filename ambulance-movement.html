@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0b5fff">
+  <title>Ambulance movement</title>
+  <style>
+:root {
+  --bg: #f4f5f7;
+  --bg-card: #ffffff;
+  --bg-subtle: #eef0f3;
+  --fg: #15181d;
+  --muted: #4b5563;
+  --border: #cfd4dc;
+  --accent: #0b5fff;
+  --accent-fg: #ffffff;
+  --warning: #9a6b00;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --tap: 44px;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --bg: #101215;
+    --bg-card: #1a1d22;
+    --bg-subtle: #15181d;
+    --fg: #f2f4f7;
+    --muted: #b0b7c3;
+    --border: #3a404a;
+    --accent: #6ea0ff;
+    --accent-fg: #0b1220;
+    --warning: #f0c36b;
+  }
+}
+html[data-theme="dark"] {
+  --bg: #101215;
+  --bg-card: #1a1d22;
+  --bg-subtle: #15181d;
+  --fg: #f2f4f7;
+  --muted: #b0b7c3;
+  --border: #3a404a;
+  --accent: #6ea0ff;
+  --accent-fg: #0b1220;
+  --warning: #f0c36b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.wrap { max-width: 920px; margin: 0 auto; padding: 16px 16px 80px; }
+h1 { font-size: 1.7rem; line-height: 1.25; margin: 0 0 8px; }
+h2 { font-size: 1.2rem; margin: 28px 0 10px; }
+.lede, .muted, .hint { color: var(--muted); }
+.lede { margin: 0 0 16px; }
+.callout {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.callout .lead { font-weight: 700; margin-bottom: 4px; }
+label.field, .field-label, .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  width: 100%;
+}
+input[type="text"], textarea {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--fg);
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1.45;
+}
+textarea { min-height: 96px; resize: vertical; }
+#messagePreview { min-height: 280px; font-family: var(--mono); font-size: 14px; background: var(--bg-subtle); }
+.invalid { border-color: var(--warning) !important; }
+.hint { font-size: 12px; line-height: 1.4; margin-top: 4px; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 700px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.grow { flex: 1 1 140px; }
+button, .btn {
+  min-height: var(--tap);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--fg);
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; font-weight: 600; }
+.actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.hidden { display: none !important; }
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.field > span { color: var(--muted); }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+button.chip {
+  font-weight: 700;
+  min-width: 52px;
+  flex: 1 1 56px;
+}
+button.chip.is-on {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+button.clear-form-btn {
+  min-height: 52px;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+.theme-toggle {
+  margin: 8px 0 12px;
+  font-weight: 600;
+}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Ambulance movement</h1>
+      <p class="lede">A short form for ambulance movement. Fill in what you know, edit anything before you copy, and send it the way you need to.</p>
+    </header>
+    <div class="callout">
+      <div class="lead">Nothing is sent</div>
+      This file runs only on this device. A draft is kept on this device until you clear the form. Every line stays in the message, even if a box is empty.
+    </div>
+    <button type="button" id="darkModeToggle" class="theme-toggle" aria-pressed="false">Dark mode: off</button>
+    <p>If you change a form field after editing the message, the message is rebuilt from the form.</p>
+
+    <h2>Vehicle</h2>
+    <label class="field"><span>Project</span><input id="project" type="text" autocomplete="off" placeholder="e.g. Tarif"></label>
+    <div class="grid grid-2" style="margin-top:12px">
+      <label class="field"><span>Call Sign</span><input id="callSign" type="text" autocomplete="off" placeholder="e.g. Medic 1"></label>
+      <label class="field"><span>Plate No</span><input id="plateNo" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. ABC 1234"></label>
+    </div>
+    <div class="field-label" style="margin-top:12px"><span>Mulkiya Exp</span>
+      <input id="mulkiyaExp" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="e.g. 31/12/2026">
+      <div id="mulkiyaHint" class="hint hidden">Use a real date, dd/mm/yyyy</div>
+    </div>
+    <div class="grid grid-2" style="margin-top:12px">
+      <label class="field"><span>Current km</span><input id="currentKm" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 45200"></label>
+      <label class="field"><span>Next service due</span><input id="nextServiceDue" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 50000 or 31/12/2026"></label>
+    </div>
+
+    <h2>Crew</h2>
+    <div class="grid grid-2">
+      <label class="field"><span>Driver</span><input id="driver" type="text" autocomplete="off" placeholder="Driver name"></label>
+      <label class="field"><span>Passenger</span><input id="passenger" type="text" autocomplete="off" placeholder="Passenger name"></label>
+    </div>
+
+    <h2>Location</h2>
+    <div class="grid grid-2">
+      <label class="field"><span>From</span><input id="locationFrom" type="text" autocomplete="off" placeholder="e.g. Tarif base"></label>
+      <label class="field"><span>To</span><input id="locationTo" type="text" autocomplete="off" placeholder="e.g. Ruwais hospital"></label>
+    </div>
+
+    <h2>Passes and licence</h2>
+    <div class="grid grid-2">
+      <label class="field"><span>Security pass</span><input id="securityPass" type="text" autocomplete="off"></label>
+      <label class="field"><span>Airport pass</span><input id="airportPass" type="text" autocomplete="off"></label>
+      <label class="field"><span>NGC GHQ pass</span><input id="ngcGhqPass" type="text" autocomplete="off"></label>
+      <label class="field"><span>NGC Brown pass</span><input id="ngcBrownPass" type="text" autocomplete="off"></label>
+      <label class="field"><span>DOH license</span><input id="dohLicense" type="text" autocomplete="off"></label>
+    </div>
+
+    <h2>Levels</h2>
+    <div class="grid grid-2">
+      <label class="field"><span>Adblue level</span>
+        <input id="adblueLevel" type="text" autocomplete="off" placeholder="e.g. 1/2">
+        <div class="chip-row" data-chips-for="adblueLevel">
+          <button type="button" class="chip" data-value="Empty">Empty</button>
+          <button type="button" class="chip" data-value="1/4">1/4</button>
+          <button type="button" class="chip" data-value="1/2">1/2</button>
+          <button type="button" class="chip" data-value="3/4">3/4</button>
+          <button type="button" class="chip" data-value="Full">Full</button>
+        </div>
+      </label>
+      <label class="field"><span>Fuel level</span>
+        <input id="fuelLevel" type="text" autocomplete="off" placeholder="e.g. 3/4">
+        <div class="chip-row" data-chips-for="fuelLevel">
+          <button type="button" class="chip" data-value="Empty">Empty</button>
+          <button type="button" class="chip" data-value="1/4">1/4</button>
+          <button type="button" class="chip" data-value="1/2">1/2</button>
+          <button type="button" class="chip" data-value="3/4">3/4</button>
+          <button type="button" class="chip" data-value="Full">Full</button>
+        </div>
+      </label>
+    </div>
+
+    <h2>Note</h2>
+    <label class="field"><span>Note</span><textarea id="note" rows="4" placeholder="Anything else to add"></textarea></label>
+
+    <h2>Message to copy</h2>
+    <p>The message updates as you fill the form. You can also edit the text below before you copy it.</p>
+    <textarea id="messagePreview" rows="18"></textarea>
+    <textarea id="copyFallback" class="hidden" readonly aria-hidden="true"></textarea>
+    <div class="actions">
+      <button type="button" class="primary" id="copyMessage">Copy message</button>
+      <button type="button" id="shareMessage">Share</button>
+    </div>
+    <button type="button" id="clearForm" class="clear-form-btn">Clear form</button>
+    <div id="shareNote" class="hint hidden" style="margin-top:8px"></div>
+  </div>
+  <script>
+(function () {
+  "use strict";
+
+  var THEME_KEY = "matty-forms-theme";
+  var STORAGE_KEY = "matty-forms-vehicle-check-v1";
+  var LEVEL_CHIPS = ["Empty", "1/4", "1/2", "3/4", "Full"];
+  var FIELD_KEYS = [
+    "project", "callSign", "plateNo", "mulkiyaExp", "currentKm", "nextServiceDue",
+    "driver", "passenger", "locationFrom", "locationTo", "securityPass", "airportPass", "ngcGhqPass",
+    "ngcBrownPass", "dohLicense", "adblueLevel", "fuelLevel", "note"
+  ];
+  var MESSAGE_LABELS = [
+    ["project", "Project"],
+    ["callSign", "Call Sign"],
+    ["plateNo", "Plate No"],
+    ["mulkiyaExp", "Mulkiya Exp"],
+    ["currentKm", "Current km"],
+    ["nextServiceDue", "Next service due"],
+    ["driver", "Driver"],
+    ["passenger", "Passenger"],
+    ["", "Location"],
+    ["locationFrom", "From"],
+    ["locationTo", "To"],
+    ["securityPass", "Security pass"],
+    ["airportPass", "Airport pass"],
+    ["ngcGhqPass", "NGC GHQ pass"],
+    ["ngcBrownPass", "NGC Brown pass"],
+    ["dohLicense", "DOH license"],
+    ["adblueLevel", "Adblue level"],
+    ["fuelLevel", "Fuel level"],
+    ["note", "Note"]
+  ];
+  var draftReady = false;
+  var saveTimer = null;
+  var copiedTimer = null;
+  var state = emptyState();
+
+  function emptyState() {
+    var s = {
+      messageEdit: "",
+      messageDirty: false,
+      mulkiyaBlurred: false
+    };
+    FIELD_KEYS.forEach(function (k) { s[k] = ""; });
+    return s;
+  }
+
+  function el(id) { return document.getElementById(id); }
+  function filled(value) { return String(value || "").trim(); }
+
+  function formatDateDigits(raw) {
+    var digits = String(raw || "").replace(/\D/g, "").slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return digits.slice(0, 2) + "/" + digits.slice(2);
+    return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+  }
+
+  function parseDateDDMMYYYY(value) {
+    var match = filled(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) return false;
+    var day = Number(match[1]);
+    var month = Number(match[2]);
+    var year = Number(match[3]);
+    var d = new Date(year, month - 1, day);
+    return d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day;
+  }
+
+  function pad2(n) { return String(n).padStart(2, "0"); }
+
+  function padDateIfValid(text) {
+    var match = filled(text).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) return "";
+    var day = Number(match[1]);
+    var month = Number(match[2]);
+    var year = Number(match[3]);
+    var d = new Date(year, month - 1, day);
+    if (d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day) {
+      return pad2(day) + "/" + pad2(month) + "/" + year;
+    }
+    return "";
+  }
+
+  function normalizeDateInput(raw) {
+    var text = String(raw || "");
+    if (/\//.test(text)) return text.replace(/[^\d/]/g, "").slice(0, 10);
+    return formatDateDigits(text);
+  }
+
+  function formatMulkiyaForMessage(value) {
+    var text = filled(value);
+    if (!text) return "";
+    var padded = padDateIfValid(text) || padDateIfValid(formatDateDigits(text));
+    return padded || text;
+  }
+
+  function isDateFieldInvalid(value, blurred) {
+    var text = filled(value);
+    if (!text) return false;
+    if (padDateIfValid(text) || padDateIfValid(formatDateDigits(text))) return false;
+    return blurred || text.replace(/\D/g, "").length >= 8;
+  }
+
+  var SHARE_TITLE = "Ambulance movement";
+
+  function buildMessage(opts) {
+    opts = opts || state;
+    var lines = MESSAGE_LABELS.map(function (pair) {
+      var key = pair[0];
+      var label = pair[1];
+      if (!key) return label + ":";
+      var value = key === "mulkiyaExp" ? formatMulkiyaForMessage(opts[key]) : String(opts[key] || "").trim();
+      return value ? (label + ": " + value) : (label + ":");
+    });
+    lines.unshift(SHARE_TITLE);
+    return lines.join("\n");
+  }
+
+  function generatedMessage() { return buildMessage(state); }
+
+  function currentMessage() {
+    return state.messageDirty ? state.messageEdit : generatedMessage();
+  }
+
+  function touchForm() { state.messageDirty = false; }
+
+  function syncChips() {
+    document.querySelectorAll("[data-chips-for]").forEach(function (row) {
+      var key = row.getAttribute("data-chips-for");
+      var cur = filled(state[key]);
+      row.querySelectorAll("button.chip").forEach(function (btn) {
+        btn.classList.toggle("is-on", filled(btn.getAttribute("data-value")) === cur);
+      });
+    });
+  }
+
+  function refresh() {
+    var dateInvalid = isDateFieldInvalid(state.mulkiyaExp, state.mulkiyaBlurred);
+    var dateEl = el("mulkiyaExp");
+    if (dateEl) dateEl.classList.toggle("invalid", dateInvalid);
+    var hint = el("mulkiyaHint");
+    if (hint) {
+      if (dateInvalid) hint.classList.remove("hidden");
+      else hint.classList.add("hidden");
+    }
+    var msg = generatedMessage();
+    if (!state.messageDirty) el("messagePreview").value = msg;
+    el("copyFallback").value = state.messageDirty ? state.messageEdit : msg;
+    syncChips();
+    scheduleSave();
+  }
+
+  function bind(id, key) {
+    el(id).addEventListener("input", function () {
+      state[key] = el(id).value;
+      touchForm();
+      refresh();
+    });
+  }
+
+  function applyDefaultsToInputs() {
+    FIELD_KEYS.forEach(function (k) {
+      var n = el(k);
+      if (n) n.value = state[k] || "";
+    });
+  }
+
+  async function copyMessage() {
+    var text = currentMessage();
+    el("copyFallback").value = text;
+    var ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch (e) { ok = false; }
+    if (!ok) {
+      var ta = el("copyFallback");
+      ta.classList.remove("hidden");
+      ta.style.position = "fixed";
+      ta.style.left = "0";
+      ta.style.top = "0";
+      ta.style.opacity = "0";
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      ta.classList.add("hidden");
+    }
+    var btn = el("copyMessage");
+    if (ok) {
+      btn.textContent = "Copied";
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(function () { btn.textContent = "Copy message"; }, 2000);
+    } else {
+      btn.textContent = "Select and copy the message";
+    }
+    return ok;
+  }
+
+  function showShareNote(text) {
+    var note = el("shareNote");
+    if (!text) {
+      note.textContent = "";
+      note.classList.add("hidden");
+      return;
+    }
+    note.textContent = text;
+    note.classList.remove("hidden");
+  }
+
+  async function shareMessage() {
+    showShareNote("");
+    var text = currentMessage();
+    var hasShare = typeof navigator.share === "function";
+    try {
+      if (hasShare) {
+        await navigator.share({ text: text });
+        return;
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+    }
+    await copyMessage();
+    showShareNote("Sharing not supported here, message copied.");
+  }
+
+  function applyTheme(mode) {
+    var dark = mode === "dark";
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+    try { localStorage.setItem(THEME_KEY, dark ? "dark" : "light"); } catch (err) {}
+    var btn = el("darkModeToggle");
+    if (btn) {
+      btn.setAttribute("aria-pressed", dark ? "true" : "false");
+      btn.textContent = dark ? "Dark mode: on" : "Dark mode: off";
+    }
+  }
+
+  function loadTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (err) {}
+    if (saved === "dark" || saved === "light") applyTheme(saved);
+    else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      document.documentElement.setAttribute("data-theme", "dark");
+      var btn = el("darkModeToggle");
+      if (btn) {
+        btn.setAttribute("aria-pressed", "true");
+        btn.textContent = "Dark mode: on";
+      }
+    } else {
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  }
+
+  function scheduleSave() {
+    if (!draftReady) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      try {
+        var data = {};
+        FIELD_KEYS.forEach(function (k) { data[k] = state[k]; });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (err) {}
+    }, 250);
+  }
+
+  function restoreDraft() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (!d || typeof d !== "object") return;
+      FIELD_KEYS.forEach(function (k) {
+        if (typeof d[k] === "string") {
+          state[k] = d[k];
+          var n = el(k);
+          if (n) n.value = d[k];
+        }
+      });
+      if (!filled(state.locationFrom) && typeof d.location === "string" && filled(d.location)) {
+        state.locationFrom = d.location;
+        var fromEl = el("locationFrom");
+        if (fromEl) fromEl.value = d.location;
+      }
+    } catch (err) {}
+  }
+
+  function resetState() {
+    var fresh = emptyState();
+    Object.keys(fresh).forEach(function (k) { state[k] = fresh[k]; });
+  }
+
+  function clearForm() {
+    if (!confirm("Clear this form? This also clears the saved draft.")) return;
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) {}
+    resetState();
+    applyDefaultsToInputs();
+    el("copyMessage").textContent = "Copy message";
+    showShareNote("");
+    refresh();
+  }
+
+  FIELD_KEYS.forEach(function (k) { bind(k, k); });
+
+  el("mulkiyaExp").addEventListener("input", function () {
+    var formatted = normalizeDateInput(el("mulkiyaExp").value);
+    if (formatted !== el("mulkiyaExp").value) el("mulkiyaExp").value = formatted;
+    state.mulkiyaExp = el("mulkiyaExp").value;
+    state.mulkiyaBlurred = false;
+    touchForm();
+    refresh();
+  });
+  el("mulkiyaExp").addEventListener("blur", function () {
+    var padded = padDateIfValid(el("mulkiyaExp").value);
+    if (padded && padded !== el("mulkiyaExp").value) {
+      el("mulkiyaExp").value = padded;
+      state.mulkiyaExp = padded;
+    }
+    state.mulkiyaBlurred = true;
+    refresh();
+  });
+
+  document.querySelectorAll("[data-chips-for]").forEach(function (row) {
+    var key = row.getAttribute("data-chips-for");
+    row.querySelectorAll("button.chip").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var value = btn.getAttribute("data-value") || "";
+        if (filled(state[key]) === filled(value)) value = "";
+        state[key] = value;
+        var n = el(key);
+        if (n) n.value = value;
+        touchForm();
+        refresh();
+      });
+    });
+  });
+
+  el("messagePreview").addEventListener("input", function () {
+    state.messageEdit = el("messagePreview").value;
+    state.messageDirty = true;
+    el("copyFallback").value = state.messageEdit;
+  });
+
+  el("copyMessage").addEventListener("click", function () { copyMessage(); });
+  el("shareMessage").addEventListener("click", function () { shareMessage(); });
+  el("clearForm").addEventListener("click", function () { clearForm(); });
+  el("darkModeToggle").addEventListener("click", function () {
+    var dark = document.documentElement.getAttribute("data-theme") !== "dark";
+    applyTheme(dark ? "dark" : "light");
+  });
+
+  loadTheme();
+  applyDefaultsToInputs();
+  restoreDraft();
+  draftReady = true;
+
+  window.__vehicleCheck = {
+    state: state,
+    STORAGE_KEY: STORAGE_KEY,
+    FIELD_KEYS: FIELD_KEYS,
+    MESSAGE_LABELS: MESSAGE_LABELS,
+    SHARE_TITLE: SHARE_TITLE,
+    LEVEL_CHIPS: LEVEL_CHIPS,
+    buildMessage: buildMessage,
+    generatedMessage: generatedMessage,
+    currentMessage: currentMessage,
+    formatDateDigits: formatDateDigits,
+    normalizeDateInput: normalizeDateInput,
+    padDateIfValid: padDateIfValid,
+    formatMulkiyaForMessage: formatMulkiyaForMessage,
+    parseDateDDMMYYYY: parseDateDDMMYYYY,
+    clearForm: clearForm,
+    resetState: resetState,
+    refresh: refresh,
+    emptyState: emptyState,
+    applyDefaultsToInputs: applyDefaultsToInputs
+  };
+  refresh();
+})();
+  </script>
+</body>
+</html>
