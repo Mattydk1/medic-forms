@@ -355,9 +355,9 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
 
     <h2>Levels</h2>
     <div class="grid grid-2">
-      <label class="field"><span>Adblue level</span>
-        <input id="adblueLevel" type="text" autocomplete="off" placeholder="e.g. 1/2">
-        <div class="chip-row" data-chips-for="adblueLevel">
+      <label class="field"><span>Fuel level</span>
+        <input id="fuelLevel" type="text" autocomplete="off" placeholder="e.g. 3/4">
+        <div class="chip-row" data-chips-for="fuelLevel">
           <button type="button" class="chip" data-value="Empty">Empty</button>
           <button type="button" class="chip" data-value="1/4">1/4</button>
           <button type="button" class="chip" data-value="1/2">1/2</button>
@@ -365,9 +365,9 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
           <button type="button" class="chip" data-value="Full">Full</button>
         </div>
       </label>
-      <label class="field"><span>Fuel level</span>
-        <input id="fuelLevel" type="text" autocomplete="off" placeholder="e.g. 3/4">
-        <div class="chip-row" data-chips-for="fuelLevel">
+      <label class="field"><span>Adblue level</span>
+        <input id="adblueLevel" type="text" autocomplete="off" placeholder="e.g. 1/2">
+        <div class="chip-row" data-chips-for="adblueLevel">
           <button type="button" class="chip" data-value="Empty">Empty</button>
           <button type="button" class="chip" data-value="1/4">1/4</button>
           <button type="button" class="chip" data-value="1/2">1/2</button>
@@ -417,7 +417,7 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
   var FIELD_KEYS = [
     "dateTime", "project", "callSign", "plateNo", "mulkiyaExp", "currentKm", "nextServiceDue",
     "driver", "passenger", "locationFrom", "locationTo", "securityPass", "airportPass", "ngcGhqPass",
-    "ngcBrownPass", "dohLicense", "adblueLevel", "fuelLevel", "note"
+    "ngcBrownPass", "dohLicense", "fuelLevel", "adblueLevel", "note"
   ];
   var MESSAGE_LABELS = [
     ["dateTime", "Date/Time"],
@@ -437,8 +437,8 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     ["ngcGhqPass", "NGC GHQ pass"],
     ["ngcBrownPass", "NGC Brown pass"],
     ["dohLicense", "DOH license"],
-    ["adblueLevel", "Adblue level"],
     ["fuelLevel", "Fuel level"],
+    ["adblueLevel", "Adblue level"],
     ["note", "Note"]
   ];
   var draftReady = false;
