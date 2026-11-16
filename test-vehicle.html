@@ -137,6 +137,76 @@ button.clear-form-btn {
   font-weight: 700;
   margin-top: 8px;
 }
+button.time-clear {
+  min-width: var(--tap);
+  width: var(--tap);
+  min-height: var(--tap);
+  padding: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--fg);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+}
+button.time-clear[hidden],
+button.time-clear.hidden { display: none !important; }
+.status-note {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+}
+.status-note.is-warn {
+  background: #fff7ed;
+  color: #9a6b00;
+  border: 1px solid #f0c36b;
+}
+.status-note.is-alert {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #f87171;
+}
+html[data-theme="dark"] .status-note.is-warn {
+  background: #3b2a14;
+  color: #f0c36b;
+  border-color: #f0c36b;
+}
+html[data-theme="dark"] .status-note.is-alert {
+  background: #3b1414;
+  color: #fca5a5;
+  border-color: #f87171;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .status-note.is-warn {
+    background: #3b2a14;
+    color: #f0c36b;
+    border-color: #f0c36b;
+  }
+  html:not([data-theme="light"]) .status-note.is-alert {
+    background: #3b1414;
+    color: #fca5a5;
+    border-color: #f87171;
+  }
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  font-size: 16px;
+  color: var(--fg);
+  font-weight: 600;
+  margin-top: 8px;
+}
+.check-row input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  accent-color: var(--accent);
+}
 .theme-toggle {
   margin: 8px 0 12px;
   font-weight: 600;
@@ -172,6 +242,16 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     <button type="button" id="darkModeToggle" class="theme-toggle" aria-pressed="false">Dark mode: off</button>
     <p>If you change a form field after editing the message, the message is rebuilt from the form.</p>
 
+    <div class="field-label"><span>Date / Time</span>
+      <div class="row">
+        <div class="grow">
+          <input id="dateTime" type="text" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="e.g. 16/11/2026 13:30">
+        </div>
+        <button type="button" id="dateTimeNow">Now</button>
+        <button type="button" id="dateTimeClear" class="time-clear" hidden aria-label="Clear date and time">✕</button>
+      </div>
+    </div>
+
     <h2>Vehicle</h2>
     <label class="field"><span>Project</span><input id="project" type="text" autocomplete="off" placeholder="e.g. Tarif"></label>
     <div class="grid grid-2" style="margin-top:12px">
@@ -181,11 +261,21 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     <div class="field-label" style="margin-top:12px"><span>Mulkiya Exp</span>
       <input id="mulkiyaExp" type="text" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="e.g. 31/12/2026">
       <div id="mulkiyaHint" class="hint hidden">Use a real date, dd/mm/yyyy</div>
+      <div id="mulkiyaWarn" class="status-note hidden" role="status"></div>
     </div>
     <div class="grid grid-2" style="margin-top:12px">
       <label class="field"><span>Current km</span><input id="currentKm" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 45200"></label>
-      <label class="field"><span>Next service due</span><input id="nextServiceDue" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 50000 or 31/12/2026"></label>
+      <label class="field"><span>Next service due</span><input id="nextServiceDue" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 50000"></label>
     </div>
+    <div id="serviceWarn" class="status-note hidden" role="status"></div>
+    <label class="field" style="margin-top:12px"><span>Maintenance contact (@)</span>
+      <input id="maintContact" type="text" autocomplete="off" placeholder="e.g. @Ahmed or a phone number">
+    </label>
+    <label class="check-row" for="tagMaint">
+      <input id="tagMaint" type="checkbox">
+      <span>Tag maintenance in message</span>
+    </label>
+    <div class="hint">Tip: in WhatsApp, type @ and pick the person to tag them properly</div>
 
     <h2>Crew</h2>
     <div class="grid grid-2">
@@ -252,13 +342,15 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
 
   var THEME_KEY = "matty-forms-theme";
   var STORAGE_KEY = "matty-forms-vehicle-check-v1";
+  var MAINT_KEY = "matty-forms-vehicle-maint";
   var LEVEL_CHIPS = ["Empty", "1/4", "1/2", "3/4", "Full"];
   var FIELD_KEYS = [
-    "project", "callSign", "plateNo", "mulkiyaExp", "currentKm", "nextServiceDue",
+    "dateTime", "project", "callSign", "plateNo", "mulkiyaExp", "currentKm", "nextServiceDue",
     "driver", "passenger", "locationFrom", "locationTo", "securityPass", "airportPass", "ngcGhqPass",
     "ngcBrownPass", "dohLicense", "adblueLevel", "fuelLevel", "note"
   ];
   var MESSAGE_LABELS = [
+    ["dateTime", "Date/Time"],
     ["project", "Project"],
     ["callSign", "Call Sign"],
     ["plateNo", "Plate No"],
@@ -288,7 +380,10 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     var s = {
       messageEdit: "",
       messageDirty: false,
-      mulkiyaBlurred: false
+      mulkiyaBlurred: false,
+      maintContact: "",
+      tagMaint: false,
+      tagMaintManual: false
     };
     FIELD_KEYS.forEach(function (k) { s[k] = ""; });
     return s;
@@ -349,6 +444,138 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     return blurred || text.replace(/\D/g, "").length >= 8;
   }
 
+  function now() {
+    if (typeof clockNow === "function") return clockNow();
+    return new Date();
+  }
+  var clockNow = function () { return new Date(); };
+
+  function startOfDay(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function formatNowDateTime(d) {
+    d = d || now();
+    return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1) + "/" + d.getFullYear() + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  }
+
+  function formatDateTimeDigits(raw) {
+    var digits = String(raw || "").replace(/\D/g, "").slice(0, 12);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return digits.slice(0, 2) + "/" + digits.slice(2);
+    if (digits.length <= 8) return digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4);
+    var date = digits.slice(0, 2) + "/" + digits.slice(2, 4) + "/" + digits.slice(4, 8);
+    var time = digits.slice(8);
+    if (time.length <= 2) return date + " " + time;
+    return date + " " + time.slice(0, 2) + ":" + time.slice(2);
+  }
+
+  function parseDateTime(value) {
+    var match = filled(value).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    var day = Number(match[1]);
+    var month = Number(match[2]);
+    var year = Number(match[3]);
+    var hours = Number(match[4]);
+    var minutes = Number(match[5]);
+    if (hours > 23 || minutes > 59) return null;
+    var d = new Date(year, month - 1, day, hours, minutes);
+    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+    return d;
+  }
+
+  function formatDateTimeForMessage(value) {
+    var text = filled(value);
+    if (!text) return "";
+    var formatted = formatDateTimeDigits(text);
+    if (parseDateTime(formatted)) {
+      var d = parseDateTime(formatted);
+      return formatNowDateTime(d);
+    }
+    return text;
+  }
+
+  function parseMulkiyaDate(value) {
+    var padded = padDateIfValid(value) || padDateIfValid(formatDateDigits(value));
+    if (!padded) return null;
+    var match = padded.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return null;
+    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+  }
+
+  function mulkiyaWarning(value, when) {
+    var exp = parseMulkiyaDate(value);
+    if (!exp) return null;
+    var days = Math.round((startOfDay(exp) - startOfDay(when || now())) / 86400000);
+    if (days < 0) return { kind: "alert", days: days, text: "EXPIRED" };
+    if (days <= 30) {
+      var label = days === 1 ? "Expires in 1 day" : ("Expires in " + days + " days");
+      return { kind: "warn", days: days, text: label };
+    }
+    return null;
+  }
+
+  function parseKm(value) {
+    var text = filled(value).replace(/,/g, "").replace(/\s/g, "");
+    if (!/^\d+(\.\d+)?$/.test(text)) return null;
+    var n = Number(text);
+    return isFinite(n) ? n : null;
+  }
+
+  function serviceStatus(currentValue, dueValue) {
+    var current = parseKm(currentValue);
+    var due = parseKm(dueValue);
+    if (current == null || due == null) return null;
+    var left = due - current;
+    if (left < 0) {
+      var over = current - due;
+      return { kind: "alert", km: over, text: "SERVICE OVERDUE by " + over + " km" };
+    }
+    if (left <= 1000) {
+      return { kind: "warn", km: left, text: "Service due in " + left + " km" };
+    }
+    return null;
+  }
+
+  function setStatusNote(id, status) {
+    var node = el(id);
+    if (!node) return;
+    if (!status) {
+      node.textContent = "";
+      node.classList.add("hidden");
+      node.classList.remove("is-warn", "is-alert");
+      return;
+    }
+    node.textContent = status.text;
+    node.classList.remove("hidden");
+    node.classList.toggle("is-warn", status.kind === "warn");
+    node.classList.toggle("is-alert", status.kind === "alert");
+  }
+
+  function serviceTagLine(opts) {
+    var status = serviceStatus(opts.currentKm, opts.nextServiceDue);
+    if (!opts.tagMaint || !filled(opts.maintContact) || !status) return "";
+    var word = status.kind === "alert" ? "Service overdue" : "Service due";
+    return word + " – " + filled(opts.maintContact) + " please arrange service";
+  }
+
+  function syncTagFromService() {
+    var status = serviceStatus(state.currentKm, state.nextServiceDue);
+    var active = !!(status && (status.kind === "warn" || status.kind === "alert"));
+    if (active) {
+      if (!state.tagMaintManual) state.tagMaint = true;
+    } else {
+      state.tagMaintManual = false;
+    }
+    var box = el("tagMaint");
+    if (box) box.checked = !!state.tagMaint;
+  }
+
+  function syncDateTimeClear() {
+    var btn = el("dateTimeClear");
+    if (btn) btn.hidden = !filled(state.dateTime);
+  }
+
   var SHARE_TITLE = "Ambulance movement";
 
   function buildMessage(opts) {
@@ -357,10 +584,18 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
       var key = pair[0];
       var label = pair[1];
       if (!key) return label + ":";
-      var value = key === "mulkiyaExp" ? formatMulkiyaForMessage(opts[key]) : String(opts[key] || "").trim();
+      var value;
+      if (key === "mulkiyaExp") value = formatMulkiyaForMessage(opts[key]);
+      else if (key === "dateTime") value = formatDateTimeForMessage(opts[key]);
+      else value = String(opts[key] || "").trim();
       return value ? (label + ": " + value) : (label + ":");
     });
     lines.unshift(SHARE_TITLE);
+    var tagLine = serviceTagLine(opts);
+    if (tagLine) {
+      lines.push("");
+      lines.push(tagLine);
+    }
     return lines.join("\n");
   }
 
@@ -391,11 +626,16 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
       if (dateInvalid) hint.classList.remove("hidden");
       else hint.classList.add("hidden");
     }
+    setStatusNote("mulkiyaWarn", dateInvalid ? null : mulkiyaWarning(state.mulkiyaExp));
+    setStatusNote("serviceWarn", serviceStatus(state.currentKm, state.nextServiceDue));
+    syncTagFromService();
+    syncDateTimeClear();
     var msg = generatedMessage();
     if (!state.messageDirty) el("messagePreview").value = msg;
     el("copyFallback").value = state.messageDirty ? state.messageEdit : msg;
     syncChips();
     scheduleSave();
+    scheduleMaintSave();
   }
 
   function bind(id, key) {
@@ -509,6 +749,8 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
       try {
         var data = {};
         FIELD_KEYS.forEach(function (k) { data[k] = state[k]; });
+        data.tagMaint = !!state.tagMaint;
+        data.tagMaintManual = !!state.tagMaintManual;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (err) {}
     }, 250);
@@ -532,12 +774,38 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
         var fromEl = el("locationFrom");
         if (fromEl) fromEl.value = d.location;
       }
+      if (typeof d.tagMaint === "boolean") state.tagMaint = d.tagMaint;
+      if (typeof d.tagMaintManual === "boolean") state.tagMaintManual = d.tagMaintManual;
+      else if (typeof d.tagMaint === "boolean") state.tagMaintManual = true;
+    } catch (err) {}
+  }
+
+  function scheduleMaintSave() {
+    if (!draftReady) return;
+    try {
+      localStorage.setItem(MAINT_KEY, JSON.stringify({ contact: state.maintContact || "" }));
+    } catch (err) {}
+  }
+
+  function restoreMaint() {
+    try {
+      var raw = localStorage.getItem(MAINT_KEY);
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (!d || typeof d !== "object") return;
+      if (typeof d.contact === "string") {
+        state.maintContact = d.contact;
+        var n = el("maintContact");
+        if (n) n.value = d.contact;
+      }
     } catch (err) {}
   }
 
   function resetState() {
+    var contact = state.maintContact;
     var fresh = emptyState();
     Object.keys(fresh).forEach(function (k) { state[k] = fresh[k]; });
+    state.maintContact = contact;
   }
 
   function clearForm() {
@@ -545,12 +813,49 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     try { localStorage.removeItem(STORAGE_KEY); } catch (err) {}
     resetState();
     applyDefaultsToInputs();
+    var contactEl = el("maintContact");
+    if (contactEl) contactEl.value = state.maintContact || "";
+    var tagEl = el("tagMaint");
+    if (tagEl) tagEl.checked = false;
     el("copyMessage").textContent = "Copy message";
     showShareNote("");
     refresh();
   }
 
   FIELD_KEYS.forEach(function (k) { bind(k, k); });
+
+  el("dateTime").addEventListener("input", function () {
+    var formatted = formatDateTimeDigits(el("dateTime").value);
+    if (formatted !== el("dateTime").value) el("dateTime").value = formatted;
+    state.dateTime = el("dateTime").value;
+    touchForm();
+    refresh();
+  });
+  el("dateTimeNow").addEventListener("click", function () {
+    var value = formatNowDateTime(now());
+    el("dateTime").value = value;
+    state.dateTime = value;
+    touchForm();
+    refresh();
+  });
+  el("dateTimeClear").addEventListener("click", function () {
+    el("dateTime").value = "";
+    state.dateTime = "";
+    touchForm();
+    refresh();
+  });
+
+  el("maintContact").addEventListener("input", function () {
+    state.maintContact = el("maintContact").value;
+    touchForm();
+    refresh();
+  });
+  el("tagMaint").addEventListener("change", function () {
+    state.tagMaint = !!el("tagMaint").checked;
+    state.tagMaintManual = true;
+    touchForm();
+    refresh();
+  });
 
   el("mulkiyaExp").addEventListener("input", function () {
     var formatted = normalizeDateInput(el("mulkiyaExp").value);
@@ -601,12 +906,14 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
 
   loadTheme();
   applyDefaultsToInputs();
+  restoreMaint();
   restoreDraft();
   draftReady = true;
 
   window.__vehicleCheck = {
     state: state,
     STORAGE_KEY: STORAGE_KEY,
+    MAINT_KEY: MAINT_KEY,
     FIELD_KEYS: FIELD_KEYS,
     MESSAGE_LABELS: MESSAGE_LABELS,
     SHARE_TITLE: SHARE_TITLE,
@@ -615,15 +922,23 @@ html[data-theme="dark"] .test-banner { background: #f0c36b; color: #3a2d12; }
     generatedMessage: generatedMessage,
     currentMessage: currentMessage,
     formatDateDigits: formatDateDigits,
+    formatDateTimeDigits: formatDateTimeDigits,
+    formatDateTimeForMessage: formatDateTimeForMessage,
+    formatNowDateTime: formatNowDateTime,
     normalizeDateInput: normalizeDateInput,
     padDateIfValid: padDateIfValid,
     formatMulkiyaForMessage: formatMulkiyaForMessage,
     parseDateDDMMYYYY: parseDateDDMMYYYY,
+    mulkiyaWarning: mulkiyaWarning,
+    serviceStatus: serviceStatus,
+    serviceTagLine: serviceTagLine,
+    parseKm: parseKm,
     clearForm: clearForm,
     resetState: resetState,
     refresh: refresh,
     emptyState: emptyState,
-    applyDefaultsToInputs: applyDefaultsToInputs
+    applyDefaultsToInputs: applyDefaultsToInputs,
+    setNow: function (fn) { clockNow = typeof fn === "function" ? fn : function () { return new Date(); }; }
   };
   refresh();
 })();
